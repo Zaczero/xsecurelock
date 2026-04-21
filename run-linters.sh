@@ -25,7 +25,7 @@ if which clang-tidy; then
     -extra-arg=-DGLOBAL_SAVER_EXECUTABLE=\"\" \
     -extra-arg=-DSAVER_EXECUTABLE=\"\" \
     -extra-arg=-DPAM_SERVICE_NAME=\"\" \
-    *.[ch] */*.[ch]
+    ./*.[ch] ./*/*.[ch]
   # Try again with all extensions.
   clang-tidy -checks="$checks" \
     -extra-arg=-I/usr/include/freetype2 \
@@ -44,7 +44,7 @@ if which clang-tidy; then
     -extra-arg=-DHAVE_XRANDR_EXT \
     -extra-arg=-DHAVE_XSCREENSAVER_EXT \
     -extra-arg=-DHAVE_XSYNC_EXT \
-    *.[ch] */*.[ch]
+    ./*.[ch] ./*/*.[ch]
 fi
 
 # CPPCheck.

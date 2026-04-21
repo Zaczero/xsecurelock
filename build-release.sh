@@ -4,7 +4,7 @@ set -ex
 
 thisversion=$(grep '^define(\[thisversion\],\[' configure.ac | cut -d '[' -f 3 | cut -d ']' -f 1)
 nextversion=$(grep '^define(\[nextversion\],\[' configure.ac | cut -d '[' -f 3 | cut -d ']' -f 1)
-if [ x"$thisversion" = x"$nextversion" ]; then
+if [ "$thisversion" = "$nextversion" ]; then
 	echo >&2 "Please bump nextversion in configure.ac first!"
 	echo >&2 "Follow semantic versioning when doing so."
 	echo >&2 "Changes since last version:"
@@ -19,7 +19,7 @@ if git grep "REMOVE IN v${nextversion%%.*}\\>" .; then
 fi
 
 # Are we on master?
-if [ x"$(git rev-parse --abbrev-ref HEAD)" != x'master' ]; then
+if [ "$(git rev-parse --abbrev-ref HEAD)" != 'master' ]; then
 	echo >&2 'Must be on master.'
 	exit 1
 fi
@@ -37,7 +37,7 @@ sh autogen.sh
 ./config.status --recheck || ./configure --with-pam-service-name=common-auth
 make clean
 rm -f version.c
-make dist GIT_VERSION=v$nextversion
+make dist GIT_VERSION="v$nextversion"
 ls -l "$tarball"
 
 # Extra stuff added by "make dist".
@@ -80,11 +80,11 @@ git_only=$(
 	} | sort | uniq -u
 )
 if [ -n "$tar_only" ]; then
-	echo >&2 "tar only: " $tar_only
+	echo >&2 "tar only: $tar_only"
 	exit 1
 fi
 if [ -n "$git_only" ]; then
-	echo >&2 "git only: " $git_only
+	echo >&2 "git only: $git_only"
 	exit 1
 fi
 
@@ -95,7 +95,7 @@ cd "$tardir"
 grep "$nextversion" version.c
 ./configure --with-pam-service-name=common-auth
 make
-make install DESTDIR=$PWD/tmp
+make install DESTDIR="$PWD"/tmp
 find tmp
 cd ..
 rm -rf "$tardir"
