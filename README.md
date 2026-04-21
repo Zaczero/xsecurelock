@@ -268,14 +268,17 @@ Options to XSecureLock can be passed by environment variables:
 *   `XSECURELOCK_BACKGROUND_COLOR`: specifies the X11 color (see manpage
     of XParseColor) for the background of the main and saver windows.
 *   `XSECURELOCK_BLANK_TIMEOUT`: specifies the time (in seconds) before telling
-    X11 to fully blank the screen; a negative value disables X11 blanking. The
-    time is measured since the closing of the auth window or xsecurelock
-    startup. Setting this to 0 is rather nonsensical, as key-release events
-    (e.g. from the keystroke to launch xsecurelock or from pressing escape to
-    close the auth dialog) always wake up the screen.
+    X11 to fully blank the screen; a negative value disables xsecurelock-managed
+    blanking. The time is measured since the closing of the auth window or
+    xsecurelock startup. Setting this to 0 is rather nonsensical, as
+    key-release events (e.g. from the keystroke to launch xsecurelock or from
+    pressing escape to close the auth dialog) always wake up the screen. Set
+    this to `-1` if you want external DPMS or screen saver policy to control
+    blanking timing instead of xsecurelock.
 *   `XSECURELOCK_BLANK_DPMS_STATE`: specifies which DPMS state to put the screen
-    in when blanking (one of standby, suspend, off and on, where "on" means to
-    not invoke DPMS at all).
+    in when xsecurelock performs blanking (one of standby, suspend, off and on,
+    where "on" means to not invoke DPMS at all). This setting only matters when
+    `XSECURELOCK_BLANK_TIMEOUT` is nonnegative.
 *   `XSECURELOCK_BURNIN_MITIGATION`: specifies the number of pixels the prompt
     of `auth_x11` may be moved at startup to mitigate possible burn-in
     effects due to the auth dialog being displayed all the time (e.g. when
@@ -456,7 +459,8 @@ Options to XSecureLock can be passed by environment variables:
     children process and before mapping windows to let children be
     ready to display and reduce the black flash.
 *   `XSECURELOCK_SAVER_STOP_ON_BLANK`: specifies if saver is stopped
-    when screen is blanked (DPMS or XSS) to save power.
+    when screen is blanked (DPMS or XSS) to save power. This only controls the
+    saver child; it does not change who decides when blanking happens.
 *   `XSECURELOCK_XSCREENSAVER_PATH`: Location where XScreenSaver hacks are
     installed for use by `saver_xscreensaver`.
 
