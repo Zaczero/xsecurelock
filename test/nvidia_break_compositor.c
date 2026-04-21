@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <unistd.h>
 
-int main() {
+int main(void) {
   Display *display = XOpenDisplay(NULL);
   if (display == NULL) {
     fprintf(stderr, "Could not connect to $DISPLAY.\n");

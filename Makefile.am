@@ -92,6 +92,7 @@ until_nonidle_SOURCES = \
 	env_settings.c env_settings.h \
 	helpers/until_nonidle.c \
 	logging.c logging.h \
+	util.c util.h \
 	wait_pgrp.c wait_pgrp.h
 endif
 

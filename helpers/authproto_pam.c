@@ -58,7 +58,8 @@ static int ReadPromptResponse(char expected_type, char **response) {
  * \return The PAM status (PAM_SUCCESS in case of success, or anything else in
  *   case of error).
  */
-int ConverseOne(const struct pam_message *msg, struct pam_response *resp) {
+static int ConverseOne(const struct pam_message *msg,
+                       struct pam_response *resp) {
   resp->resp = NULL;
   resp->resp_retcode = 0;  // Unused but should be set to zero.
   switch (msg->msg_style) {
@@ -90,8 +91,8 @@ int ConverseOne(const struct pam_message *msg, struct pam_response *resp) {
  * \return The PAM status (PAM_SUCCESS in case of success, or anything else in
  *   case of error).
  */
-int Converse(int num_msg, const struct pam_message **msg,
-             struct pam_response **resp, void *appdata_ptr) {
+static int Converse(int num_msg, const struct pam_message **msg,
+                    struct pam_response **resp, void *appdata_ptr) {
   (void)appdata_ptr;
   *resp = NULL;
 
@@ -136,8 +137,8 @@ int Converse(int num_msg, const struct pam_message **msg,
 
 /*! \brief Perform a single PAM operation with retrying logic.
  */
-int CallPAMWithRetries(int (*pam_call)(pam_handle_t *, int), pam_handle_t *pam,
-                       int flags) {
+static int CallPAMWithRetries(int (*pam_call)(pam_handle_t *, int),
+                              pam_handle_t *pam, int flags) {
   int attempt = 0;
   for (;;) {
     conv_error = 0;
@@ -171,7 +172,7 @@ int CallPAMWithRetries(int (*pam_call)(pam_handle_t *, int), pam_handle_t *pam,
  * \return The PAM status (PAM_SUCCESS after successful authentication, or
  *   anything else in case of error).
  */
-int Authenticate(struct pam_conv *conv, pam_handle_t **pam) {
+static int Authenticate(struct pam_conv *conv, pam_handle_t **pam) {
   const char *service_name =
       GetStringSetting("XSECURELOCK_PAM_SERVICE", PAM_SERVICE_NAME);
   if (strchr(service_name, '/')) {
@@ -269,7 +270,7 @@ int Authenticate(struct pam_conv *conv, pam_handle_t **pam) {
  *
  * \return 0 if authentication successful, anything else otherwise.
  */
-int main() {
+int main(void) {
   setlocale(LC_CTYPE, "");
 
   struct pam_conv conv;

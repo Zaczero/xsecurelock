@@ -30,7 +30,7 @@ limitations under the License.
 #include <stdlib.h>
 #include <unistd.h>
 
-int main() {
+int main(void) {
   for (;;) {
     pause();
   }

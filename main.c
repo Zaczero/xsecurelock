@@ -130,52 +130,52 @@ struct {
   int len;
 } priv;
 //! The name of the auth child to execute, relative to HELPER_PATH.
-const char *auth_executable;
+static const char *auth_executable;
 //! The name of the saver child to execute, relative to HELPER_PATH.
-const char *saver_executable;
+static const char *saver_executable;
 //! The command to run once screen locking is complete.
-char *const *notify_command = NULL;
+static char *const *notify_command = NULL;
 #ifdef HAVE_XCOMPOSITE_EXT
 //! Do not use XComposite to cover transparent notifications.
-int no_composite = 0;
+static int no_composite = 0;
 //! Create an almost-fullscreen sized "obscurer window" against bad compositors.
-int composite_obscurer = 0;
+static int composite_obscurer = 0;
 #endif
 //! If set, we can start a new login session.
-int have_switch_user_command = 0;
+static int have_switch_user_command = 0;
 //! If set, we try to force grabbing by "evil" means.
-int force_grab = 0;
+static int force_grab = 0;
 //! If set, print window info about any "conflicting" windows to stderr.
-int debug_window_info = 0;
+static int debug_window_info = 0;
 //! If nonnegative, the time in seconds till we blank the screen explicitly.
-int blank_timeout = -1;
+static int blank_timeout = -1;
 //! The DPMS state to switch the screen to when blanking.
-const char *blank_dpms_state = "off";
+static const char *blank_dpms_state = "off";
 //! Whether to reset the saver module when auth closes.
-int saver_reset_on_auth_close = 0;
+static int saver_reset_on_auth_close = 0;
 //! Delay we should wait before starting mapping windows to let children run.
-int saver_delay_ms = 0;
+static int saver_delay_ms = 0;
 //! Whetever stopping saver when screen is blanked.
-int saver_stop_on_blank = 0;
+static int saver_stop_on_blank = 0;
 
 //! The PID of a currently running notify command, or 0 if none is running.
-pid_t notify_command_pid = 0;
+static pid_t notify_command_pid = 0;
 
 //! The time when we will blank the screen.
-int64_t time_to_blank_ms;
+static int64_t time_to_blank_ms;
 
 //! Whether the screen is currently blanked by us.
-int blanked = 0;
+static int blanked = 0;
 
 #ifdef HAVE_DPMS_EXT
 //! Whether DPMS needs to be disabled when unblanking. Set when blanking.
-int must_disable_dpms = 0;
+static int must_disable_dpms = 0;
 #endif
 
 //! If set by signal handler we should wake up and prompt for auth.
 static volatile sig_atomic_t signal_wakeup = 0;
 
-void ResetBlankScreenTimer(void) {
+static void ResetBlankScreenTimer(void) {
   if (blank_timeout < 0) {
     return;
   }
@@ -186,7 +186,7 @@ void ResetBlankScreenTimer(void) {
   time_to_blank_ms += (int64_t)blank_timeout * 1000;
 }
 
-void InitBlankScreen(void) {
+static void InitBlankScreen(void) {
   if (blank_timeout < 0) {
     return;
   }
@@ -194,7 +194,7 @@ void InitBlankScreen(void) {
   ResetBlankScreenTimer();
 }
 
-void MaybeBlankScreen(Display *display) {
+static void MaybeBlankScreen(Display *display) {
   if (blank_timeout < 0 || blanked) {
     return;
   }
@@ -245,7 +245,7 @@ done:
   XFlush(display);
 }
 
-void ScreenNoLongerBlanked(Display *display) {
+static void ScreenNoLongerBlanked(Display *display) {
 #ifdef HAVE_DPMS_EXT
   if (must_disable_dpms) {
     DPMSDisable(display);
@@ -258,7 +258,7 @@ void ScreenNoLongerBlanked(Display *display) {
   blanked = 0;
 }
 
-void UnblankScreen(Display *display) {
+static void UnblankScreen(Display *display) {
   if (blanked) {
     XForceScreenSaver(display, ScreenSaverReset);
     ScreenNoLongerBlanked(display);
@@ -305,8 +305,9 @@ enum WatchChildrenState {
  * \param stdinbuf Key presses to send to the auth child, if set.
  * \return If true, authentication was successful and the program should exit.
  */
-int WatchChildren(Display *dpy, Window auth_win, Window saver_win,
-                  enum WatchChildrenState state, const char *stdinbuf) {
+static int WatchChildren(Display *dpy, Window auth_win, Window saver_win,
+                         enum WatchChildrenState state,
+                         const char *stdinbuf) {
   int want_auth = WantAuthChild(state == WATCH_CHILDREN_FORCE_AUTH);
   int auth_running = 0;
 
@@ -354,8 +355,8 @@ int WatchChildren(Display *dpy, Window auth_win, Window saver_win,
  *
  * \return If true, authentication was successful, and the program should exit.
  */
-int WakeUp(Display *dpy, Window auth_win, Window saver_win,
-           const char *stdinbuf) {
+static int WakeUp(Display *dpy, Window auth_win, Window saver_win,
+                  const char *stdinbuf) {
   return WatchChildren(dpy, auth_win, saver_win, WATCH_CHILDREN_FORCE_AUTH,
                        stdinbuf);
 }
@@ -364,7 +365,7 @@ int WakeUp(Display *dpy, Window auth_win, Window saver_win,
  *
  * This is used to prevent X11 errors from terminating XSecureLock.
  */
-int JustLogErrorsHandler(Display *display, XErrorEvent *error) {
+static int JustLogErrorsHandler(Display *display, XErrorEvent *error) {
   char buf[128];
   XGetErrorText(display, error->error_code, buf, sizeof(buf));
   buf[sizeof(buf) - 1] = 0;
@@ -376,7 +377,7 @@ int JustLogErrorsHandler(Display *display, XErrorEvent *error) {
  *
  * This is used for calls where we expect errors to happen.
  */
-int SilentlyIgnoreErrorsHandler(Display *display, XErrorEvent *error) {
+static int SilentlyIgnoreErrorsHandler(Display *display, XErrorEvent *error) {
   (void)display;
   (void)error;
   return 0;
@@ -384,7 +385,7 @@ int SilentlyIgnoreErrorsHandler(Display *display, XErrorEvent *error) {
 
 /*! \brief Print a version message.
  */
-void Version(void) {
+static void Version(void) {
   printf("XSecureLock - X11 screen lock utility designed for security.\n");
   if (*git_version) {
     printf("Version: %s\n", git_version);
@@ -399,7 +400,7 @@ void Version(void) {
  *
  * \param me The name this executable was invoked as.
  */
-void Usage(const char *me) {
+static void Usage(const char *me) {
   Version();
   printf(
       "\n"
@@ -431,7 +432,7 @@ void Usage(const char *me) {
  *
  * These settings override what was figured out at ./configure time.
  */
-void LoadDefaults() {
+static void LoadDefaults(void) {
   auth_executable =
       GetExecutablePathSetting("XSECURELOCK_AUTH", AUTH_EXECUTABLE, 1);
   saver_executable = GetExecutablePathSetting("XSECURELOCK_GLOBAL_SAVER",
@@ -462,7 +463,7 @@ void LoadDefaults() {
  *
  * Possible errors will be printed on stderr.
  */
-void ParseArgumentsOrExit(int argc, char **argv) {
+static void ParseArgumentsOrExit(int argc, char **argv) {
   for (int i = 1; i < argc; ++i) {
     if (!strncmp(argv[i], "auth_", 5)) {
       Log("Setting auth child name from command line is DEPRECATED. Use "
@@ -505,7 +506,7 @@ void ParseArgumentsOrExit(int argc, char **argv) {
  *
  * \return true if everything is OK, false otherwise.
  */
-int CheckSettings() {
+static int CheckSettings(void) {
   // Flawfinder note: the access() calls here are not security relevant and just
   // prevent accidentally running with a nonexisting saver or auth executable as
   // that could make the system un-unlockable.
@@ -527,7 +528,7 @@ int CheckSettings() {
  *
  * Spammy.
  */
-void DebugDumpWindowInfo(Window w) {
+static void DebugDumpWindowInfo(Window w) {
   if (!debug_window_info) {
     return;
   }
@@ -555,7 +556,8 @@ void DebugDumpWindowInfo(Window w) {
  *   covers us. Set this only if confident that there is something overlapping
  *   us, like in response to a negative VisibilityNotify.
  */
-void MaybeRaiseWindow(Display *display, Window w, int silent, int force) {
+static void MaybeRaiseWindow(Display *display, Window w, int silent,
+                             int force) {
   int need_raise = force;
   Window root, parent;
   Window *children, *siblings;
@@ -606,7 +608,7 @@ typedef struct {
   int silent;
 } AcquireGrabsState;
 
-int TryAcquireGrabs(Window w, void *state_voidp) {
+static int TryAcquireGrabs(Window w, void *state_voidp) {
   AcquireGrabsState *state = state_voidp;
   int ok = 1;
   if (XGrabPointer(state->display, state->root_window, False,
@@ -643,9 +645,10 @@ int TryAcquireGrabs(Window w, void *state_voidp) {
  * very likely interfere strongly with window managers. \return true if grabbing
  * succeeded, false otherwise.
  */
-int AcquireGrabs(Display *display, Window root_window, Window *ignored_windows,
-                 unsigned int n_ignored_windows, Cursor cursor, int silent,
-                 int force) {
+static int AcquireGrabs(Display *display, Window root_window,
+                        Window *ignored_windows,
+                        unsigned int n_ignored_windows, Cursor cursor,
+                        int silent, int force) {
   AcquireGrabsState grab_state;
   grab_state.display = display;
   grab_state.root_window = root_window;
@@ -688,7 +691,7 @@ int AcquireGrabs(Display *display, Window root_window, Window *ignored_windows,
  *
  * \param fd The file descriptor of the X11 connection that we shouldn't close.
  */
-void NotifyOfLock(int xss_sleep_lock_fd) {
+static void NotifyOfLock(int xss_sleep_lock_fd) {
   if (xss_sleep_lock_fd != -1) {
     if (close(xss_sleep_lock_fd) != 0) {
       LogErrno("close(XSS_SLEEP_LOCK_FD)");
@@ -710,7 +713,7 @@ void NotifyOfLock(int xss_sleep_lock_fd) {
   }
 }
 
-int CheckLockingEffectiveness() {
+static int CheckLockingEffectiveness(void) {
   // When this variable is set, all checks in here are still evaluated but we
   // try locking anyway.
   int error_status = 0;

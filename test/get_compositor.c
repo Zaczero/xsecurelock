@@ -4,7 +4,7 @@
 #include <stdio.h>                      // for printf, snprintf, fflush, stdout
 #include <stdlib.h>                     // for system
 
-void DumpWindow(const char *title, Window w) {
+static void DumpWindow(const char *title, Window w) {
   printf("# %s window = %#llx\n", title, (unsigned long long)w);
   if (w == None) {
     return;
@@ -41,7 +41,7 @@ void DumpWindow(const char *title, Window w) {
   }
 }
 
-int main() {
+int main(void) {
   Display *display = XOpenDisplay(NULL);
   if (display == NULL) {
     fprintf(stderr, "Could not connect to $DISPLAY.\n");

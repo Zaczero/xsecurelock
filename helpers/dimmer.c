@@ -38,7 +38,7 @@ limitations under the License.
 #include "../wm_properties.h"  // for SetWMProperties
 
 // Get the entry of value index of the Bayer matrix for n = 2^power.
-void Bayer(int index, int power, int *x, int *y) {
+static void Bayer(int index, int power, int *x, int *y) {
   // M_1 = [1].
   if (power == 0) {
     *x = 0;
@@ -73,7 +73,7 @@ void Bayer(int index, int power, int *x, int *y) {
   }
 }
 
-int HaveCompositor(Display *display) {
+static int HaveCompositor(Display *display) {
   char buf[64];
   int buflen =
       snprintf(buf, sizeof(buf), "_NET_WM_CM_S%d", (int)DefaultScreen(display));
@@ -85,12 +85,12 @@ int HaveCompositor(Display *display) {
   return XGetSelectionOwner(display, atom) != None;
 }
 
-int dim_time_ms;
-int wait_time_ms;
-double dim_fps;
-double dim_alpha;
+static int dim_time_ms;
+static int wait_time_ms;
+static double dim_fps;
+static double dim_alpha;
 
-XColor dim_color;
+static XColor dim_color;
 
 struct DimEffect {
   void (*PreCreateWindow)(void *self, Display *display,
@@ -114,17 +114,18 @@ struct DitherEffect {
   GC dim_gc, pattern_gc;
 };
 
-void DitherEffectPreCreateWindow(void *unused_self, Display *unused_display,
-                                 XSetWindowAttributes *unused_dimattrs,
-                                 unsigned long *unused_dimmask) {
+static void DitherEffectPreCreateWindow(void *unused_self,
+                                        Display *unused_display,
+                                        XSetWindowAttributes *unused_dimattrs,
+                                        unsigned long *unused_dimmask) {
   (void)unused_self;
   (void)unused_display;
   (void)unused_dimattrs;
   *unused_dimmask = *unused_dimmask;  // Shut up clang-analyzer.
 }
 
-void DitherEffectPostCreateWindow(void *self, Display *display,
-                                  Window dim_window) {
+static void DitherEffectPostCreateWindow(void *self, Display *display,
+                                         Window dim_window) {
   struct DitherEffect *dimmer = self;
 
   // Create a pixmap to define the pattern we want to set as the window shape.
@@ -148,8 +149,8 @@ void DitherEffectPostCreateWindow(void *self, Display *display,
                 &dimmer->gc_values);
 }
 
-void DitherEffectDrawFrame(void *self, Display *display, Window dim_window,
-                           int frame, int w, int h) {
+static void DitherEffectDrawFrame(void *self, Display *display,
+                                  Window dim_window, int frame, int w, int h) {
   struct DitherEffect *dimmer = self;
 
   // Move the pattern forward to the next display frame. One display frame can
@@ -186,7 +187,8 @@ void DitherEffectDrawFrame(void *self, Display *display, Window dim_window,
   }
 }
 
-void DitherEffectInit(struct DitherEffect *dimmer, Display *unused_display) {
+static void DitherEffectInit(struct DitherEffect *dimmer,
+                             Display *unused_display) {
   (void)unused_display;
 
   // Ensure dimming at least at a defined frame rate.
@@ -227,9 +229,10 @@ struct OpacityEffect {
   double dim_color_brightness;
 };
 
-void OpacityEffectPreCreateWindow(void *unused_self, Display *unused_display,
-                                  XSetWindowAttributes *dimattrs,
-                                  unsigned long *dimmask) {
+static void OpacityEffectPreCreateWindow(void *unused_self,
+                                         Display *unused_display,
+                                         XSetWindowAttributes *dimattrs,
+                                         unsigned long *dimmask) {
   (void)unused_self;
   (void)unused_display;
 
@@ -237,8 +240,8 @@ void OpacityEffectPreCreateWindow(void *unused_self, Display *unused_display,
   *dimmask |= CWBackPixel;
 }
 
-void OpacityEffectPostCreateWindow(void *self, Display *display,
-                                   Window dim_window) {
+static void OpacityEffectPostCreateWindow(void *self, Display *display,
+                                          Window dim_window) {
   struct OpacityEffect *dimmer = self;
 
   long value = 0;
@@ -246,17 +249,18 @@ void OpacityEffectPostCreateWindow(void *self, Display *display,
                   PropModeReplace, (unsigned char *)&value, 1);
 }
 
-double sRGBToLinear(double value) {
+static double sRGBToLinear(double value) {
   return (value <= 0.04045) ? value / 12.92 : pow((value + 0.055) / 1.055, 2.4);
 }
 
-double LinearTosRGB(double value) {
+static double LinearTosRGB(double value) {
   return (value <= 0.0031308) ? 12.92 * value
                               : 1.055 * pow(value, 1.0 / 2.4) - 0.055;
 }
 
-void OpacityEffectDrawFrame(void *self, Display *display, Window dim_window,
-                            int frame, int unused_w, int unused_h) {
+static void OpacityEffectDrawFrame(void *self, Display *display,
+                                   Window dim_window, int frame, int unused_w,
+                                   int unused_h) {
   struct OpacityEffect *dimmer = self;
   (void)unused_w;
   (void)unused_h;
@@ -289,7 +293,7 @@ void OpacityEffectDrawFrame(void *self, Display *display, Window dim_window,
   XFlush(display);
 }
 
-void OpacityEffectInit(struct OpacityEffect *dimmer, Display *display) {
+static void OpacityEffectInit(struct OpacityEffect *dimmer, Display *display) {
   dimmer->property_atom = XInternAtom(display, "_NET_WM_WINDOW_OPACITY", False);
   dimmer->dim_color_brightness =
       sRGBToLinear(dim_color.red / 65535.0) * 0.2126 +

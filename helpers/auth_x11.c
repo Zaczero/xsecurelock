@@ -70,19 +70,19 @@ limitations under the License.
 #endif
 
 //! Number of args.
-int argc;
+static int argc;
 
 //! Args.
-char *const *argv;
+static char *const *argv;
 
 //! The authproto helper to use.
-const char *authproto_executable;
+static const char *authproto_executable;
 
 //! The blinking interval in microseconds.
 #define BLINK_INTERVAL (250 * 1000)
 
 //! The maximum time to wait at a prompt for user input in seconds.
-int prompt_timeout;
+static int prompt_timeout;
 
 //! Length of the "paranoid password display".
 #define PARANOID_PASSWORD_LENGTH (1 << DISCO_PASSWORD_DANCERS)
@@ -112,7 +112,7 @@ enum PasswordPrompt {
 
   PASSWORD_PROMPT_COUNT,
 };
-const char *PasswordPromptStrings[] = {
+static const char *const PasswordPromptStrings[] = {
     /* PASSWORD_PROMPT_CURSOR= */ "cursor",
     /* PASSWORD_PROMPT_ASTERISKS= */ "asterisks",
     /* PASSWORD_PROMPT_HIDDEN= */ "hidden",
@@ -126,13 +126,13 @@ const char *PasswordPromptStrings[] = {
 #endif
 };
 
-enum PasswordPrompt password_prompt;
+static enum PasswordPrompt password_prompt;
 
 // Emoji to display in emoji mode. The length of the array must be equal to
 // PARANOID_PASSWORD_LENGTH. List taken from the top items in
 // http://emojitracker.com/ The first item is always display in an empty prompt
 // (before typing in the password)
-const char *emoji[] = {
+static const char *const emoji[] = {
     "_____", "😂", "❤", "♻", "😍", "♥", "😭", "😊", "😒", "💕", "😘",
     "😩",     "☺", "👌", "😔", "😁", "😏", "😉", "👍", "⬅", "😅", "🙏",
     "😌",     "😢", "👀", "💔", "😎", "🎶", "💙", "💜", "🙌", "😳",
@@ -143,7 +143,7 @@ STATIC_ASSERT(sizeof(emoji) / sizeof(*emoji) == PARANOID_PASSWORD_LENGTH,
 // Emoticons to display in emoji mode. The length of the array must be equal to
 // PARANOID_PASSWORD_LENGTH. The first item is always display in an empty prompt
 // (before typing in the password)
-const char *emoticons[] = {
+static const char *const emoticons[] = {
     ":-)",  ":-p", ":-O", ":-\\", "(-:",  "d-:", "O-:", "/-:",
     "8-)",  "8-p", "8-O", "8-\\", "(-8",  "d-8", "O-8", "/-8",
     "X-)",  "X-p", "X-O", "X-\\", "(-X",  "d-X", "O-X", "/-X",
@@ -156,7 +156,7 @@ STATIC_ASSERT(sizeof(emoticons) / sizeof(*emoticons) ==
 // Kaomoji to display in kaomoji mode. The length of the array must be equal to
 // PARANOID_PASSWORD_LENGTH. The first item is always display in an empty prompt
 // (before typing in the password)
-const char *kaomoji[] = {
+static const char *const kaomoji[] = {
     "(͡°͜ʖ͡°)",     "(>_<)",       "O_ם",      "(^_-)",        "o_0",
     "o.O",       "0_o",         "O.o",      "(°o°)",        "^m^",
     "^_^",       "((d[-_-]b))", "┏(･o･)┛",  "┗(･o･)┓",      "（ﾟДﾟ)",
@@ -169,56 +169,56 @@ STATIC_ASSERT(sizeof(kaomoji) / sizeof(*kaomoji) == PARANOID_PASSWORD_LENGTH,
               "Kaomoji array size must be equal to PARANOID_PASSWORD_LENGTH");
 
 //! If set, we can start a new login session.
-int have_switch_user_command;
+static int have_switch_user_command;
 
 //! If set, the prompt will be fixed by <username>@.
-int show_username;
+static int show_username;
 
 //! If set, the prompt will be fixed by <hostname>. If >1, the hostname will be
 // shown in full and not cut at the first dot.
-int show_hostname;
+static int show_hostname;
 
 //! If set, data and time will be shown.
-int show_datetime;
+static int show_datetime;
 
 //! The date format to display.
-const char *datetime_format = "%c";
+static const char *datetime_format = "%c";
 
 //! The local hostname.
-char hostname[256];
+static char hostname[256];
 
 //! The username to authenticate as.
-char username[256];
+static char username[256];
 
 //! The X11 display.
-Display *display;
+static Display *display;
 
 //! The X11 window provided by main. Provided from $XSCREENSAVER_WINDOW.
-Window main_window;
+static Window main_window;
 
 //! main_window's parent. Used to create per-monitor siblings.
-Window parent_window;
+static Window parent_window;
 
 //! The X11 core font for the PAM messages.
-XFontStruct *core_font;
+static XFontStruct *core_font;
 
 #ifdef HAVE_XFT_EXT
 //! The Xft font for the PAM messages.
-XftColor xft_color_foreground;
-XftColor xft_color_warning;
-XftFont *xft_font;
-int xft_color_foreground_allocated = 0;
-int xft_color_warning_allocated = 0;
+static XftColor xft_color_foreground;
+static XftColor xft_color_warning;
+static XftFont *xft_font;
+static int xft_color_foreground_allocated = 0;
+static int xft_color_warning_allocated = 0;
 #endif
 
 //! The background color.
-XColor xcolor_background;
+static XColor xcolor_background;
 
 //! The foreground color.
-XColor xcolor_foreground;
+static XColor xcolor_foreground;
 
 //! The warning color (used as foreground).
-XColor xcolor_warning;
+static XColor xcolor_warning;
 
 //! The cursor character displayed at the end of the masked password input.
 static const char cursor[] = "_";
@@ -262,39 +262,39 @@ static int auth_y_position = 50;
 static int single_auth_window = 0;
 
 //! If set, we need to re-query monitor data and adjust windows.
-int per_monitor_windows_dirty = 1;
+static int per_monitor_windows_dirty = 1;
 
 #ifdef HAVE_XKB_EXT
 //! If set, we show Xkb keyboard layout name.
-int show_keyboard_layout = 1;
+static int show_keyboard_layout = 1;
 //! If set, we show Xkb lock/latch status rather than Xkb indicators.
-int show_locks_and_latches = 0;
+static int show_locks_and_latches = 0;
 #endif
 
 #define MAIN_WINDOW 0
 #define MAX_WINDOWS 16
 
 //! The number of active X11 per-monitor windows.
-size_t num_windows = 0;
+static size_t num_windows = 0;
 
 //! The X11 per-monitor windows to draw on.
-Window windows[MAX_WINDOWS];
+static Window windows[MAX_WINDOWS];
 
 //! The last known geometry for each per-monitor window.
-Rect window_rects[MAX_WINDOWS];
+static Rect window_rects[MAX_WINDOWS];
 
 //! The X11 graphics contexts to draw with.
-GC gcs[MAX_WINDOWS];
+static GC gcs[MAX_WINDOWS];
 
 //! The X11 graphics contexts to draw warnings with.
-GC gcs_warning[MAX_WINDOWS];
+static GC gcs_warning[MAX_WINDOWS];
 
 #ifdef HAVE_XFT_EXT
 //! The Xft draw contexts to draw with.
-XftDraw *xft_draws[MAX_WINDOWS];
+static XftDraw *xft_draws[MAX_WINDOWS];
 #endif
 
-int have_xkb_ext;
+static int have_xkb_ext;
 
 static void FreeKeyboardDescription(XkbDescPtr *xkb) {
 #ifdef HAVE_XKB_EXT
@@ -419,7 +419,7 @@ enum Sound { SOUND_PROMPT, SOUND_INFO, SOUND_ERROR, SOUND_SUCCESS };
 #define NOTE_E4 330
 #define NOTE_B4 494
 #define NOTE_E5 659
-int sounds[][2] = {
+static const int sounds[][2] = {
     /* SOUND_PROMPT=  */ {NOTE_B4, NOTE_E5},   // V|I I
     /* SOUND_INFO=    */ {NOTE_E5, NOTE_E5},   // I 2x
     /* SOUND_ERROR=   */ {NOTE_A3, NOTE_DS3},  // V7 2x
@@ -430,7 +430,7 @@ int sounds[][2] = {
 
 /*! \brief Play a sound sequence.
  */
-void PlaySound(enum Sound snd) {
+static void PlaySound(enum Sound snd) {
   XKeyboardState state;
   XKeyboardControl control;
   struct timespec sleeptime;
@@ -473,7 +473,7 @@ void PlaySound(enum Sound snd) {
 
 /*! \brief Switch to the next keyboard layout.
  */
-void SwitchKeyboardLayout(void) {
+static void SwitchKeyboardLayout(void) {
 #ifdef HAVE_XKB_EXT
   if (!have_xkb_ext) {
     return;
@@ -510,7 +510,7 @@ void SwitchKeyboardLayout(void) {
  *
  * \return The current modifier mask as a string.
  */
-const char *GetIndicators(int *warning, int *have_multiple_layouts) {
+static const char *GetIndicators(int *warning, int *have_multiple_layouts) {
 #ifdef HAVE_XKB_EXT
   static char buf[128];
 
@@ -659,7 +659,7 @@ static void CleanupPerMonitorWindow(size_t i) {
   windows[i] = None;
 }
 
-void DestroyPerMonitorWindows(size_t keep_windows) {
+static void DestroyPerMonitorWindows(size_t keep_windows) {
   for (size_t i = keep_windows; i < num_windows; ++i) {
     CleanupPerMonitorWindow(i);
   }
@@ -678,8 +678,9 @@ static void ClearWindowUncoveredAreas(size_t i, Rect new_rect) {
   }
 }
 
-int CreateOrUpdatePerMonitorWindow(size_t i, const Monitor *monitor, int region_w,
-                                   int region_h, int x_offset, int y_offset) {
+static int CreateOrUpdatePerMonitorWindow(size_t i, const Monitor *monitor,
+                                          int region_w, int region_h,
+                                          int x_offset, int y_offset) {
   // Desired box.
   int w = region_w;
   int h = region_h;
@@ -791,8 +792,8 @@ int CreateOrUpdatePerMonitorWindow(size_t i, const Monitor *monitor, int region_
   return 1;
 }
 
-int UpdatePerMonitorWindows(int monitors_changed, int region_w, int region_h,
-                            int x_offset, int y_offset) {
+static int UpdatePerMonitorWindows(int monitors_changed, int region_w,
+                                   int region_h, int x_offset, int y_offset) {
   static size_t num_monitors = 0;
   static Monitor monitors[MAX_WINDOWS];
 
@@ -852,7 +853,7 @@ int UpdatePerMonitorWindows(int monitors_changed, int region_w, int region_h,
   return 1;
 }
 
-int TextAscent(void) {
+static int TextAscent(void) {
 #ifdef HAVE_XFT_EXT
   if (xft_font != NULL) {
     return xft_font->ascent;
@@ -861,7 +862,7 @@ int TextAscent(void) {
   return core_font->max_bounds.ascent;
 }
 
-int TextDescent(void) {
+static int TextDescent(void) {
 #ifdef HAVE_XFT_EXT
   if (xft_font != NULL) {
     return xft_font->descent;
@@ -873,7 +874,7 @@ int TextDescent(void) {
 #ifdef HAVE_XFT_EXT
 // Returns the amount of pixels to expand the logical box in extents so it
 // covers the visible box.
-int XGlyphInfoExpandAmount(XGlyphInfo *extents) {
+static int XGlyphInfoExpandAmount(XGlyphInfo *extents) {
   // Use whichever is larger - visible bounding box (bigger if font is italic)
   // or spacing to next character (bigger if last character is a space).
   // Best reference I could find:
@@ -891,7 +892,7 @@ int XGlyphInfoExpandAmount(XGlyphInfo *extents) {
 }
 #endif
 
-int TextWidth(const char *string, int len) {
+static int TextWidth(const char *string, int len) {
 #ifdef HAVE_XFT_EXT
   if (xft_font != NULL) {
     XGlyphInfo extents;
@@ -903,8 +904,8 @@ int TextWidth(const char *string, int len) {
   return XTextWidth(core_font, string, len);
 }
 
-void DrawString(int monitor, int x, int y, int is_warning, const char *string,
-                int len) {
+static void DrawString(int monitor, int x, int y, int is_warning,
+                       const char *string, int len) {
 #ifdef HAVE_XFT_EXT
   if (xft_font != NULL) {
     // HACK: Query text extents here to make the text fit into the specified
@@ -941,8 +942,8 @@ static void DrawDialogBorder(size_t window_index, int region_w, int region_h) {
                  region_h - auth_border_size - 1);
 }
 
-void StrAppend(char **output, size_t *output_size, const char *input,
-               size_t input_size) {
+static void StrAppend(char **output, size_t *output_size, const char *input,
+                      size_t input_size) {
   if (*output_size <= input_size) {
     // Cut the input off. Sorry.
     input_size = *output_size - 1;
@@ -952,7 +953,7 @@ void StrAppend(char **output, size_t *output_size, const char *input,
   *output_size -= input_size;
 }
 
-void BuildTitle(char *output, size_t output_size, const char *input) {
+static void BuildTitle(char *output, size_t output_size, const char *input) {
   if (show_username) {
     size_t username_len = strlen(username);
     StrAppend(&output, &output_size, username, username_len);
@@ -989,7 +990,7 @@ void BuildTitle(char *output, size_t output_size, const char *input) {
  * \param str The message itself.
  * \param is_warning Whether to use the warning style to display the message.
  */
-int DisplayMessage(const char *title, const char *str, int is_warning) {
+static int DisplayMessage(const char *title, const char *str, int is_warning) {
   char full_title[256];
   BuildTitle(full_title, sizeof(full_title), title);
 
@@ -1122,7 +1123,7 @@ int DisplayMessage(const char *title, const char *str, int is_warning) {
   return 1;
 }
 
-void WaitForKeypress(int seconds) {
+static void WaitForKeypress(int seconds) {
   // Sleep for up to 1 second _or_ a key press.
   struct pollfd pfd;
   pfd.fd = 0;
@@ -1145,8 +1146,8 @@ void WaitForKeypress(int seconds) {
  * \param pos The initial cursor position; will get updated.
  * \param last_keystroke The time of last keystroke; will get updated.
  */
-void BumpDisplayMarker(size_t pwlen, size_t *pos,
-                       struct timeval *last_keystroke) {
+static void BumpDisplayMarker(size_t pwlen, size_t *pos,
+                              struct timeval *last_keystroke) {
   gettimeofday(last_keystroke, NULL);
 
   // Empty password: always put at 0.
@@ -1165,12 +1166,18 @@ void BumpDisplayMarker(size_t pwlen, size_t *pos,
 //! The size of the buffer to use for display, with space for cursor and NUL.
 #define DISPLAYBUF_SIZE (PWBUF_SIZE + 2)
 
-void ShowFromArray(const char **array, size_t displaymarker, char *displaybuf,
-                   size_t displaybufsize, size_t *displaylen) {
+static void ShowFromArray(const char *const *array, size_t displaymarker,
+                          char *displaybuf, size_t displaybufsize,
+                          size_t *displaylen) {
   const char *selection = array[displaymarker];
-  strncpy(displaybuf, selection, displaybufsize);
-  displaybuf[displaybufsize - 1] = 0;
-  *displaylen = strlen(selection);
+  size_t selection_len = strlen(selection);
+  size_t copy_len = selection_len;
+  if (copy_len >= displaybufsize) {
+    copy_len = displaybufsize - 1;
+  }
+  memcpy(displaybuf, selection, copy_len);
+  displaybuf[copy_len] = 0;
+  *displaylen = selection_len;
 }
 
 enum PromptResult {
@@ -1335,7 +1342,7 @@ static void TerminateAuthproto(pid_t childpid) {
  *   (password entry).
  * \return Whether the prompt was submitted, cancelled, or failed locally.
  */
-enum PromptResult Prompt(const char *msg, char **response, int echo) {
+static enum PromptResult Prompt(const char *msg, char **response, int echo) {
   // Ask something. Return strdup'd string.
   struct {
     // The received X11 event.
@@ -1659,7 +1666,7 @@ redraw:
  *
  * \return The authentication status (0 for OK, 1 otherwise).
  */
-int Authenticate() {
+static int Authenticate(void) {
   int requestfd[2], responsefd[2];
   if (PipeCloexec(requestfd) != 0) {
     LogErrno("PipeCloexec");
@@ -1836,7 +1843,7 @@ done:
   return status != 0;
 }
 
-enum PasswordPrompt GetPasswordPromptFromFlags(
+static enum PasswordPrompt GetPasswordPromptFromFlags(
     int paranoid_password_flag, const char *password_prompt_flag) {
   if (!*password_prompt_flag) {
     return paranoid_password_flag ? PASSWORD_PROMPT_CURSOR
@@ -1855,8 +1862,8 @@ enum PasswordPrompt GetPasswordPromptFromFlags(
 }
 
 #ifdef HAVE_XFT_EXT
-XftFont *FixedXftFontOpenName(Display *display, int screen,
-                              const char *font_name) {
+static XftFont *FixedXftFontOpenName(Display *display, int screen,
+                                     const char *font_name) {
   XftFont *xft_font = XftFontOpenName(display, screen, font_name);
 #ifdef HAVE_FONTCONFIG
   // Workaround for Xft crashing the process when trying to render a colored

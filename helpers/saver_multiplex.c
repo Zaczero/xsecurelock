@@ -45,9 +45,9 @@ static void HandleSIGTERM(int signo) {
 
 #define MAX_MONITORS MAX_SAVERS
 
-static const char* saver_executable;
+static const char *saver_executable;
 
-static Display* display;
+static Display *display;
 static Monitor monitors[MAX_MONITORS];
 static size_t num_monitors;
 static Window windows[MAX_MONITORS];
@@ -86,7 +86,7 @@ static void KillSavers(void) {
  *
  * Spawns spearate saver subprocesses, one on each screen.
  */
-int main(int argc, char** argv) {
+int main(int argc, char **argv) {
   if (GetIntSetting("XSECURELOCK_INSIDE_SAVER_MULTIPLEX", 0)) {
     Log("Starting saver_multiplex inside saver_multiplex?!?");
     // If we die, the parent process will revive us, so let's sleep a while to

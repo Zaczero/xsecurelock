@@ -59,6 +59,9 @@ AC_DEFUN([RP_TRY_CC_FLAG], [
 	CFLAGS=$saved_CFLAGS])
 RP_TRY_CC_FLAG([-Wall])
 RP_TRY_CC_FLAG([-Wextra])
+RP_TRY_CC_FLAG([-Wmissing-prototypes])
+RP_TRY_CC_FLAG([-Wmissing-declarations])
+RP_TRY_CC_FLAG([-Wstrict-prototypes])
 AC_SUBST([WARNING_CFLAGS])
 
 dnl Feature-test macros must be compiler flags so they apply before any system

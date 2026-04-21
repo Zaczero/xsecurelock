@@ -53,7 +53,7 @@ void KillAuthChildSigHandler(int signo) {
  *
  * XSECURELOCK_DISCARD_FIRST_KEYPRESS=0 xsecurelock
  */
-static int DiscardFirstKeypress() {
+static int DiscardFirstKeypress(void) {
   return GetIntSetting("XSECURELOCK_DISCARD_FIRST_KEYPRESS",
                        !GetIntSetting("XSECURELOCK_WANT_FIRST_KEYPRESS", 0));
 }

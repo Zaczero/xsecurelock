@@ -35,11 +35,11 @@
  */
 
 #include "config.h"
+#include "util.h"
 
 #include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
-#include <stdint.h>
 #include <string.h>
 #include <sys/time.h>
 #include <time.h>

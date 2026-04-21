@@ -52,17 +52,17 @@ limitations under the License.
 #include "../wait_pgrp.h"     // for KillPgrp, WaitPgrp
 
 #ifdef HAVE_XSCREENSAVER_EXT
-int have_xscreensaver_ext;
-XScreenSaverInfo *saver_info;
+static int have_xscreensaver_ext;
+static XScreenSaverInfo *saver_info;
 #endif
 
 #ifdef HAVE_XSYNC_EXT
-int have_xsync_ext;
-int num_xsync_counters;
-XSyncSystemCounter *xsync_counters;
+static int have_xsync_ext;
+static int num_xsync_counters;
+static XSyncSystemCounter *xsync_counters;
 #endif
 
-pid_t childpid = 0;
+static pid_t childpid = 0;
 
 static void HandleSIGTERM(int signo) {
   if (childpid != 0) {
@@ -71,8 +71,8 @@ static void HandleSIGTERM(int signo) {
   raise(signo);
 }
 
-uint64_t GetIdleTimeForSingleTimer(Display *display, Window w,
-                                   const char *timer) {
+static uint64_t GetIdleTimeForSingleTimer(Display *display, Window w,
+                                          const char *timer) {
   if (*timer == 0) {
 #ifdef HAVE_XSCREENSAVER_EXT
     if (have_xscreensaver_ext) {
@@ -101,7 +101,7 @@ uint64_t GetIdleTimeForSingleTimer(Display *display, Window w,
   return (uint64_t)-1;
 }
 
-uint64_t GetIdleTime(Display *display, Window w, const char *timers) {
+static uint64_t GetIdleTime(Display *display, Window w, const char *timers) {
   uint64_t min_idle_time = (uint64_t)-1;
   for (;;) {
     size_t len = strcspn(timers, ",");

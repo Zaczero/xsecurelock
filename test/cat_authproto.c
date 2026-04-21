@@ -2,7 +2,7 @@
 
 #include "../helpers/authproto.h"
 
-int main() {
+int main(void) {
   int eof_permitted = 0;
   for (;;) {
     char type;
