@@ -152,6 +152,7 @@ auth_x11_SOURCES = \
 	helpers/monitors.c helpers/monitors.h \
 	logging.c logging.h \
 	mlock_page.h \
+	rect.c rect.h \
 	util.c util.h \
 	wait_pgrp.c wait_pgrp.h \
 	wm_properties.c wm_properties.h \
@@ -194,7 +195,7 @@ CLEANFILES += xsecurelock.1.md xsecurelock.1
 endif
 
 # Some tools that we sure don't wan to install
-noinst_PROGRAMS = cat_authproto nvidia_break_compositor get_compositor remap_all
+noinst_PROGRAMS = cat_authproto nvidia_break_compositor get_compositor remap_all rect_test
 cat_authproto_SOURCES = \
 	logging.c logging.h \
 	helpers/authproto.c helpers/authproto.h \
@@ -209,6 +210,9 @@ remap_all_SOURCES= \
 	test/remap_all.c \
 	unmap_all.c unmap_all.h
 remap_all_CPPFLAGS = $(macros)
+rect_test_SOURCES = \
+	rect.c rect.h \
+	test/rect_test.c
 
 FORCE:
 version.c: FORCE

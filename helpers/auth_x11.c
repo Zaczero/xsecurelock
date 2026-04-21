@@ -46,6 +46,7 @@ limitations under the License.
 #include "../env_settings.h"      // for GetIntSetting, GetStringSetting
 #include "../logging.h"           // for Log, LogErrno
 #include "../mlock_page.h"        // for MLOCK_PAGE
+#include "../rect.h"              // for Rect, RectSubtract
 #include "../util.h"              // for explicit_bzero
 #include "../wait_pgrp.h"         // for WaitPgrp
 #include "../wm_properties.h"     // for SetWMProperties
@@ -274,6 +275,9 @@ size_t num_windows = 0;
 
 //! The X11 per-monitor windows to draw on.
 Window windows[MAX_WINDOWS];
+
+//! The last known geometry for each per-monitor window.
+Rect window_rects[MAX_WINDOWS];
 
 //! The X11 graphics contexts to draw with.
 GC gcs[MAX_WINDOWS];
@@ -555,6 +559,9 @@ const char *GetIndicators(int *warning, int *have_multiple_layouts) {
 
 void DestroyPerMonitorWindows(size_t keep_windows) {
   for (size_t i = keep_windows; i < num_windows; ++i) {
+    // Once the window is unmapped or destroyed, nobody else is guaranteed to
+    // repaint the pixels it used to cover immediately.
+    XClearWindow(display, windows[i]);
 #ifdef HAVE_XFT_EXT
     XftDrawDestroy(xft_draws[i]);
 #endif
@@ -568,6 +575,16 @@ void DestroyPerMonitorWindows(size_t keep_windows) {
   }
   if (num_windows > keep_windows) {
     num_windows = keep_windows;
+  }
+}
+
+static void ClearWindowUncoveredAreas(size_t i, Rect new_rect) {
+  Rect uncovered[4];
+  size_t count = RectSubtract(window_rects[i], new_rect, uncovered);
+  for (size_t j = 0; j < count; ++j) {
+    XClearArea(display, windows[i], uncovered[j].x - window_rects[i].x,
+               uncovered[j].y - window_rects[i].y, uncovered[j].w,
+               uncovered[j].h, False);
   }
 }
 
@@ -594,10 +611,13 @@ void CreateOrUpdatePerMonitorWindow(size_t i, const Monitor *monitor,
   if (y + h > monitor->y + monitor->height) {
     h = monitor->y + monitor->height - y;
   }
+  Rect new_rect = {.x = x, .y = y, .w = w, .h = h};
 
   if (i < num_windows) {
     // Move the existing window.
+    ClearWindowUncoveredAreas(i, new_rect);
     XMoveResizeWindow(display, windows[i], x, y, w, h);
+    window_rects[i] = new_rect;
     return;
   }
 
@@ -658,6 +678,7 @@ void CreateOrUpdatePerMonitorWindow(size_t i, const Monitor *monitor,
 
   // This window is now ready to use.
   XMapWindow(display, windows[i]);
+  window_rects[i] = new_rect;
   num_windows = i + 1;
 }
 
