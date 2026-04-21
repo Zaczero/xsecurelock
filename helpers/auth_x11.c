@@ -245,6 +245,10 @@ static int auth_sounds = 0;
 //! Whether to blink the cursor in the auth dialog.
 static int auth_cursor_blink = 1;
 
+//! Horizontal position of the auth dialog as a percentage (0=left, 50=center,
+//! 100=right).
+static int auth_x_position = 50;
+
 //! Vertical position of the auth dialog as a percentage (0=top, 50=center,
 //! 100=bottom).
 static int auth_y_position = 50;
@@ -573,7 +577,7 @@ void CreateOrUpdatePerMonitorWindow(size_t i, const Monitor *monitor,
   // Desired box.
   int w = region_w;
   int h = region_h;
-  int x = monitor->x + (monitor->width - w) / 2 + x_offset;
+  int x = monitor->x + (monitor->width - w) * auth_x_position / 100 + x_offset;
   int y = monitor->y + (monitor->height - h) * auth_y_position / 100 + y_offset;
   // Clip to monitor.
   if (x < 0) {
@@ -1648,6 +1652,9 @@ int main(int argc_local, char **argv_local) {
   auth_sounds = GetIntSetting("XSECURELOCK_AUTH_SOUNDS", 0);
   single_auth_window = GetIntSetting("XSECURELOCK_SINGLE_AUTH_WINDOW", 0);
   auth_cursor_blink = GetIntSetting("XSECURELOCK_AUTH_CURSOR_BLINK", 1);
+  auth_x_position = GetIntSetting("XSECURELOCK_AUTH_X_POSITION", 50);
+  if (auth_x_position < 0) auth_x_position = 0;
+  if (auth_x_position > 100) auth_x_position = 100;
   auth_y_position = GetIntSetting("XSECURELOCK_AUTH_Y_POSITION", 50);
   if (auth_y_position < 0) auth_y_position = 0;
   if (auth_y_position > 100) auth_y_position = 100;
