@@ -190,7 +190,12 @@ CLEANFILES += xsecurelock.1.md xsecurelock.1
 endif
 
 # Some tools that we sure don't wan to install
-noinst_PROGRAMS = cat_authproto nvidia_break_compositor get_compositor remap_all rect_test
+noinst_PROGRAMS = authproto_bounds_test cat_authproto nvidia_break_compositor get_compositor remap_all rect_test
+authproto_bounds_test_SOURCES = \
+	logging.c logging.h \
+	helpers/authproto.c helpers/authproto.h \
+	test/authproto_bounds_test.c \
+	util.c util.h
 cat_authproto_SOURCES = \
 	logging.c logging.h \
 	helpers/authproto.c helpers/authproto.h \
@@ -242,6 +247,7 @@ check-local:
 	export UBSAN_OPTIONS='print_stacktrace=1:halt_on_error=1'; \
 	echo "Running native smoke tests"; \
 	"$$builddir"/rect_test; \
+	"$$builddir"/authproto_bounds_test; \
 	printf 'P 7\nhunter2\n' > "$$builddir"/cat_authproto.fixture; \
 	"$$builddir"/cat_authproto < "$$builddir"/cat_authproto.fixture > "$$builddir"/cat_authproto.out; \
 	cmp -s "$$builddir"/cat_authproto.fixture "$$builddir"/cat_authproto.out || { \

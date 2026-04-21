@@ -16,7 +16,6 @@ limitations under the License.
 
 #include "authproto.h"
 
-#include <errno.h>   // for errno
 #include <stdio.h>   // for snprintf
 #include <stdlib.h>  // for malloc, size_t
 #include <string.h>  // for strlen
@@ -25,6 +24,9 @@ limitations under the License.
 #include "../logging.h"     // for LogErrno, Log
 #include "../mlock_page.h"  // for MLOCK_PAGE
 #include "../util.h"        // for explicit_bzero
+
+#define MAX_PACKET_LENGTH 0xFFFE
+#define MAX_PACKET_LENGTH_DIGITS 5
 
 static size_t WriteChars(int fd, const char *buf, size_t n) {
   size_t total = 0;
@@ -99,6 +101,15 @@ static size_t ReadChars(int fd, char *buf, size_t n, int eof_permitted) {
   return total;
 }
 
+static void ClearAndFreePacket(char **message, size_t len) {
+  if (*message == NULL) {
+    return;
+  }
+  explicit_bzero(*message, len + 1);
+  free(*message);
+  *message = NULL;
+}
+
 char ReadPacket(int fd, char **message, int eof_permitted) {
   char type;
   *message = NULL;
@@ -118,55 +129,42 @@ char ReadPacket(int fd, char **message, int eof_permitted) {
     return 0;
   }
   int len = 0;
-  for (;;) {
-    errno = 0;
+  for (int digits = 0; digits <= MAX_PACKET_LENGTH_DIGITS; ++digits) {
     if (!ReadChars(fd, &c, 1, 0)) {
       return 0;
     }
-    switch (c) {
-      case '\n':
-        goto have_len;
-      case '0':
-        len = len * 10 + 0;
-        break;
-      case '1':
-        len = len * 10 + 1;
-        break;
-      case '2':
-        len = len * 10 + 2;
-        break;
-      case '3':
-        len = len * 10 + 3;
-        break;
-      case '4':
-        len = len * 10 + 4;
-        break;
-      case '5':
-        len = len * 10 + 5;
-        break;
-      case '6':
-        len = len * 10 + 6;
-        break;
-      case '7':
-        len = len * 10 + 7;
-        break;
-      case '8':
-        len = len * 10 + 8;
-        break;
-      case '9':
-        len = len * 10 + 9;
-        break;
-      default:
-        Log("invalid character during packet length, expecting 0-9 or newline");
+    if (c == '\n') {
+      if (digits == 0) {
+        Log("missing packet length");
         return 0;
+      }
+      goto have_len;
     }
+    if (c < '0' || c > '9') {
+      Log("invalid character during packet length, expecting 0-9 or newline");
+      return 0;
+    }
+    if (digits == MAX_PACKET_LENGTH_DIGITS) {
+      Log("overlong packet length");
+      return 0;
+    }
+    int digit = c - '0';
+    if (len > (MAX_PACKET_LENGTH - digit) / 10) {
+      Log("invalid packet length");
+      return 0;
+    }
+    len = len * 10 + digit;
   }
 have_len:
-  if (len < 0 || len >= 0xFFFF) {
+  if (len < 0 || len > MAX_PACKET_LENGTH) {
     Log("invalid length %d", len);
     return 0;
   }
   *message = malloc((size_t)len + 1);
+  if (*message == NULL) {
+    LogErrno("malloc");
+    return 0;
+  }
   if ((type == PTYPE_RESPONSE_LIKE_PASSWORD) &&
       MLOCK_PAGE(*message, len + 1) < 0) {
     // We continue anyway, as the user being unable to unlock the screen is
@@ -174,20 +172,17 @@ have_len:
     LogErrno("mlock");
   }
   if (len != 0 && !ReadChars(fd, *message, len, 0)) {
-    explicit_bzero(*message, len + 1);
-    free(*message);
-    *message = NULL;
+    ClearAndFreePacket(message, (size_t)len);
     return 0;
   }
   (*message)[len] = 0;
   if (!ReadChars(fd, &c, 1, 0)) {
-    explicit_bzero(*message, len + 1);
-    free(*message);
-    *message = NULL;
+    ClearAndFreePacket(message, (size_t)len);
     return 0;
   }
   if (c != '\n') {
     Log("invalid character after packet message, expecting newline");
+    ClearAndFreePacket(message, (size_t)len);
     return 0;
   }
   return type;
