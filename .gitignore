@@ -35,6 +35,7 @@
 *.o
 
 # Binaries.
+/authproto_bounds_test
 /auth_x11
 /authproto_pam
 /cat_authproto
@@ -43,9 +44,11 @@
 /nvidia_break_compositor
 /pgrp_placeholder
 /remap_all
+/rect_test
 /saver_multiplex
 /until_nonidle
 /xsecurelock
+/test/*.log
 
 # Doxygen stuff.
 /doxy
