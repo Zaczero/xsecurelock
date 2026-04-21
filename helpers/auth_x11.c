@@ -1949,16 +1949,13 @@ int main(int argc_local, char **argv_local) {
   auth_sounds = GetIntSetting("XSECURELOCK_AUTH_SOUNDS", 0);
   single_auth_window = GetIntSetting("XSECURELOCK_SINGLE_AUTH_WINDOW", 0);
   auth_cursor_blink = GetIntSetting("XSECURELOCK_AUTH_CURSOR_BLINK", 1);
-  auth_padding = GetIntSetting("XSECURELOCK_AUTH_PADDING", 16);
-  if (auth_padding < 0) auth_padding = 0;
-  auth_border_size = GetIntSetting("XSECURELOCK_AUTH_BORDER_SIZE", 0);
-  if (auth_border_size < 0) auth_border_size = 0;
-  auth_x_position = GetIntSetting("XSECURELOCK_AUTH_X_POSITION", 50);
-  if (auth_x_position < 0) auth_x_position = 0;
-  if (auth_x_position > 100) auth_x_position = 100;
-  auth_y_position = GetIntSetting("XSECURELOCK_AUTH_Y_POSITION", 50);
-  if (auth_y_position < 0) auth_y_position = 0;
-  if (auth_y_position > 100) auth_y_position = 100;
+  auth_padding = GetClampedIntSetting("XSECURELOCK_AUTH_PADDING", 16, 0, INT_MAX);
+  auth_border_size =
+      GetClampedIntSetting("XSECURELOCK_AUTH_BORDER_SIZE", 0, 0, INT_MAX);
+  auth_x_position =
+      GetClampedIntSetting("XSECURELOCK_AUTH_X_POSITION", 50, 0, 100);
+  auth_y_position =
+      GetClampedIntSetting("XSECURELOCK_AUTH_Y_POSITION", 50, 0, 100);
 #ifdef HAVE_XKB_EXT
   show_keyboard_layout =
       GetIntSetting("XSECURELOCK_SHOW_KEYBOARD_LAYOUT", 1);

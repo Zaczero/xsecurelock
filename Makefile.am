@@ -150,7 +150,7 @@ CLEANFILES += xsecurelock.1.md xsecurelock.1
 endif
 
 # Some tools that we sure don't wan to install
-noinst_PROGRAMS = authproto_bounds_test cat_authproto nvidia_break_compositor get_compositor remap_all rect_test prompt_display_test explicit_bzero_test explicit_bzero_fallback_test retry_io_test retry_io_fallback_test indicator_text_test mlock_page_test prompt_random_test
+noinst_PROGRAMS = authproto_bounds_test cat_authproto nvidia_break_compositor get_compositor remap_all rect_test prompt_display_test explicit_bzero_test explicit_bzero_fallback_test retry_io_test retry_io_fallback_test indicator_text_test mlock_page_test prompt_random_test env_settings_test
 authproto_bounds_test_SOURCES = \
 	logging.c logging.h \
 	helpers/authproto.c helpers/authproto.h \
@@ -198,6 +198,10 @@ mlock_page_test_CPPFLAGS = $(AM_CPPFLAGS) -DFORCE_MLOCK_PAGE_UNAVAILABLE=1
 prompt_random_test_SOURCES = \
 	helpers/prompt_random.c helpers/prompt_random.h \
 	test/prompt_random_test.c
+env_settings_test_SOURCES = \
+	env_settings.c env_settings.h \
+	logging.c logging.h \
+	test/env_settings_test.c
 
 check-local:
 	@$(SHELL) "$(abs_srcdir)/test/check-local.sh" "$(abs_srcdir)"

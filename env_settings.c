@@ -76,6 +76,18 @@ int GetIntSetting(const char* name, int def) {
   return number;
 }
 
+int GetClampedIntSetting(const char* name, int def, int min_value,
+                         int max_value) {
+  int number = GetIntSetting(name, def);
+  if (number < min_value) {
+    return min_value;
+  }
+  if (number > max_value) {
+    return max_value;
+  }
+  return number;
+}
+
 double GetDoubleSetting(const char* name, double def) {
   const char* value = getenv(name);
   if (value == NULL || value[0] == 0) {

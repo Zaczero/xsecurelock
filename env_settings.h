@@ -42,6 +42,18 @@ long GetLongSetting(const char* name, long def);
  */
 int GetIntSetting(const char* name, int def);
 
+/*! \brief Loads an integer setting from the environment and clamps it.
+ *
+ * \param name The setting to read (with XSECURELOCK_ variable name prefix).
+ * \param def The default value.
+ * \param min_value The smallest allowed value.
+ * \param max_value The largest allowed value.
+ * \return The parsed value clamped into the inclusive [min_value, max_value]
+ *   range.
+ */
+int GetClampedIntSetting(const char* name, int def, int min_value,
+                         int max_value);
+
 /*! \brief Loads a floating-point setting from the environment.
  *
  * \param name The setting to read (with XSECURELOCK_ variable name prefix).
