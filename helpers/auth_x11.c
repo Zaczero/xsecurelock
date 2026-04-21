@@ -1503,7 +1503,7 @@ redraw:
   }
 
   // priv contains password related data, so better clear it.
-  memset(&priv, 0, sizeof(priv));
+  explicit_bzero(&priv, sizeof(priv));
 
   if (!done) {
     Log("Unreachable code - the loop above must set done");
