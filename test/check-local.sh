@@ -45,6 +45,7 @@ echo "Running native smoke tests"
 "$builddir"/rect_test
 "$builddir"/authproto_bounds_test
 "$builddir"/prompt_display_test
+"$builddir"/prompt_state_test
 "$builddir"/explicit_bzero_test
 "$builddir"/explicit_bzero_fallback_test
 "$builddir"/retry_io_test

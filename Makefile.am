@@ -107,6 +107,7 @@ auth_x11_SOURCES = \
 	helpers/monitors.c helpers/monitors.h \
 	helpers/prompt_display.c helpers/prompt_display.h \
 	helpers/prompt_random.c helpers/prompt_random.h \
+	helpers/prompt_state.c helpers/prompt_state.h \
 	logging.c logging.h \
 	mlock_page.h \
 	rect.c rect.h \
@@ -150,7 +151,7 @@ CLEANFILES += xsecurelock.1.md xsecurelock.1
 endif
 
 # Some tools that we sure don't wan to install
-noinst_PROGRAMS = authproto_bounds_test cat_authproto nvidia_break_compositor get_compositor remap_all rect_test prompt_display_test explicit_bzero_test explicit_bzero_fallback_test retry_io_test retry_io_fallback_test indicator_text_test mlock_page_test prompt_random_test env_settings_test
+noinst_PROGRAMS = authproto_bounds_test cat_authproto nvidia_break_compositor get_compositor remap_all rect_test prompt_display_test prompt_state_test explicit_bzero_test explicit_bzero_fallback_test retry_io_test retry_io_fallback_test indicator_text_test mlock_page_test prompt_random_test env_settings_test
 authproto_bounds_test_SOURCES = \
 	logging.c logging.h \
 	helpers/authproto.c helpers/authproto.h \
@@ -173,7 +174,13 @@ rect_test_SOURCES = \
 	test/rect_test.c
 prompt_display_test_SOURCES = \
 	helpers/prompt_display.c helpers/prompt_display.h \
+	helpers/prompt_state.h \
 	test/prompt_display_test.c
+prompt_state_test_SOURCES = \
+	helpers/prompt_random.c helpers/prompt_random.h \
+	helpers/prompt_state.c helpers/prompt_state.h \
+	test/prompt_state_test.c \
+	util.c util.h
 explicit_bzero_test_SOURCES = \
 	test/explicit_bzero_test.c \
 	util.c util.h

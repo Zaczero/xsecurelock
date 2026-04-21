@@ -1,0 +1,73 @@
+#include "config.h"
+
+#include "prompt_state.h"
+
+#include <assert.h>
+#include <string.h>
+#include <stdlib.h>
+#include <sys/time.h>
+
+#include "../util.h"
+#include "prompt_random.h"
+
+void PromptStateInit(struct PromptState *state) {
+  assert(state != NULL);
+
+  memset(state, 0, sizeof(*state));
+}
+
+int PromptStateAppendByte(struct PromptState *state, char input_byte) {
+  assert(state != NULL);
+
+  if (state->password_length >= sizeof(state->password)) {
+    return 0;
+  }
+  state->password[state->password_length] = input_byte;
+  ++state->password_length;
+  return 1;
+}
+
+void PromptStateDeleteLastGlyph(struct PromptState *state) {
+  size_t previous_length = 0;
+  size_t offset = 0;
+
+  assert(state != NULL);
+
+  mblen(NULL, 0);
+  while (offset < state->password_length) {
+    previous_length = offset;
+    int glyph_length =
+        mblen(state->password + offset, state->password_length - offset);
+    if (glyph_length <= 0) {
+      break;
+    }
+    offset += (size_t)glyph_length;
+  }
+  state->password_length = previous_length;
+}
+
+void PromptStateClear(struct PromptState *state) {
+  assert(state != NULL);
+  state->password_length = 0;
+}
+
+void PromptStateBumpDisplayMarker(struct PromptState *state,
+                                  struct PromptRng *rng, size_t marker_count,
+                                  size_t min_change) {
+  assert(state != NULL);
+  assert(rng != NULL);
+
+  gettimeofday(&state->last_keystroke, NULL);
+  if (state->password_length == 0) {
+    state->display_marker = 0;
+    return;
+  }
+
+  state->display_marker = NextDisplayMarker(
+      rng, state->display_marker, marker_count, min_change);
+}
+
+void PromptStateWipe(struct PromptState *state) {
+  assert(state != NULL);
+  explicit_bzero(state, sizeof(*state));
+}

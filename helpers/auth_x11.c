@@ -20,20 +20,16 @@ limitations under the License.
 #include <X11/X.h>     // for Success, None, Atom, KBBellPitch
 #include <X11/Xlib.h>  // for DefaultScreen, Screen, XFree, True
 #include <errno.h>     // for errno, ESRCH
+#include <limits.h>    // for INT_MAX
 #include <locale.h>    // for NULL, setlocale, LC_CTYPE, LC_TIME
 #include <poll.h>      // for pollfd, POLLIN, POLLHUP, POLLNVAL
 #include <signal.h>    // for SIGTERM, kill
 #include <stdio.h>
-#include <stdlib.h>      // for free, mblen, size_t, EXIT_FAILURE
+#include <stdlib.h>      // for free, size_t, EXIT_FAILURE
 #include <string.h>      // for strlen, memcpy, memset, strcspn
 #include <sys/time.h>    // for gettimeofday, timeval
 #include <time.h>        // for time, nanosleep, localtime_r
 #include <unistd.h>      // for close, _exit, dup2, dup
-
-#if __STDC_VERSION__ >= 199901L
-#include <inttypes.h>
-#include <stdint.h>
-#endif
 
 #ifdef HAVE_XFT_EXT
 #include <X11/Xft/Xft.h>             // for XftColorAllocValue, XftColorFree
@@ -61,6 +57,7 @@ limitations under the License.
 #include "monitors.h"             // for Monitor, GetMonitors, IsMonitorC...
 #include "prompt_display.h"       // for DISCO_PASSWORD_DANCERS, Format...
 #include "prompt_random.h"        // for PromptRng, NextDisplayMarker
+#include "prompt_state.h"         // for PromptState
 
 #if __STDC_VERSION__ >= 201112L
 #define STATIC_ASSERT(state, message) _Static_assert(state, message)
@@ -96,77 +93,7 @@ STATIC_ASSERT(PARANOID_PASSWORD_MIN_CHANGE <=
 //! Extra line spacing.
 #define LINE_SPACING 4
 
-//! Actual password prompt selected
-enum PasswordPrompt {
-  PASSWORD_PROMPT_CURSOR,
-  PASSWORD_PROMPT_ASTERISKS,
-  PASSWORD_PROMPT_HIDDEN,
-  PASSWORD_PROMPT_DISCO,
-  PASSWORD_PROMPT_EMOJI,
-  PASSWORD_PROMPT_EMOTICON,
-  PASSWORD_PROMPT_KAOMOJI,
-#if __STDC_VERSION__ >= 199901L
-  PASSWORD_PROMPT_TIME,
-  PASSWORD_PROMPT_TIME_HEX,
-#endif
-
-  PASSWORD_PROMPT_COUNT,
-};
-static const char *const PasswordPromptStrings[] = {
-    /* PASSWORD_PROMPT_CURSOR= */ "cursor",
-    /* PASSWORD_PROMPT_ASTERISKS= */ "asterisks",
-    /* PASSWORD_PROMPT_HIDDEN= */ "hidden",
-    /* PASSWORD_PROMPT_DISCO= */ "disco",
-    /* PASSWORD_PROMPT_EMOJI= */ "emoji",
-    /* PASSWORD_PROMPT_EMOTICON= */ "emoticon",
-    /* PASSWORD_PROMPT_KAOMOJI= */ "kaomoji",
-#if __STDC_VERSION__ >= 199901L
-    /* PASSWORD_PROMPT_TIME= */ "time",
-    /* PASSWORD_PROMPT_TIME_HEX= */ "time_hex",
-#endif
-};
-
-static enum PasswordPrompt password_prompt;
-
-// Emoji to display in emoji mode. The length of the array must be equal to
-// PARANOID_PASSWORD_LENGTH. List taken from the top items in
-// http://emojitracker.com/ The first item is always display in an empty prompt
-// (before typing in the password)
-static const char *const emoji[] = {
-    "_____", "😂", "❤", "♻", "😍", "♥", "😭", "😊", "😒", "💕", "😘",
-    "😩",     "☺", "👌", "😔", "😁", "😏", "😉", "👍", "⬅", "😅", "🙏",
-    "😌",     "😢", "👀", "💔", "😎", "🎶", "💙", "💜", "🙌", "😳",
-};
-STATIC_ASSERT(sizeof(emoji) / sizeof(*emoji) == PARANOID_PASSWORD_LENGTH,
-              "Emoji array size must be equal to PARANOID_PASSWORD_LENGTH");
-
-// Emoticons to display in emoji mode. The length of the array must be equal to
-// PARANOID_PASSWORD_LENGTH. The first item is always display in an empty prompt
-// (before typing in the password)
-static const char *const emoticons[] = {
-    ":-)",  ":-p", ":-O", ":-\\", "(-:",  "d-:", "O-:", "/-:",
-    "8-)",  "8-p", "8-O", "8-\\", "(-8",  "d-8", "O-8", "/-8",
-    "X-)",  "X-p", "X-O", "X-\\", "(-X",  "d-X", "O-X", "/-X",
-    ":'-)", ":-S", ":-D", ":-#",  "(-':", "S-:", "D-:", "#-:",
-};
-STATIC_ASSERT(sizeof(emoticons) / sizeof(*emoticons) ==
-                  PARANOID_PASSWORD_LENGTH,
-              "Emoticons array size must be equal to PARANOID_PASSWORD_LENGTH");
-
-// Kaomoji to display in kaomoji mode. The length of the array must be equal to
-// PARANOID_PASSWORD_LENGTH. The first item is always display in an empty prompt
-// (before typing in the password)
-static const char *const kaomoji[] = {
-    "(͡°͜ʖ͡°)",     "(>_<)",       "O_ם",      "(^_-)",        "o_0",
-    "o.O",       "0_o",         "O.o",      "(°o°)",        "^m^",
-    "^_^",       "((d[-_-]b))", "┏(･o･)┛",  "┗(･o･)┓",      "（ﾟДﾟ)",
-    "(°◇°)",     "\\o/",        "\\o|",     "|o/",          "|o|",
-    "(●＾o＾●)", "(＾ｖ＾)",    "(＾ｕ＾)", "(＾◇＾)",      "¯\\_(ツ)_/¯",
-    "(^0_0^)",   "(☞ﾟ∀ﾟ)☞",     "(-■_■)",   "(┛ಠ_ಠ)┛彡┻━┻", "┬─┬ノ(º_ºノ)",
-    "(˘³˘)♥",    "❤(◍•ᴗ•◍)",
-};
-STATIC_ASSERT(sizeof(kaomoji) / sizeof(*kaomoji) == PARANOID_PASSWORD_LENGTH,
-              "Kaomoji array size must be equal to PARANOID_PASSWORD_LENGTH");
+static enum PromptDisplayMode prompt_display_mode;
 
 //! If set, we can start a new login session.
 static int have_switch_user_command;
@@ -1132,58 +1059,10 @@ static void WaitForKeypress(int seconds) {
   (void)RetryPoll(&pfd, 1, seconds * 1000);
 }
 
-/*! \brief Bump the position for the password "cursor".
- *
- * If pwlen > 0:
- * Precondition: pos in 0..PARANOID_PASSWORD_LENGTH-1.
- * Postcondition: pos' in 1..PARANOID_PASSWORD_LENGTH-1.
- * Postcondition: abs(pos' - pos) >= PARANOID_PASSWORD_MIN_CHANGE.
- * Postcondition: pos' is uniformly distributed among all permitted choices.
- * If pwlen == 0:
- * Postcondition: pos' is 0.
- *
- * \param pwlen The current password length.
- * \param pos The initial cursor position; will get updated.
- * \param last_keystroke The time of last keystroke; will get updated.
- */
-static void BumpDisplayMarker(size_t pwlen, size_t *pos,
-                              struct timeval *last_keystroke) {
-  gettimeofday(last_keystroke, NULL);
-
-  // Empty password: always put at 0.
-  if (pwlen == 0) {
-    *pos = 0;
-    return;
-  }
-
-  *pos = NextDisplayMarker(&prompt_rng, *pos, PARANOID_PASSWORD_LENGTH,
-                           PARANOID_PASSWORD_MIN_CHANGE);
-}
-
-//! The size of the buffer to store the password in. Not NUL terminated.
-#define PWBUF_SIZE 256
-
-//! The size of the buffer to use for display, with space for cursor and NUL.
-#define DISPLAYBUF_SIZE (PWBUF_SIZE + 2)
-
-static void ShowFromArray(const char *const *array, size_t displaymarker,
-                          char *displaybuf, size_t displaybufsize,
-                          size_t *displaylen) {
-  const char *selection = array[displaymarker];
-  size_t selection_len = strlen(selection);
-  size_t copy_len = selection_len;
-  if (copy_len >= displaybufsize) {
-    copy_len = displaybufsize - 1;
-  }
-  memcpy(displaybuf, selection, copy_len);
-  displaybuf[copy_len] = 0;
-  *displaylen = selection_len;
-}
-
-enum PromptResult {
-  PROMPT_RESULT_SUBMITTED,
-  PROMPT_RESULT_CANCELLED,
-  PROMPT_RESULT_FAILED,
+enum PromptSessionResult {
+  PROMPT_SESSION_RESULT_SUBMITTED,
+  PROMPT_SESSION_RESULT_CANCELLED,
+  PROMPT_SESSION_RESULT_FAILED,
 };
 
 enum AuthActivityResult {
@@ -1333,6 +1212,112 @@ static void TerminateAuthproto(pid_t childpid) {
   }
 }
 
+static int ShowPromptStorageWarning(const char *message) {
+  if (!DisplayMessage("Error", message, 1)) {
+    return 0;
+  }
+  WaitForKeypress(1);
+  return 1;
+}
+
+static int RenderPromptFrame(const char *message, const struct PromptState *state,
+                             int echo, int blink_state) {
+  char displaybuf[PROMPT_DISPLAY_BUFFER_SIZE];
+  size_t displaylen = 0;
+
+  if (RenderPromptDisplay(prompt_display_mode, state, echo, blink_state,
+                          *cursor, displaybuf, sizeof(displaybuf),
+                          &displaylen) == 0) {
+    return DisplayMessage(message, displaybuf, 0);
+  }
+
+  if (echo) {
+    Log("Prompt rendering failed in echo mode");
+    return 0;
+  }
+
+  Log("Prompt rendering failed; falling back to cursor display");
+  if (RenderPromptDisplay(PROMPT_DISPLAY_MODE_CURSOR, state, 0, blink_state,
+                          *cursor, displaybuf, sizeof(displaybuf),
+                          &displaylen) != 0) {
+    Log("Cursor prompt rendering fallback failed");
+    return 0;
+  }
+  (void)displaylen;
+  return DisplayMessage(message, displaybuf, 0);
+}
+
+static int BuildPromptResponse(const struct PromptState *state, int echo,
+                               char **response) {
+  *response = malloc(state->password_length + 1);
+  if (*response == NULL) {
+    LogErrno("malloc");
+    return 0;
+  }
+  if (state->password_length != 0) {
+    memcpy(*response, state->password, state->password_length);
+  }
+  (*response)[state->password_length] = '\0';
+
+  if (!echo && MLOCK_PAGE(*response, state->password_length + 1) < 0) {
+    LogErrno("mlock");
+    if (!ShowPromptStorageWarning("Password has not been stored securely.")) {
+      ClearFreeString(response);
+      return 0;
+    }
+  }
+
+  return 1;
+}
+
+static int HandlePromptInputByte(struct PromptState *state, char input_byte,
+                                 int echo, char **response,
+                                 enum PromptSessionResult *result) {
+  switch (input_byte) {
+    case '\b':
+    case '\177':
+      PromptStateDeleteLastGlyph(state);
+      PromptStateBumpDisplayMarker(state, &prompt_rng, PARANOID_PASSWORD_LENGTH,
+                                   PARANOID_PASSWORD_MIN_CHANGE);
+      return 0;
+    case '\001':
+    case '\025':
+      PromptStateClear(state);
+      PromptStateBumpDisplayMarker(state, &prompt_rng, PARANOID_PASSWORD_LENGTH,
+                                   PARANOID_PASSWORD_MIN_CHANGE);
+      return 0;
+    case '\023':
+      SwitchKeyboardLayout();
+      return 0;
+    case 0:
+      *result = PROMPT_SESSION_RESULT_FAILED;
+      return 1;
+    case '\033':
+      *result = PROMPT_SESSION_RESULT_CANCELLED;
+      return 1;
+    case '\r':
+    case '\n':
+      if (!BuildPromptResponse(state, echo, response)) {
+        *result = PROMPT_SESSION_RESULT_FAILED;
+      } else {
+        *result = PROMPT_SESSION_RESULT_SUBMITTED;
+      }
+      return 1;
+    default:
+      if (input_byte >= '\000' && input_byte <= '\037') {
+        return 0;
+      }
+      if (!PromptStateAppendByte(state, input_byte)) {
+        Log("Password entered is too long - bailing out");
+        *result = PROMPT_SESSION_RESULT_FAILED;
+        return 1;
+      }
+      PromptStateBumpDisplayMarker(state, &prompt_rng, PARANOID_PASSWORD_LENGTH,
+                                   PARANOID_PASSWORD_MIN_CHANGE);
+      return 0;
+  }
+}
+
 /*! \brief Ask a question to the user.
  *
  * \param msg The message.
@@ -1342,169 +1327,29 @@ static void TerminateAuthproto(pid_t childpid) {
  *   (password entry).
  * \return Whether the prompt was submitted, cancelled, or failed locally.
  */
-static enum PromptResult Prompt(const char *msg, char **response, int echo) {
-  // Ask something. Return strdup'd string.
-  struct {
-    // The received X11 event.
-    XEvent ev;
-
-    // Input buffer. Not NUL-terminated.
-    char pwbuf[PWBUF_SIZE];
-    // Current input length.
-    size_t pwlen;
-
-    // Display buffer. If echo is 0, this will only contain asterisks, a
-    // possible cursor, and be NUL-terminated.
-    char displaybuf[DISPLAYBUF_SIZE];
-    // Display buffer length.
-    size_t displaylen;
-
-    // The display marker changes on every input action to a value from 0 to
-    // PARANOID_PASSWORD-1. It indicates where to display the "cursor".
-    size_t displaymarker;
-
-    // Character read buffer.
-    char inputbuf;
-
-    // The time of last keystroke.
-    struct timeval last_keystroke;
-
-    // Temporary position variables that might leak properties about the
-    // password and thus are in the private struct too.
-    size_t prevpos;
-    size_t pos;
-    int len;
-  } priv;
+static enum PromptSessionResult RunPromptSession(const char *message,
+                                                 char **response, int echo) {
+  struct PromptState state;
+  char input_byte = 0;
   int blink_state = 0;
 
-  if (!echo && MLOCK_PAGE(&priv, sizeof(priv)) < 0) {
+  PromptStateInit(&state);
+
+  if (!echo && MLOCK_PAGE(&state, sizeof(state)) < 0) {
     LogErrno("mlock");
-    // We continue anyway, as the user being unable to unlock the screen is
-    // worse. But let's alert the user.
-    if (!DisplayMessage("Error", "Password will not be stored securely.", 1)) {
-      return PROMPT_RESULT_FAILED;
+    if (!ShowPromptStorageWarning("Password will not be stored securely.")) {
+      return PROMPT_SESSION_RESULT_FAILED;
     }
-    WaitForKeypress(1);
   }
 
-  priv.pwlen = 0;
-  priv.displaymarker = 0;
-
   time_t deadline = time(NULL) + prompt_timeout;
-
-  // Unfortunately we may have to break out of multiple loops at once here but
-  // still do common cleanup work. So we have to track the return value in a
-  // variable.
-  enum PromptResult result = PROMPT_RESULT_CANCELLED;
+  enum PromptSessionResult result = PROMPT_SESSION_RESULT_CANCELLED;
   int done = 0;
   int played_sound = 0;
 
   while (!done) {
-    if (echo) {
-      if (priv.pwlen != 0) {
-        memcpy(priv.displaybuf, priv.pwbuf, priv.pwlen);
-      }
-      priv.displaylen = priv.pwlen;
-      // Note that priv.pwlen <= sizeof(priv.pwbuf) and thus
-      // priv.pwlen + 2 <= sizeof(priv.displaybuf).
-      priv.displaybuf[priv.displaylen] = blink_state ? ' ' : *cursor;
-      priv.displaybuf[priv.displaylen + 1] = '\0';
-    } else {
-      switch (password_prompt) {
-        case PASSWORD_PROMPT_ASTERISKS: {
-          mblen(NULL, 0);
-          priv.pos = priv.displaylen = 0;
-          while (priv.pos < priv.pwlen) {
-            ++priv.displaylen;
-            // Note: this won't read past priv.pwlen.
-            priv.len = mblen(priv.pwbuf + priv.pos, priv.pwlen - priv.pos);
-            if (priv.len <= 0) {
-              // This guarantees to "eat" one byte each step. Therefore,
-              // priv.displaylen <= priv.pwlen is ensured.
-              break;
-            }
-            priv.pos += priv.len;
-          }
-          memset(priv.displaybuf, '*', priv.displaylen);
-          // Note that priv.pwlen <= sizeof(priv.pwbuf) and thus
-          // priv.pwlen + 2 <= sizeof(priv.displaybuf).
-          priv.displaybuf[priv.displaylen] = blink_state ? ' ' : *cursor;
-          priv.displaybuf[priv.displaylen + 1] = '\0';
-          break;
-        }
-
-        case PASSWORD_PROMPT_HIDDEN: {
-          priv.displaylen = 0;
-          priv.displaybuf[0] = '\0';
-          break;
-        }
-
-        case PASSWORD_PROMPT_DISCO: {
-          if (FormatDiscoPrompt(priv.displaymarker, priv.displaybuf,
-                                sizeof(priv.displaybuf),
-                                &priv.displaylen) != 0) {
-            Log("Disco prompt rendering overflow; falling back to cursor");
-            priv.displaylen = PARANOID_PASSWORD_LENGTH;
-            memset(priv.displaybuf, '_', priv.displaylen);
-            priv.displaybuf[priv.displaymarker] = blink_state ? '-' : '|';
-            priv.displaybuf[priv.displaylen] = '\0';
-          }
-          break;
-        }
-
-        case PASSWORD_PROMPT_EMOJI: {
-          ShowFromArray(emoji, priv.displaymarker, priv.displaybuf,
-                        sizeof(priv.displaybuf), &priv.displaylen);
-          break;
-        }
-
-        case PASSWORD_PROMPT_EMOTICON: {
-          ShowFromArray(emoticons, priv.displaymarker, priv.displaybuf,
-                        sizeof(priv.displaybuf), &priv.displaylen);
-          break;
-        }
-
-        case PASSWORD_PROMPT_KAOMOJI: {
-          ShowFromArray(kaomoji, priv.displaymarker, priv.displaybuf,
-                        sizeof(priv.displaybuf), &priv.displaylen);
-          break;
-        }
-
-#if __STDC_VERSION__ >= 199901L
-        case PASSWORD_PROMPT_TIME:
-        case PASSWORD_PROMPT_TIME_HEX: {
-          if (priv.pwlen == 0) {
-            strncpy(priv.displaybuf, "----", DISPLAYBUF_SIZE - 1);
-            priv.displaybuf[DISPLAYBUF_SIZE - 1] = 0;
-          } else {
-            if (password_prompt == PASSWORD_PROMPT_TIME) {
-              snprintf(priv.displaybuf, DISPLAYBUF_SIZE,
-                       "%" PRId64 ".%06" PRId64,
-                       (int64_t)priv.last_keystroke.tv_sec,
-                       (int64_t)priv.last_keystroke.tv_usec);
-            } else {
-              snprintf(priv.displaybuf, DISPLAYBUF_SIZE, "%#" PRIx64,
-                       (int64_t)priv.last_keystroke.tv_sec * 1000000 +
-                           (int64_t)priv.last_keystroke.tv_usec);
-            }
-            priv.displaybuf[DISPLAYBUF_SIZE - 1] = 0;
-          }
-          break;
-        }
-#endif
-
-        default:
-        case PASSWORD_PROMPT_CURSOR: {
-          priv.displaylen = PARANOID_PASSWORD_LENGTH;
-          memset(priv.displaybuf, '_', priv.displaylen);
-          priv.displaybuf[priv.displaymarker] = blink_state ? '-' : '|';
-          priv.displaybuf[priv.displaylen] = '\0';
-          break;
-        }
-      }
-    }
-    if (!DisplayMessage(msg, priv.displaybuf, 0)) {
-      result = PROMPT_RESULT_FAILED;
+    if (!RenderPromptFrame(message, &state, echo, blink_state)) {
+      result = PROMPT_SESSION_RESULT_FAILED;
       done = 1;
       break;
     }
@@ -1522,21 +1367,21 @@ static enum PromptResult Prompt(const char *msg, char **response, int echo) {
     int poll_only = 0;
 
     while (!done) {
-      switch (WaitForAuthActivity(-1, &deadline, poll_only, &priv.inputbuf)) {
+      switch (WaitForAuthActivity(-1, &deadline, poll_only, &input_byte)) {
         case AUTH_ACTIVITY_REDRAW:
           goto redraw;
         case AUTH_ACTIVITY_TIMEOUT:
           Log("AUTH_TIMEOUT hit");
-          result = PROMPT_RESULT_CANCELLED;
+          result = PROMPT_SESSION_RESULT_CANCELLED;
           done = 1;
           break;
         case AUTH_ACTIVITY_FAILED:
-          result = PROMPT_RESULT_FAILED;
+          result = PROMPT_SESSION_RESULT_FAILED;
           done = 1;
           break;
         case AUTH_ACTIVITY_EXTRA_FD_READY:
           Log("Unexpected authproto readiness while prompting");
-          result = PROMPT_RESULT_FAILED;
+          result = PROMPT_SESSION_RESULT_FAILED;
           done = 1;
           break;
         case AUTH_ACTIVITY_INPUT_READY:
@@ -1548,103 +1393,7 @@ static enum PromptResult Prompt(const char *msg, char **response, int echo) {
       if (done) {
         break;
       }
-      switch (priv.inputbuf) {
-        case '\b':      // Backspace.
-        case '\177': {  // Delete (note: i3lock does not handle this one).
-          // Backwards skip with multibyte support.
-          mblen(NULL, 0);
-          priv.pos = priv.prevpos = 0;
-          while (priv.pos < priv.pwlen) {
-            priv.prevpos = priv.pos;
-            // Note: this won't read past priv.pwlen.
-            priv.len = mblen(priv.pwbuf + priv.pos, priv.pwlen - priv.pos);
-            if (priv.len <= 0) {
-              // This guarantees to "eat" one byte each step. Therefore,
-              // this cannot loop endlessly.
-              break;
-            }
-            priv.pos += priv.len;
-          }
-          priv.pwlen = priv.prevpos;
-          BumpDisplayMarker(priv.pwlen, &priv.displaymarker,
-                            &priv.last_keystroke);
-          break;
-        }
-        case '\001':  // Ctrl-A.
-          // Clearing input line on just Ctrl-A is odd - but commonly
-          // requested. In most toolkits, Ctrl-A does not immediately erase but
-          // almost every keypress other than arrow keys will erase afterwards.
-          priv.pwlen = 0;
-          BumpDisplayMarker(priv.pwlen, &priv.displaymarker,
-                            &priv.last_keystroke);
-          break;
-        case '\023':  // Ctrl-S.
-          SwitchKeyboardLayout();
-          break;
-        case '\025':  // Ctrl-U.
-          // Delete the entire input line.
-          // i3lock: supports Ctrl-U but not Ctrl-A.
-          // xscreensaver: supports Ctrl-U and Ctrl-X but not Ctrl-A.
-          priv.pwlen = 0;
-          BumpDisplayMarker(priv.pwlen, &priv.displaymarker,
-                            &priv.last_keystroke);
-          break;
-        case 0:  // Shouldn't happen.
-          result = PROMPT_RESULT_FAILED;
-          done = 1;
-          break;
-        case '\033':  // Escape.
-          result = PROMPT_RESULT_CANCELLED;
-          done = 1;
-          break;
-        case '\r':  // Return.
-        case '\n':  // Return.
-          *response = malloc(priv.pwlen + 1);
-          if (*response == NULL) {
-            LogErrno("malloc");
-            result = PROMPT_RESULT_FAILED;
-            done = 1;
-            break;
-          }
-          if (!echo && MLOCK_PAGE(*response, priv.pwlen + 1) < 0) {
-            LogErrno("mlock");
-            // We continue anyway, as the user being unable to unlock the screen
-            // is worse. But let's alert the user of this.
-            if (!DisplayMessage("Error",
-                                "Password has not been stored securely.", 1)) {
-              result = PROMPT_RESULT_FAILED;
-              done = 1;
-              break;
-            }
-            WaitForKeypress(1);
-          }
-          if (priv.pwlen != 0) {
-            memcpy(*response, priv.pwbuf, priv.pwlen);
-          }
-          (*response)[priv.pwlen] = 0;
-          result = PROMPT_RESULT_SUBMITTED;
-          done = 1;
-          break;
-        default:
-          if (priv.inputbuf >= '\000' && priv.inputbuf <= '\037') {
-            // Other control character. We ignore them (and specifically do not
-            // update the cursor on them) to "discourage" their use in
-            // passwords, as most login screens do not support them anyway.
-            break;
-          }
-          if (priv.pwlen < sizeof(priv.pwbuf)) {
-            priv.pwbuf[priv.pwlen] = priv.inputbuf;
-            ++priv.pwlen;
-            BumpDisplayMarker(priv.pwlen, &priv.displaymarker,
-                              &priv.last_keystroke);
-          } else {
-            Log("Password entered is too long - bailing out");
-            result = PROMPT_RESULT_FAILED;
-            done = 1;
-            break;
-          }
-          break;
-      }
+      done = HandlePromptInputByte(&state, input_byte, echo, response, &result);
     }
 
 redraw:
@@ -1653,8 +1402,7 @@ redraw:
     }
   }
 
-  // priv contains password related data, so better clear it.
-  explicit_bzero(&priv, sizeof(priv));
+  PromptStateWipe(&state);
 
   if (!done) {
     Log("Unreachable code - the loop above must set done");
@@ -1785,36 +1533,36 @@ static int Authenticate(void) {
         ClearFreeString(&message);
         break;
       case PTYPE_PROMPT_LIKE_USERNAME:
-        switch (Prompt(message, &response, 1)) {
-          case PROMPT_RESULT_SUBMITTED:
+        switch (RunPromptSession(message, &response, 1)) {
+          case PROMPT_SESSION_RESULT_SUBMITTED:
             WritePacket(responsefd[1], PTYPE_RESPONSE_LIKE_USERNAME, response);
             explicit_bzero(response, strlen(response));
             free(response);
             SHOW_PROCESSING_OR_FAIL();
             break;
-          case PROMPT_RESULT_CANCELLED:
+          case PROMPT_SESSION_RESULT_CANCELLED:
             WritePacket(responsefd[1], PTYPE_RESPONSE_CANCELLED, "");
             SHOW_PROCESSING_OR_FAIL();
             break;
-          case PROMPT_RESULT_FAILED:
+          case PROMPT_SESSION_RESULT_FAILED:
             ClearFreeString(&message);
             goto done;
         }
         ClearFreeString(&message);
         break;
       case PTYPE_PROMPT_LIKE_PASSWORD:
-        switch (Prompt(message, &response, 0)) {
-          case PROMPT_RESULT_SUBMITTED:
+        switch (RunPromptSession(message, &response, 0)) {
+          case PROMPT_SESSION_RESULT_SUBMITTED:
             WritePacket(responsefd[1], PTYPE_RESPONSE_LIKE_PASSWORD, response);
             explicit_bzero(response, strlen(response));
             free(response);
             SHOW_PROCESSING_OR_FAIL();
             break;
-          case PROMPT_RESULT_CANCELLED:
+          case PROMPT_SESSION_RESULT_CANCELLED:
             WritePacket(responsefd[1], PTYPE_RESPONSE_CANCELLED, "");
             SHOW_PROCESSING_OR_FAIL();
             break;
-          case PROMPT_RESULT_FAILED:
+          case PROMPT_SESSION_RESULT_FAILED:
             ClearFreeString(&message);
             goto done;
         }
@@ -1841,24 +1589,6 @@ done:
     PlaySound(SOUND_SUCCESS);
   }
   return status != 0;
-}
-
-static enum PasswordPrompt GetPasswordPromptFromFlags(
-    int paranoid_password_flag, const char *password_prompt_flag) {
-  if (!*password_prompt_flag) {
-    return paranoid_password_flag ? PASSWORD_PROMPT_CURSOR
-                                  : PASSWORD_PROMPT_ASTERISKS;
-  }
-
-  for (enum PasswordPrompt prompt = 0; prompt < PASSWORD_PROMPT_COUNT;
-       ++prompt) {
-    if (strcmp(password_prompt_flag, PasswordPromptStrings[prompt]) == 0) {
-      return prompt;
-    }
-  }
-
-  Log("Invalid XSECURELOCK_PASSWORD_PROMPT value; defaulting to cursor");
-  return PASSWORD_PROMPT_CURSOR;
 }
 
 #ifdef HAVE_XFT_EXT
@@ -1963,8 +1693,11 @@ int main(int argc_local, char **argv_local) {
       GetIntSetting("XSECURELOCK_SHOW_LOCKS_AND_LATCHES", 0);
 #endif
 
-  password_prompt =
-      GetPasswordPromptFromFlags(paranoid_password_flag, password_prompt_flag);
+  if (!GetPromptDisplayModeFromFlags(paranoid_password_flag,
+                                     password_prompt_flag,
+                                     &prompt_display_mode)) {
+    Log("Invalid XSECURELOCK_PASSWORD_PROMPT value; defaulting to cursor");
+  }
 
   if ((display = XOpenDisplay(NULL)) == NULL) {
     Log("Could not connect to $DISPLAY");
