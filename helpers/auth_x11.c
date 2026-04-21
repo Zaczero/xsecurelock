@@ -58,6 +58,7 @@ limitations under the License.
 #include "../xscreensaver_api.h"  // for ReadWindowID
 #include "authproto.h"            // for WritePacket, ReadPacket, PTYPE_R...
 #include "monitors.h"             // for Monitor, GetMonitors, IsMonitorC...
+#include "prompt_display.h"       // for DISCO_PASSWORD_DANCERS, Format...
 
 #if __STDC_VERSION__ >= 201112L
 #define STATIC_ASSERT(state, message) _Static_assert(state, message)
@@ -80,9 +81,6 @@ const char *authproto_executable;
 
 //! The maximum time to wait at a prompt for user input in seconds.
 int prompt_timeout;
-
-//! Number of dancers in the disco password display
-#define DISCO_PASSWORD_DANCERS 5
 
 //! Length of the "paranoid password display".
 #define PARANOID_PASSWORD_LENGTH (1 << DISCO_PASSWORD_DANCERS)
@@ -124,15 +122,6 @@ const char *PasswordPromptStrings[] = {
 };
 
 enum PasswordPrompt password_prompt;
-
-// A disco password is composed of multiple disco_dancers (each selected at
-// random from the array), joined by the disco_combiner
-const char *disco_combiner = " ♪ ";
-// Note: the disco_dancers MUST all have the same length
-const char *disco_dancers[] = {
-    "┏(･o･)┛",
-    "┗(･o･)┓",
-};
 
 // Emoji to display in emoji mode. The length of the array must be equal to
 // PARANOID_PASSWORD_LENGTH. List taken from the top items in
@@ -1308,25 +1297,15 @@ enum PromptResult Prompt(const char *msg, char **response, int echo) {
         }
 
         case PASSWORD_PROMPT_DISCO: {
-          size_t combiner_length = strlen(disco_combiner);
-          size_t dancer_length = strlen(disco_dancers[0]);
-          size_t stride = combiner_length + dancer_length;
-          priv.displaylen =
-              stride * DISCO_PASSWORD_DANCERS * strlen(disco_dancers[0]) +
-              strlen(disco_combiner);
-
-          for (size_t i = 0, bit = 1; i < DISCO_PASSWORD_DANCERS;
-               ++i, bit <<= 1) {
-            const char *dancer =
-                disco_dancers[(priv.displaymarker & bit) ? 1 : 0];
-            memcpy(priv.displaybuf + i * stride, disco_combiner,
-                   combiner_length);
-            memcpy(priv.displaybuf + i * stride + combiner_length, dancer,
-                   dancer_length);
+          if (FormatDiscoPrompt(priv.displaymarker, priv.displaybuf,
+                                sizeof(priv.displaybuf),
+                                &priv.displaylen) != 0) {
+            Log("Disco prompt rendering overflow; falling back to cursor");
+            priv.displaylen = PARANOID_PASSWORD_LENGTH;
+            memset(priv.displaybuf, '_', priv.displaylen);
+            priv.displaybuf[priv.displaymarker] = blink_state ? '-' : '|';
+            priv.displaybuf[priv.displaylen] = '\0';
           }
-          memcpy(priv.displaybuf + DISCO_PASSWORD_DANCERS * stride,
-                 disco_combiner, combiner_length);
-          priv.displaybuf[priv.displaylen] = '\0';
           break;
         }
 

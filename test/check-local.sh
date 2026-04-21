@@ -44,6 +44,7 @@ export UBSAN_OPTIONS='print_stacktrace=1:halt_on_error=1'
 echo "Running native smoke tests"
 "$builddir"/rect_test
 "$builddir"/authproto_bounds_test
+"$builddir"/prompt_display_test
 printf 'P 7\nhunter2\n' > "$builddir"/cat_authproto.fixture
 "$builddir"/cat_authproto < "$builddir"/cat_authproto.fixture > "$builddir"/cat_authproto.out
 cmp -s "$builddir"/cat_authproto.fixture "$builddir"/cat_authproto.out || {

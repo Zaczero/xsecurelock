@@ -102,6 +102,7 @@ auth_x11_SOURCES = \
 	helpers/authproto.c helpers/authproto.h \
 	helpers/auth_x11.c \
 	helpers/monitors.c helpers/monitors.h \
+	helpers/prompt_display.c helpers/prompt_display.h \
 	logging.c logging.h \
 	mlock_page.h \
 	rect.c rect.h \
@@ -145,7 +146,7 @@ CLEANFILES += xsecurelock.1.md xsecurelock.1
 endif
 
 # Some tools that we sure don't wan to install
-noinst_PROGRAMS = authproto_bounds_test cat_authproto nvidia_break_compositor get_compositor remap_all rect_test
+noinst_PROGRAMS = authproto_bounds_test cat_authproto nvidia_break_compositor get_compositor remap_all rect_test prompt_display_test
 authproto_bounds_test_SOURCES = \
 	logging.c logging.h \
 	helpers/authproto.c helpers/authproto.h \
@@ -166,6 +167,9 @@ remap_all_SOURCES= \
 rect_test_SOURCES = \
 	rect.c rect.h \
 	test/rect_test.c
+prompt_display_test_SOURCES = \
+	helpers/prompt_display.c helpers/prompt_display.h \
+	test/prompt_display_test.c
 
 check-local:
 	@$(SHELL) "$(abs_srcdir)/test/check-local.sh" "$(abs_srcdir)"
