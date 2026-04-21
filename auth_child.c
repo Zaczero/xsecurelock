@@ -18,11 +18,11 @@ limitations under the License.
 
 #include <stdlib.h>  // for NULL, EXIT_FAILURE
 #include <string.h>  // for strlen
-#include <unistd.h>  // for close, _exit, dup2, execl, fork, pipe
+#include <unistd.h>  // for close, _exit, dup2, execl, fork
 
 #include "env_settings.h"      // for GetIntSetting
 #include "logging.h"           // for LogErrno, Log
-#include "util.h"              // for RetryWrite
+#include "util.h"              // for PipeCloexec, RetryWrite
 #include "wait_pgrp.h"         // for KillPgrp, WaitPgrp
 #include "xscreensaver_api.h"  // for ExportWindowID
 
@@ -117,8 +117,8 @@ int WatchAuthChild(Window w, const char *executable, int force_auth,
   if (force_auth && auth_child_pid == 0) {
     // Start auth child.
     int pc[2];
-    if (pipe(pc)) {
-      LogErrno("pipe");
+    if (PipeCloexec(pc) != 0) {
+      LogErrno("PipeCloexec");
     } else {
       pid_t pid = ForkWithoutSigHandlers();
       if (pid == -1) {

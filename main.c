@@ -39,7 +39,6 @@ limitations under the License.
 #include <stdio.h>           // for printf, size_t, snprintf
 #include <stdlib.h>          // for exit, system, EXIT_FAILURE
 #include <string.h>          // for memset, strcmp, strncmp
-#include <sys/time.h>        // for gettimeofday
 #include <time.h>            // for nanosleep, timespec
 #include <unistd.h>          // for _exit, chdir, close, execvp
 
@@ -163,7 +162,7 @@ int saver_stop_on_blank = 0;
 pid_t notify_command_pid = 0;
 
 //! The time when we will blank the screen.
-struct timeval time_to_blank;
+int64_t time_to_blank_ms;
 
 //! Whether the screen is currently blanked by us.
 int blanked = 0;
@@ -180,8 +179,11 @@ void ResetBlankScreenTimer(void) {
   if (blank_timeout < 0) {
     return;
   }
-  gettimeofday(&time_to_blank, NULL);
-  time_to_blank.tv_sec += blank_timeout;
+  if (GetMonotonicTimeMs(&time_to_blank_ms) != 0) {
+    time_to_blank_ms = INT64_MAX;
+    return;
+  }
+  time_to_blank_ms += (int64_t)blank_timeout * 1000;
 }
 
 void InitBlankScreen(void) {
@@ -196,11 +198,11 @@ void MaybeBlankScreen(Display *display) {
   if (blank_timeout < 0 || blanked) {
     return;
   }
-  struct timeval now;
-  gettimeofday(&now, NULL);
-  if (now.tv_sec < time_to_blank.tv_sec ||
-      (now.tv_sec == time_to_blank.tv_sec &&
-       now.tv_usec < time_to_blank.tv_usec)) {
+  int64_t now_ms;
+  if (GetMonotonicTimeMs(&now_ms) != 0) {
+    return;
+  }
+  if (now_ms < time_to_blank_ms) {
     return;
   }
   // Blank timer expired - blank the screen.

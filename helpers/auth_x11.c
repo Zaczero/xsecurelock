@@ -28,7 +28,7 @@ limitations under the License.
 #include <string.h>      // for strlen, memcpy, memset, strcspn
 #include <sys/time.h>    // for gettimeofday, timeval
 #include <time.h>        // for time, nanosleep, localtime_r
-#include <unistd.h>      // for close, _exit, dup2, pipe, dup
+#include <unistd.h>      // for close, _exit, dup2, dup
 
 #if __STDC_VERSION__ >= 199901L
 #include <inttypes.h>
@@ -1661,12 +1661,16 @@ redraw:
  */
 int Authenticate() {
   int requestfd[2], responsefd[2];
-  if (pipe(requestfd)) {
-    LogErrno("pipe");
+  if (PipeCloexec(requestfd) != 0) {
+    LogErrno("PipeCloexec");
     return 1;
   }
-  if (pipe(responsefd)) {
-    LogErrno("pipe");
+  if (PipeCloexec(responsefd) != 0) {
+    int saved_errno = errno;
+    close(requestfd[0]);
+    close(requestfd[1]);
+    errno = saved_errno;
+    LogErrno("PipeCloexec");
     return 1;
   }
 

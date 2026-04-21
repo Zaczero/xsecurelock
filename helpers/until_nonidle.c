@@ -34,7 +34,6 @@ limitations under the License.
 #include <stdint.h>    // for uint64_t
 #include <stdlib.h>    // for NULL, size_t, EXIT_FAILURE
 #include <string.h>    // for memcpy, NULL, strcmp, strcspn
-#include <sys/time.h>  // for gettimeofday, timeval
 #include <time.h>      // for nanosleep, timespec
 #include <unistd.h>    // for _exit, execvp, fork, setsid
 
@@ -49,6 +48,7 @@ limitations under the License.
 
 #include "../env_settings.h"  // for GetIntSetting, GetStringSetting
 #include "../logging.h"       // for Log, LogErrno
+#include "../util.h"          // for GetMonotonicTimeMs
 #include "../wait_pgrp.h"     // for KillPgrp, WaitPgrp
 
 #ifdef HAVE_XSCREENSAVER_EXT
@@ -206,8 +206,11 @@ int main(int argc, char **argv) {
 
   InitWaitPgrp();
 
-  struct timeval start_time;
-  gettimeofday(&start_time, NULL);
+  int64_t start_time_ms;
+  if (GetMonotonicTimeMs(&start_time_ms) != 0) {
+    LogErrno("GetMonotonicTimeMs");
+    exit(EXIT_FAILURE);
+  }
   int still_idle = 1;
   while (childpid != 0) {
     nanosleep(&(const struct timespec){0, 10000000L}, NULL);  // 10ms.
@@ -218,10 +221,12 @@ int main(int argc, char **argv) {
 
     // Also exit when both dim and wait time expire. This allows using
     // xss-lock's dim-screen.sh without changes.
-    struct timeval current_time;
-    gettimeofday(&current_time, NULL);
-    int active_ms = (current_time.tv_sec - start_time.tv_sec) * 1000 +
-                    (current_time.tv_usec - start_time.tv_usec) / 1000;
+    int64_t current_time_ms;
+    if (GetMonotonicTimeMs(&current_time_ms) != 0) {
+      LogErrno("GetMonotonicTimeMs");
+      exit(EXIT_FAILURE);
+    }
+    int active_ms = (int)(current_time_ms - start_time_ms);
     int should_be_running =
         still_idle && (active_ms <= dim_time_ms + wait_time_ms);
 

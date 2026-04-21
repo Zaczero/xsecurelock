@@ -228,11 +228,44 @@ static void TestRetryPollHighFd(void) {
   WaitForChild(childpid);
 }
 
+static void TestPipeCloexec(void) {
+  int fds[2];
+  assert(PipeCloexec(fds) == 0);
+
+  int flags0 = fcntl(fds[0], F_GETFD);
+  int flags1 = fcntl(fds[1], F_GETFD);
+  assert(flags0 >= 0);
+  assert(flags1 >= 0);
+  assert(flags0 & FD_CLOEXEC);
+  assert(flags1 & FD_CLOEXEC);
+
+  assert(write(fds[1], "E", 1) == 1);
+  char ch = 0;
+  assert(read(fds[0], &ch, 1) == 1);
+  assert(ch == 'E');
+
+  close(fds[0]);
+  close(fds[1]);
+}
+
+static void TestGetMonotonicTimeMs(void) {
+  int64_t start_ms = 0;
+  int64_t end_ms = 0;
+
+  assert(GetMonotonicTimeMs(&start_ms) == 0);
+  SleepMs(20);
+  assert(GetMonotonicTimeMs(&end_ms) == 0);
+  assert(end_ms >= start_ms);
+  assert(end_ms - start_ms >= 1);
+}
+
 int main(void) {
   InstallSignalHandler();
   TestRetryRead();
   TestRetryWrite();
   TestRetryPoll();
   TestRetryPollHighFd();
+  TestPipeCloexec();
+  TestGetMonotonicTimeMs();
   return 0;
 }
