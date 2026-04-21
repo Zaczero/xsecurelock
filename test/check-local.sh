@@ -51,6 +51,7 @@ echo "Running native smoke tests"
 "$builddir"/retry_io_test
 "$builddir"/retry_io_fallback_test
 "$builddir"/indicator_text_test
+"$builddir"/xkb_test
 "$builddir"/mlock_page_test
 "$builddir"/prompt_random_test
 "$builddir"/env_settings_test

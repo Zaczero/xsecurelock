@@ -37,12 +37,6 @@ limitations under the License.
 #include <fontconfig/fontconfig.h>   // for FcChar8
 #endif
 
-#ifdef HAVE_XKB_EXT
-#include <X11/XKBlib.h>             // for XkbFreeKeyboard, XkbGetControls
-#include <X11/extensions/XKB.h>     // for XkbUseCoreKbd, XkbGroupsWrapMask
-#include <X11/extensions/XKBstr.h>  // for _XkbDesc, XkbStateRec, _XkbControls
-#endif
-
 #include "../env_info.h"          // for GetHostName, GetUserName
 #include "../env_settings.h"      // for GetIntSetting, GetStringSetting
 #include "../logging.h"           // for Log, LogErrno
@@ -53,11 +47,11 @@ limitations under the License.
 #include "../wm_properties.h"     // for SetWMProperties
 #include "../xscreensaver_api.h"  // for ReadWindowID
 #include "authproto.h"            // for WritePacket, ReadPacket, PTYPE_R...
-#include "indicator_text.h"       // for AppendIndicatorText
 #include "monitors.h"             // for Monitor, GetMonitors, IsMonitorC...
 #include "prompt_display.h"       // for DISCO_PASSWORD_DANCERS, Format...
 #include "prompt_random.h"        // for PromptRng, NextDisplayMarker
 #include "prompt_state.h"         // for PromptState
+#include "xkb.h"                  // for GetXkbIndicators, SwitchToNext...
 
 #if __STDC_VERSION__ >= 201112L
 #define STATIC_ASSERT(state, message) _Static_assert(state, message)
@@ -191,12 +185,10 @@ static int single_auth_window = 0;
 //! If set, we need to re-query monitor data and adjust windows.
 static int per_monitor_windows_dirty = 1;
 
-#ifdef HAVE_XKB_EXT
 //! If set, we show Xkb keyboard layout name.
 static int show_keyboard_layout = 1;
 //! If set, we show Xkb lock/latch status rather than Xkb indicators.
 static int show_locks_and_latches = 0;
-#endif
 
 #define MAIN_WINDOW 0
 #define MAX_WINDOWS 16
@@ -222,91 +214,6 @@ static XftDraw *xft_draws[MAX_WINDOWS];
 #endif
 
 static int have_xkb_ext;
-
-static void FreeKeyboardDescription(XkbDescPtr *xkb) {
-#ifdef HAVE_XKB_EXT
-  if (*xkb != NULL) {
-    XkbFreeKeyboard(*xkb, 0, True);
-    *xkb = NULL;
-  }
-#else
-  (void)xkb;
-#endif
-}
-
-static XkbDescPtr GetKeyboardDescription(unsigned int names_mask) {
-#ifdef HAVE_XKB_EXT
-  XkbDescPtr xkb = XkbGetMap(display, 0, XkbUseCoreKbd);
-  if (xkb == NULL) {
-    Log("XkbGetMap failed");
-    return NULL;
-  }
-  if (XkbGetControls(display, XkbGroupsWrapMask, xkb) != Success) {
-    Log("XkbGetControls failed");
-    FreeKeyboardDescription(&xkb);
-    return NULL;
-  }
-  if (xkb->ctrls == NULL) {
-    Log("XkbGetControls returned no controls");
-    FreeKeyboardDescription(&xkb);
-    return NULL;
-  }
-  if (names_mask != 0) {
-    if (XkbGetNames(display, names_mask, xkb) != Success) {
-      Log("XkbGetNames failed");
-      FreeKeyboardDescription(&xkb);
-      return NULL;
-    }
-    if (xkb->names == NULL) {
-      Log("XkbGetNames returned no names");
-      FreeKeyboardDescription(&xkb);
-      return NULL;
-    }
-  }
-  return xkb;
-#else
-  (void)names_mask;
-  return NULL;
-#endif
-}
-
-static int GetKeyboardState(XkbStateRec *state) {
-#ifdef HAVE_XKB_EXT
-  if (XkbGetState(display, XkbUseCoreKbd, state) != Success) {
-    Log("XkbGetState failed");
-    return 0;
-  }
-  return 1;
-#else
-  (void)state;
-  return 0;
-#endif
-}
-
-static char *GetAtomNameOrNull(Atom atom) {
-  if (atom == None) {
-    return NULL;
-  }
-  char *name = XGetAtomName(display, atom);
-  if (name == NULL) {
-    Log("XGetAtomName failed for atom %#lx", (unsigned long)atom);
-  }
-  return name;
-}
-
-static int AppendIndicatorAtomName(char **output, size_t *output_size,
-                                   int *have_output, Atom atom) {
-  char *name = GetAtomNameOrNull(atom);
-  if (name == NULL) {
-    return 1;
-  }
-  int ok = AppendIndicatorText(output, output_size, have_output, name);
-  if (!ok) {
-    Log("Not enough space to store modifier name '%s'", name);
-  }
-  XFree(name);
-  return ok;
-}
 
 static int AllocNamedColorOrLog(const char *label, const char *color_name,
                                 XColor *color) {
@@ -398,164 +305,6 @@ static void PlaySound(enum Sound snd) {
   nanosleep(&sleeptime, NULL);
 }
 
-/*! \brief Switch to the next keyboard layout.
- */
-static void SwitchKeyboardLayout(void) {
-#ifdef HAVE_XKB_EXT
-  if (!have_xkb_ext) {
-    return;
-  }
-
-  XkbDescPtr xkb = GetKeyboardDescription(0);
-  if (xkb == NULL) {
-    return;
-  }
-  if (xkb->ctrls->num_groups < 1) {
-    Log("XkbGetControls returned less than 1 group");
-    FreeKeyboardDescription(&xkb);
-    return;
-  }
-  XkbStateRec state;
-  if (!GetKeyboardState(&state)) {
-    FreeKeyboardDescription(&xkb);
-    return;
-  }
-
-  XkbLockGroup(display, XkbUseCoreKbd,
-               (state.group + 1) % xkb->ctrls->num_groups);
-
-  FreeKeyboardDescription(&xkb);
-#endif
-}
-
-/*! \brief Check which modifiers are active.
- *
- * \param warning Will be set to 1 if something's "bad" with the keyboard
- *     layout (e.g. Caps Lock).
- * \param have_multiple_layouts Will be set to 1 if more than one keyboard
- *     layout is available for switching.
- *
- * \return The current modifier mask as a string.
- */
-static const char *GetIndicators(int *warning, int *have_multiple_layouts) {
-#ifdef HAVE_XKB_EXT
-  static char buf[128];
-
-  if (!have_xkb_ext) {
-    return "";
-  }
-
-  XkbDescPtr xkb =
-      GetKeyboardDescription(XkbIndicatorNamesMask | XkbGroupNamesMask |
-                             XkbSymbolsNameMask);
-  if (xkb == NULL) {
-    return "";
-  }
-  XkbStateRec state;
-  if (!GetKeyboardState(&state)) {
-    FreeKeyboardDescription(&xkb);
-    return "";
-  }
-  unsigned int istate = 0;
-  if (!show_locks_and_latches) {
-    if (XkbGetIndicatorState(display, XkbUseCoreKbd, &istate) != Success) {
-      Log("XkbGetIndicatorState failed");
-      FreeKeyboardDescription(&xkb);
-      return "";
-    }
-  }
-
-  // Detect Caps Lock.
-  // Note: in very pathological cases the modifier might be set without an
-  // XkbIndicator for it; then we show the line in red without telling the user
-  // why. Such a situation has not been observd yet though.
-  unsigned int implicit_mods = state.latched_mods | state.locked_mods;
-  if (implicit_mods & LockMask) {
-    *warning = 1;
-  }
-
-  // Provide info about multiple layouts.
-  if (xkb->ctrls->num_groups > 1) {
-    *have_multiple_layouts = 1;
-  }
-
-  char *p = buf;
-  size_t buf_remaining = sizeof(buf);
-  buf[0] = 0;
-
-  const char *word = "Keyboard: ";
-  size_t n = strlen(word);
-  if (n + 1 > buf_remaining) {
-    Log("Not enough space to store intro '%s'", word);
-    FreeKeyboardDescription(&xkb);
-    return "";
-  }
-  memcpy(p, word, n);
-  p += n;
-  buf_remaining -= n;
-  *p = 0;
-
-  int have_output = 0;
-  if (show_keyboard_layout) {
-    Atom layouta = None;
-    if ((unsigned int)state.group < XkbNumKbdGroups) {
-      layouta = xkb->names->groups[state.group];  // Human-readable.
-    }
-    if (layouta == None) {
-      layouta = xkb->names->symbols;  // Machine-readable fallback.
-    }
-    if (!AppendIndicatorAtomName(&p, &buf_remaining, &have_output, layouta)) {
-      FreeKeyboardDescription(&xkb);
-      return "";
-    }
-  }
-
-  if (show_locks_and_latches) {
-    // TODO(divVerent): There must be a better way to get the names of the
-    // modifiers than explicitly enumerating them. Also, there may even be
-    // something that knows that Mod1 is Alt/Meta and Mod2 is Num lock.
-#define APPEND_INDICATOR(mask, name)                                    \
-    do {                                                                \
-      if ((implicit_mods & (mask)) &&                                   \
-          !AppendIndicatorText(&p, &buf_remaining, &have_output,        \
-                               (name))) {                               \
-        Log("Not enough space to store modifier name '%s'", (name));    \
-        goto done;                                                      \
-      }                                                                 \
-    } while (0)
-    APPEND_INDICATOR(ShiftMask, "Shift");
-    APPEND_INDICATOR(LockMask, "Lock");
-    APPEND_INDICATOR(ControlMask, "Control");
-    APPEND_INDICATOR(Mod1Mask, "Mod1");
-    APPEND_INDICATOR(Mod2Mask, "Mod2");
-    APPEND_INDICATOR(Mod3Mask, "Mod3");
-    APPEND_INDICATOR(Mod4Mask, "Mod4");
-    APPEND_INDICATOR(Mod5Mask, "Mod5");
-#undef APPEND_INDICATOR
-  } else {
-    for (int i = 0; i < XkbNumIndicators; i++) {
-      if (!(istate & (1U << i))) {
-        continue;
-      }
-      Atom namea = xkb->names->indicators[i];
-      if (namea == None) {
-        continue;
-      }
-      if (!AppendIndicatorAtomName(&p, &buf_remaining, &have_output, namea)) {
-        break;
-      }
-    }
-  }
-done:
-  *p = 0;
-  FreeKeyboardDescription(&xkb);
-  return have_output ? buf : "";
-#else
-  *warning = *warning;                              // Shut up clang-analyzer.
-  *have_multiple_layouts = *have_multiple_layouts;  // Shut up clang-analyzer.
-  return "";
-#endif
-}
 
 static void CleanupPerMonitorWindow(size_t i) {
   if (windows[i] == None) {
@@ -930,15 +679,15 @@ static int DisplayMessage(const char *title, const char *str, int is_warning) {
   int len_str = strlen(str);
   int tw_str = TextWidth(str, len_str);
 
-  int indicators_warning = 0;
-  int have_multiple_layouts = 0;
-  const char *indicators =
-      GetIndicators(&indicators_warning, &have_multiple_layouts);
-  int len_indicators = strlen(indicators);
-  int tw_indicators = TextWidth(indicators, len_indicators);
+  struct XkbIndicators indicators = {0};
+  (void)GetXkbIndicators(display, have_xkb_ext, show_keyboard_layout,
+                         show_locks_and_latches, &indicators);
+  int len_indicators = strlen(indicators.text);
+  int tw_indicators = TextWidth(indicators.text, len_indicators);
 
-  const char *switch_layout =
-      have_multiple_layouts ? "Press Ctrl-Tab to switch keyboard layout" : "";
+  const char *switch_layout = indicators.have_multiple_layouts
+                                  ? "Press Ctrl-Tab to switch keyboard layout"
+                                  : "";
   int len_switch_layout = strlen(switch_layout);
   int tw_switch_layout = TextWidth(switch_layout, len_switch_layout);
 
@@ -985,7 +734,7 @@ static int DisplayMessage(const char *title, const char *str, int is_warning) {
   if (box_w < tw_switch_user) {
     box_w = tw_switch_user;
   }
-  int box_h = (4 + have_multiple_layouts + have_switch_user_command +
+  int box_h = (4 + indicators.have_multiple_layouts + have_switch_user_command +
                show_datetime * 2) *
               th;
   int region_inset = AuthDialogInset();
@@ -1028,11 +777,11 @@ static int DisplayMessage(const char *title, const char *str, int is_warning) {
     DrawString(i, cx - tw_str / 2, y, is_warning, str, len_str);
     y += th;
 
-    DrawString(i, cx - tw_indicators / 2, y, indicators_warning, indicators,
+    DrawString(i, cx - tw_indicators / 2, y, indicators.warning, indicators.text,
                len_indicators);
     y += th;
 
-    if (have_multiple_layouts) {
+    if (indicators.have_multiple_layouts) {
       DrawString(i, cx - tw_switch_layout / 2, y, 0, switch_layout,
                  len_switch_layout);
       y += th;
@@ -1287,7 +1036,7 @@ static int HandlePromptInputByte(struct PromptState *state, char input_byte,
                                    PARANOID_PASSWORD_MIN_CHANGE);
       return 0;
     case '\023':
-      SwitchKeyboardLayout();
+      SwitchToNextXkbLayout(display, have_xkb_ext);
       return 0;
     case 0:
       *result = PROMPT_SESSION_RESULT_FAILED;
@@ -1704,13 +1453,7 @@ int main(int argc_local, char **argv_local) {
     return 1;
   }
 
-#ifdef HAVE_XKB_EXT
-  int xkb_opcode, xkb_event_base, xkb_error_base;
-  int xkb_major_version = XkbMajorVersion, xkb_minor_version = XkbMinorVersion;
-  have_xkb_ext =
-      XkbQueryExtension(display, &xkb_opcode, &xkb_event_base, &xkb_error_base,
-                        &xkb_major_version, &xkb_minor_version);
-#endif
+  have_xkb_ext = HaveXkbExtension(display);
 
   if (!GetHostName(hostname, sizeof(hostname))) {
     return 1;

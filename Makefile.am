@@ -108,6 +108,7 @@ auth_x11_SOURCES = \
 	helpers/prompt_display.c helpers/prompt_display.h \
 	helpers/prompt_random.c helpers/prompt_random.h \
 	helpers/prompt_state.c helpers/prompt_state.h \
+	helpers/xkb.c helpers/xkb.h \
 	logging.c logging.h \
 	mlock_page.h \
 	rect.c rect.h \
@@ -151,7 +152,7 @@ CLEANFILES += xsecurelock.1.md xsecurelock.1
 endif
 
 # Some tools that we sure don't wan to install
-noinst_PROGRAMS = authproto_bounds_test cat_authproto nvidia_break_compositor get_compositor remap_all rect_test prompt_display_test prompt_state_test explicit_bzero_test explicit_bzero_fallback_test retry_io_test retry_io_fallback_test indicator_text_test mlock_page_test prompt_random_test env_settings_test
+noinst_PROGRAMS = authproto_bounds_test cat_authproto nvidia_break_compositor get_compositor remap_all rect_test prompt_display_test prompt_state_test xkb_test explicit_bzero_test explicit_bzero_fallback_test retry_io_test retry_io_fallback_test indicator_text_test mlock_page_test prompt_random_test env_settings_test
 authproto_bounds_test_SOURCES = \
 	logging.c logging.h \
 	helpers/authproto.c helpers/authproto.h \
@@ -198,6 +199,11 @@ retry_io_fallback_test_CPPFLAGS = $(AM_CPPFLAGS) -DFORCE_PIPE2_FALLBACK=1
 indicator_text_test_SOURCES = \
 	helpers/indicator_text.c helpers/indicator_text.h \
 	test/indicator_text_test.c
+xkb_test_SOURCES = \
+	helpers/indicator_text.c helpers/indicator_text.h \
+	helpers/xkb.c helpers/xkb.h \
+	logging.c logging.h \
+	test/xkb_test.c
 mlock_page_test_SOURCES = \
 	test/mlock_page_test.c \
 	mlock_page.h
