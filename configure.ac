@@ -140,9 +140,6 @@ RP_SEARCH_LIBS(pam_authenticate, pam,
                [HAVE_PAM], [pam], [yes],
                [Enable support for the PAM library to authenticate the user])
 
-RP_CHECK_MODULE(libbsd, [libbsd],
-                [HAVE_LIBBSD], [libbsd], [check],
-                [Use libbsd for utility functions.])
 AC_CHECK_FUNCS([explicit_bzero])
 
 # Xft optionally provides nicer font rendering.

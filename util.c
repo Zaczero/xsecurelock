@@ -37,6 +37,8 @@
 #ifndef HAVE_EXPLICIT_BZERO
 #include <string.h>
 
+// Keep the wipe visible to the optimizer when libc does not provide
+// explicit_bzero().
 void explicit_bzero(void *s, size_t len) {
   memset(s, '\0', len);
   asm volatile("" ::: "memory");

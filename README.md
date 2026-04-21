@@ -14,7 +14,10 @@ pitfalls of screen locking utility design on X11. Details are available in the
 
 # Requirements
 
-The following packages need to be installed; their names depend on your Linux
+XSecureLock targets POSIX/X11 systems on Linux and BSD and expects a
+C99-capable compiler.
+
+The following packages need to be installed; their names depend on your
 distribution of choice, but will be similar:
 
 *   apache2-utils (for the `auth_htpasswd` module)
@@ -22,7 +25,7 @@ distribution of choice, but will be similar:
 *   autoconf (for Ubuntu 18.04 and newer)
 *   binutils
 *   gcc
-*   libc6-dev
+*   libc development headers (for example `libc6-dev` on Debian/Ubuntu)
 *   libpam0g-dev (for Ubuntu 18.04 and newer)
 *   libpam-dev (for the `authproto_pam` module)
 *   libx11-dev
