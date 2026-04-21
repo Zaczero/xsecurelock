@@ -1,0 +1,24 @@
+#preexec export XSECURELOCK_NO_COMPOSITE=1
+#preexec export XSECURELOCK_AUTH="$PWD/../auth_x11"
+#preexec export XSECURELOCK_AUTHPROTO="$PWD/fakeproto.py"
+#preexec export XSECURELOCK_FAKEPROTO_MODE=info-then-prompt
+#preexec export XSECURELOCK_AUTH_TIMEOUT=10
+
+# Assert that xsecurelock is running.
+search --name background
+search --name saver
+sleep 1
+
+# Wake the screen and let the fake authproto advance from an info message to a
+# password prompt without requiring an acknowledgement keypress.
+search --maxdepth 0 ''
+type 'a'
+sleep 2
+
+# Enter the password expected by fakeproto and wait for xsecurelock to exit.
+search --maxdepth 0 ''
+type 'hunter2'
+sleep 2
+
+# Assert that xsecurelock is now gone.
+exec --sync /bin/sh -c '! xdotool search --name background exec echo fail'

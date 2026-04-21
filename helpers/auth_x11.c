@@ -16,7 +16,9 @@ limitations under the License.
 
 #include <X11/X.h>     // for Success, None, Atom, KBBellPitch
 #include <X11/Xlib.h>  // for DefaultScreen, Screen, XFree, True
+#include <errno.h>     // for errno, ESRCH
 #include <locale.h>    // for NULL, setlocale, LC_CTYPE, LC_TIME
+#include <signal.h>    // for SIGTERM, kill
 #include <stdio.h>
 #include <stdlib.h>      // for free, rand, mblen, size_t, EXIT_...
 #include <string.h>      // for strlen, memcpy, memset, strcspn
@@ -1076,6 +1078,128 @@ enum PromptResult {
   PROMPT_RESULT_FAILED,
 };
 
+enum AuthActivityResult {
+  AUTH_ACTIVITY_REDRAW,
+  AUTH_ACTIVITY_INPUT_READY,
+  AUTH_ACTIVITY_EXTRA_FD_READY,
+  AUTH_ACTIVITY_TIMEOUT,
+  AUTH_ACTIVITY_FAILED,
+};
+
+enum StaticMessageResult {
+  STATIC_MESSAGE_RESULT_ADVANCE,
+  STATIC_MESSAGE_RESULT_CANCELLED,
+  STATIC_MESSAGE_RESULT_FAILED,
+};
+
+static void DrainMonitorChangeEvents(void) {
+  XEvent ev;
+  while (XPending(display) && (XNextEvent(display, &ev), 1)) {
+    if (IsMonitorChangeEvent(display, ev.type)) {
+      per_monitor_windows_dirty = 1;
+    }
+  }
+}
+
+static enum AuthActivityResult WaitForAuthActivity(int extra_read_fd,
+                                                   time_t *deadline,
+                                                   int poll_only,
+                                                   char *inputbuf) {
+  struct timeval timeout;
+  if (poll_only) {
+    timeout.tv_sec = 0;
+    timeout.tv_usec = 0;
+  } else {
+    timeout.tv_sec = BLINK_INTERVAL / 1000000;
+    timeout.tv_usec = BLINK_INTERVAL % 1000000;
+  }
+
+  fd_set set;
+  memset(&set, 0, sizeof(set));  // For clang-analyzer.
+  FD_ZERO(&set);
+  FD_SET(0, &set);
+  int max_fd = 0;
+  if (extra_read_fd >= 0) {
+    FD_SET(extra_read_fd, &set);
+    if (extra_read_fd > max_fd) {
+      max_fd = extra_read_fd;
+    }
+  }
+
+  int nfds = select(max_fd + 1, &set, NULL, NULL, &timeout);
+  if (nfds < 0) {
+    LogErrno("select");
+    return AUTH_ACTIVITY_FAILED;
+  }
+
+  time_t now = time(NULL);
+  if (now > *deadline) {
+    return AUTH_ACTIVITY_TIMEOUT;
+  }
+  if (*deadline > now + prompt_timeout) {
+    // Guard against the system clock stepping back.
+    *deadline = now + prompt_timeout;
+  }
+  if (nfds == 0) {
+    return AUTH_ACTIVITY_REDRAW;
+  }
+  if (extra_read_fd >= 0 && FD_ISSET(extra_read_fd, &set)) {
+    return AUTH_ACTIVITY_EXTRA_FD_READY;
+  }
+
+  ssize_t nread = read(0, inputbuf, 1);
+  if (nread <= 0) {
+    Log("EOF on password input - bailing out");
+    return AUTH_ACTIVITY_FAILED;
+  }
+
+  *deadline = now + prompt_timeout;
+  return AUTH_ACTIVITY_INPUT_READY;
+}
+
+static enum StaticMessageResult WaitStaticMessage(const char *title,
+                                                  const char *message,
+                                                  int is_warning,
+                                                  int extra_read_fd) {
+  int played_sound = 0;
+  char inputbuf = 0;
+  time_t deadline = time(NULL) + prompt_timeout;
+
+  for (;;) {
+    DisplayMessage(title, message, is_warning);
+    if (!played_sound) {
+      PlaySound(is_warning ? SOUND_ERROR : SOUND_INFO);
+      played_sound = 1;
+    }
+
+    switch (WaitForAuthActivity(extra_read_fd, &deadline, 0, &inputbuf)) {
+      case AUTH_ACTIVITY_REDRAW:
+        DrainMonitorChangeEvents();
+        break;
+      case AUTH_ACTIVITY_INPUT_READY:
+        DrainMonitorChangeEvents();
+        if (inputbuf == '\033') {
+          return STATIC_MESSAGE_RESULT_CANCELLED;
+        }
+        break;
+      case AUTH_ACTIVITY_EXTRA_FD_READY:
+        DrainMonitorChangeEvents();
+        return STATIC_MESSAGE_RESULT_ADVANCE;
+      case AUTH_ACTIVITY_TIMEOUT:
+        Log("AUTH_TIMEOUT hit");
+        return STATIC_MESSAGE_RESULT_CANCELLED;
+      case AUTH_ACTIVITY_FAILED:
+        return STATIC_MESSAGE_RESULT_FAILED;
+    }
+  }
+}
+
+static void TerminateAuthproto(pid_t childpid) {
+  if (kill(childpid, SIGTERM) != 0 && errno != ESRCH) {
+    LogErrno("kill");
+  }
+}
+
 /*! \brief Ask a question to the user.
  *
  * \param msg The message.
@@ -1266,52 +1390,33 @@ enum PromptResult Prompt(const char *msg, char **response, int echo) {
       blink_state = !blink_state;
     }
 
-    struct timeval timeout;
-    timeout.tv_sec = BLINK_INTERVAL / 1000000;
-    timeout.tv_usec = BLINK_INTERVAL % 1000000;
+    int poll_only = 0;
 
     while (!done) {
-      fd_set set;
-      memset(&set, 0, sizeof(set));  // For clang-analyzer.
-      FD_ZERO(&set);
-      FD_SET(0, &set);
-      int nfds = select(1, &set, NULL, NULL, &timeout);
-      if (nfds < 0) {
-        LogErrno("select");
-        result = PROMPT_RESULT_FAILED;
-        done = 1;
-        break;
+      switch (WaitForAuthActivity(-1, &deadline, poll_only, &priv.inputbuf)) {
+        case AUTH_ACTIVITY_REDRAW:
+          goto redraw;
+        case AUTH_ACTIVITY_TIMEOUT:
+          Log("AUTH_TIMEOUT hit");
+          result = PROMPT_RESULT_CANCELLED;
+          done = 1;
+          break;
+        case AUTH_ACTIVITY_FAILED:
+          result = PROMPT_RESULT_FAILED;
+          done = 1;
+          break;
+        case AUTH_ACTIVITY_EXTRA_FD_READY:
+          Log("Unexpected authproto readiness while prompting");
+          result = PROMPT_RESULT_FAILED;
+          done = 1;
+          break;
+        case AUTH_ACTIVITY_INPUT_READY:
+          poll_only = 1;
+          // Force the cursor to be in visible state while typing.
+          blink_state = 0;
+          break;
       }
-      time_t now = time(NULL);
-      if (now > deadline) {
-        Log("AUTH_TIMEOUT hit");
-        result = PROMPT_RESULT_CANCELLED;
-        done = 1;
-        break;
-      }
-      if (deadline > now + prompt_timeout) {
-        // Guard against the system clock stepping back.
-        deadline = now + prompt_timeout;
-      }
-      if (nfds == 0) {
-        // Blink...
-        break;
-      }
-
-      // From now on, only do nonblocking selects so we update the screen ASAP.
-      timeout.tv_usec = 0;
-
-      // Force the cursor to be in visible state while typing.
-      blink_state = 0;
-
-      // Reset the prompt timeout.
-      deadline = now + prompt_timeout;
-
-      ssize_t nread = read(0, &priv.inputbuf, 1);
-      if (nread <= 0) {
-        Log("EOF on password input - bailing out");
-        result = PROMPT_RESULT_FAILED;
-        done = 1;
+      if (done) {
         break;
       }
       switch (priv.inputbuf) {
@@ -1403,11 +1508,9 @@ enum PromptResult Prompt(const char *msg, char **response, int echo) {
       }
     }
 
-    // Handle X11 events that queued up.
-    while (!done && XPending(display) && (XNextEvent(display, &priv.ev), 1)) {
-      if (IsMonitorChangeEvent(display, priv.ev.type)) {
-        per_monitor_windows_dirty = 1;
-      }
+redraw:
+    if (!done) {
+      DrainMonitorChangeEvents();
     }
   }
 
@@ -1504,18 +1607,38 @@ int Authenticate() {
     char type = ReadPacket(requestfd[0], &message, 1);
     switch (type) {
       case PTYPE_INFO_MESSAGE:
-        DisplayMessage("PAM says", message, 0);
+        switch (WaitStaticMessage("PAM says", message, 0, requestfd[0])) {
+          case STATIC_MESSAGE_RESULT_ADVANCE:
+            break;
+          case STATIC_MESSAGE_RESULT_CANCELLED:
+            TerminateAuthproto(childpid);
+            explicit_bzero(message, strlen(message));
+            free(message);
+            goto done;
+          case STATIC_MESSAGE_RESULT_FAILED:
+            explicit_bzero(message, strlen(message));
+            free(message);
+            goto done;
+        }
         explicit_bzero(message, strlen(message));
         free(message);
-        PlaySound(SOUND_INFO);
-        WaitForKeypress(1);
         break;
       case PTYPE_ERROR_MESSAGE:
-        DisplayMessage("Error", message, 1);
+        switch (WaitStaticMessage("Error", message, 1, requestfd[0])) {
+          case STATIC_MESSAGE_RESULT_ADVANCE:
+            break;
+          case STATIC_MESSAGE_RESULT_CANCELLED:
+            TerminateAuthproto(childpid);
+            explicit_bzero(message, strlen(message));
+            free(message);
+            goto done;
+          case STATIC_MESSAGE_RESULT_FAILED:
+            explicit_bzero(message, strlen(message));
+            free(message);
+            goto done;
+        }
         explicit_bzero(message, strlen(message));
         free(message);
-        PlaySound(SOUND_ERROR);
-        WaitForKeypress(1);
         break;
       case PTYPE_PROMPT_LIKE_USERNAME:
         switch (Prompt(message, &response, 1)) {

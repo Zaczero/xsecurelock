@@ -248,6 +248,7 @@ EXTRA_DIST = \
 	run-iwyu.sh \
 	run-linters.sh \
 	test/*.c \
+	test/*.py \
 	test/*.sh \
 	test/*.xdo \
 	version.c

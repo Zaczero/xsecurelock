@@ -1,0 +1,27 @@
+#preexec export XSECURELOCK_NO_COMPOSITE=1
+#preexec export XSECURELOCK_AUTH="$PWD/../auth_x11"
+#preexec export XSECURELOCK_AUTHPROTO="$PWD/fakeproto.py"
+#preexec export XSECURELOCK_FAKEPROTO_MODE=info-block
+#preexec export XSECURELOCK_AUTH_TIMEOUT=2
+
+# Assert that xsecurelock is running.
+search --name background
+search --name saver
+sleep 1
+
+# Wake the screen and start auth_x11.
+search --maxdepth 0 ''
+type 'a'
+sleep 1
+exec --sync /bin/sh -c 'pgrep -P "$XSECURELOCK_PID" -x auth_x11 >/dev/null'
+
+# Timeout should abort the auth attempt and let the auth child exit.
+sleep 3
+exec --sync /bin/sh -c '! pgrep -P "$XSECURELOCK_PID" -x auth_x11 >/dev/null'
+
+# Waking again should start a fresh auth_x11 instance instead of leaving the
+# previous one hung forever.
+search --maxdepth 0 ''
+type 'a'
+sleep 1
+exec --sync /bin/sh -c 'pgrep -P "$XSECURELOCK_PID" -x auth_x11 >/dev/null'

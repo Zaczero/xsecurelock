@@ -249,8 +249,10 @@ Options to XSecureLock can be passed by environment variables:
 *   `XSECURELOCK_AUTH_FOREGROUND_COLOR`: specifies the X11 color (see manpage of
     XParseColor) for the foreground text of the auth dialog.
 *   `XSECURELOCK_AUTH_TIMEOUT`: specifies the time (in seconds) to wait for
-    response to a prompt by `auth_x11` before giving up and reverting to
-    the screen saver.
+    response to an auth prompt or static PAM message shown by `auth_x11`
+    before giving up and reverting to the screen saver. This also applies to
+    PAM modules that display informational messages while waiting for external
+    input, such as U2F prompts.
 *   `XSECURELOCK_AUTH_WARNING_COLOR`: specifies the X11 color (see manpage of
     XParseColor) for the warning text of the auth dialog.
 *   `XSECURELOCK_AUTH_PADDING`: padding between auth dialog content and its

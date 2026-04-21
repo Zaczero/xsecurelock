@@ -9,10 +9,12 @@ htpasswd -bc "$homedir/.xsecurelock.pw" "$USER" hunter2
 
 # Run preparatory commands.
 eval "$(grep '^#preexec ' "$1" | cut -d ' ' -f 2-)"
+: "${XSECURELOCK_AUTH:=auth_htpasswd}"
+: "${XSECURELOCK_SAVER:=saver_blank}"
 
 # Lock the screen - and wait for the lock to succeed.
 mkfifo "$homedir"/lock.notify
-HOME="$homedir" XSECURELOCK_AUTH=auth_htpasswd XSECURELOCK_SAVER=saver_blank \
+HOME="$homedir" XSECURELOCK_AUTH="$XSECURELOCK_AUTH" XSECURELOCK_SAVER="$XSECURELOCK_SAVER" \
   xsecurelock -- cat "$homedir"/lock.notify & pid=$!
 echo "Waiting for lock..."
 : > "$homedir"/lock.notify
