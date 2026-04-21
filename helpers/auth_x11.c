@@ -57,6 +57,7 @@ limitations under the License.
 #include "../wm_properties.h"     // for SetWMProperties
 #include "../xscreensaver_api.h"  // for ReadWindowID
 #include "authproto.h"            // for WritePacket, ReadPacket, PTYPE_R...
+#include "indicator_text.h"       // for AppendIndicatorText
 #include "monitors.h"             // for Monitor, GetMonitors, IsMonitorC...
 #include "prompt_display.h"       // for DISCO_PASSWORD_DANCERS, Format...
 
@@ -202,6 +203,8 @@ XFontStruct *core_font;
 XftColor xft_color_foreground;
 XftColor xft_color_warning;
 XftFont *xft_font;
+int xft_color_foreground_allocated = 0;
+int xft_color_warning_allocated = 0;
 #endif
 
 //! The background color.
@@ -286,6 +289,121 @@ XftDraw *xft_draws[MAX_WINDOWS];
 
 int have_xkb_ext;
 
+static void FreeKeyboardDescription(XkbDescPtr *xkb) {
+#ifdef HAVE_XKB_EXT
+  if (*xkb != NULL) {
+    XkbFreeKeyboard(*xkb, 0, True);
+    *xkb = NULL;
+  }
+#else
+  (void)xkb;
+#endif
+}
+
+static XkbDescPtr GetKeyboardDescription(unsigned int names_mask) {
+#ifdef HAVE_XKB_EXT
+  XkbDescPtr xkb = XkbGetMap(display, 0, XkbUseCoreKbd);
+  if (xkb == NULL) {
+    Log("XkbGetMap failed");
+    return NULL;
+  }
+  if (XkbGetControls(display, XkbGroupsWrapMask, xkb) != Success) {
+    Log("XkbGetControls failed");
+    FreeKeyboardDescription(&xkb);
+    return NULL;
+  }
+  if (xkb->ctrls == NULL) {
+    Log("XkbGetControls returned no controls");
+    FreeKeyboardDescription(&xkb);
+    return NULL;
+  }
+  if (names_mask != 0) {
+    if (XkbGetNames(display, names_mask, xkb) != Success) {
+      Log("XkbGetNames failed");
+      FreeKeyboardDescription(&xkb);
+      return NULL;
+    }
+    if (xkb->names == NULL) {
+      Log("XkbGetNames returned no names");
+      FreeKeyboardDescription(&xkb);
+      return NULL;
+    }
+  }
+  return xkb;
+#else
+  (void)names_mask;
+  return NULL;
+#endif
+}
+
+static int GetKeyboardState(XkbStateRec *state) {
+#ifdef HAVE_XKB_EXT
+  if (XkbGetState(display, XkbUseCoreKbd, state) != Success) {
+    Log("XkbGetState failed");
+    return 0;
+  }
+  return 1;
+#else
+  (void)state;
+  return 0;
+#endif
+}
+
+static char *GetAtomNameOrNull(Atom atom) {
+  if (atom == None) {
+    return NULL;
+  }
+  char *name = XGetAtomName(display, atom);
+  if (name == NULL) {
+    Log("XGetAtomName failed for atom %#lx", (unsigned long)atom);
+  }
+  return name;
+}
+
+static int AppendIndicatorAtomName(char **output, size_t *output_size,
+                                   int *have_output, Atom atom) {
+  char *name = GetAtomNameOrNull(atom);
+  if (name == NULL) {
+    return 1;
+  }
+  int ok = AppendIndicatorText(output, output_size, have_output, name);
+  if (!ok) {
+    Log("Not enough space to store modifier name '%s'", name);
+  }
+  XFree(name);
+  return ok;
+}
+
+static int AllocNamedColorOrLog(const char *label, const char *color_name,
+                                XColor *color) {
+  XColor dummy;
+  if (XAllocNamedColor(display, DefaultColormap(display, DefaultScreen(display)),
+                       color_name, color, &dummy)) {
+    return 1;
+  }
+  Log("Could not allocate %s color '%s'", label, color_name);
+  return 0;
+}
+
+#ifdef HAVE_XFT_EXT
+static int AllocXftColorOrLog(const char *label, const XColor *xcolor,
+                              XftColor *xft_color, int *allocated) {
+  XRenderColor xrcolor;
+  xrcolor.alpha = 65535;
+  xrcolor.red = xcolor->red;
+  xrcolor.green = xcolor->green;
+  xrcolor.blue = xcolor->blue;
+  if (!XftColorAllocValue(display, DefaultVisual(display, DefaultScreen(display)),
+                          DefaultColormap(display, DefaultScreen(display)),
+                          &xrcolor, xft_color)) {
+    Log("XftColorAllocValue failed for %s color", label);
+    return 0;
+  }
+  *allocated = 1;
+  return 1;
+}
+#endif
+
 enum Sound { SOUND_PROMPT, SOUND_INFO, SOUND_ERROR, SOUND_SUCCESS };
 
 #define NOTE_DS3 156
@@ -354,29 +472,25 @@ void SwitchKeyboardLayout(void) {
     return;
   }
 
-  XkbDescPtr xkb;
-  xkb = XkbGetMap(display, 0, XkbUseCoreKbd);
-  if (XkbGetControls(display, XkbGroupsWrapMask, xkb) != Success) {
-    Log("XkbGetControls failed");
-    XkbFreeKeyboard(xkb, 0, True);
+  XkbDescPtr xkb = GetKeyboardDescription(0);
+  if (xkb == NULL) {
     return;
   }
   if (xkb->ctrls->num_groups < 1) {
     Log("XkbGetControls returned less than 1 group");
-    XkbFreeKeyboard(xkb, 0, True);
+    FreeKeyboardDescription(&xkb);
     return;
   }
   XkbStateRec state;
-  if (XkbGetState(display, XkbUseCoreKbd, &state) != Success) {
-    Log("XkbGetState failed");
-    XkbFreeKeyboard(xkb, 0, True);
+  if (!GetKeyboardState(&state)) {
+    FreeKeyboardDescription(&xkb);
     return;
   }
 
   XkbLockGroup(display, XkbUseCoreKbd,
                (state.group + 1) % xkb->ctrls->num_groups);
 
-  XkbFreeKeyboard(xkb, 0, True);
+  FreeKeyboardDescription(&xkb);
 #endif
 }
 
@@ -392,38 +506,27 @@ void SwitchKeyboardLayout(void) {
 const char *GetIndicators(int *warning, int *have_multiple_layouts) {
 #ifdef HAVE_XKB_EXT
   static char buf[128];
-  char *p;
 
   if (!have_xkb_ext) {
     return "";
   }
 
-  XkbDescPtr xkb;
-  xkb = XkbGetMap(display, 0, XkbUseCoreKbd);
-  if (XkbGetControls(display, XkbGroupsWrapMask, xkb) != Success) {
-    Log("XkbGetControls failed");
-    XkbFreeKeyboard(xkb, 0, True);
-    return "";
-  }
-  if (XkbGetNames(
-          display,
-          XkbIndicatorNamesMask | XkbGroupNamesMask | XkbSymbolsNameMask,
-          xkb) != Success) {
-    Log("XkbGetNames failed");
-    XkbFreeKeyboard(xkb, 0, True);
+  XkbDescPtr xkb =
+      GetKeyboardDescription(XkbIndicatorNamesMask | XkbGroupNamesMask |
+                             XkbSymbolsNameMask);
+  if (xkb == NULL) {
     return "";
   }
   XkbStateRec state;
-  if (XkbGetState(display, XkbUseCoreKbd, &state) != Success) {
-    Log("XkbGetState failed");
-    XkbFreeKeyboard(xkb, 0, True);
+  if (!GetKeyboardState(&state)) {
+    FreeKeyboardDescription(&xkb);
     return "";
   }
   unsigned int istate = 0;
   if (!show_locks_and_latches) {
     if (XkbGetIndicatorState(display, XkbUseCoreKbd, &istate) != Success) {
       Log("XkbGetIndicatorState failed");
-      XkbFreeKeyboard(xkb, 0, True);
+      FreeKeyboardDescription(&xkb);
       return "";
     }
   }
@@ -442,75 +545,59 @@ const char *GetIndicators(int *warning, int *have_multiple_layouts) {
     *have_multiple_layouts = 1;
   }
 
-  p = buf;
+  char *p = buf;
+  size_t buf_remaining = sizeof(buf);
+  buf[0] = 0;
 
   const char *word = "Keyboard: ";
   size_t n = strlen(word);
-  if (n >= sizeof(buf) - (p - buf)) {
+  if (n + 1 > buf_remaining) {
     Log("Not enough space to store intro '%s'", word);
-    XkbFreeKeyboard(xkb, 0, True);
+    FreeKeyboardDescription(&xkb);
     return "";
   }
   memcpy(p, word, n);
   p += n;
+  buf_remaining -= n;
+  *p = 0;
 
   int have_output = 0;
   if (show_keyboard_layout) {
-    Atom layouta = xkb->names->groups[state.group];  // Human-readable.
+    Atom layouta = None;
+    if ((unsigned int)state.group < XkbNumKbdGroups) {
+      layouta = xkb->names->groups[state.group];  // Human-readable.
+    }
     if (layouta == None) {
       layouta = xkb->names->symbols;  // Machine-readable fallback.
     }
-    if (layouta != None) {
-      char *layout = XGetAtomName(display, layouta);
-      n = strlen(layout);
-      if (n >= sizeof(buf) - (p - buf)) {
-        Log("Not enough space to store layout name '%s'", layout);
-        XFree(layout);
-        XkbFreeKeyboard(xkb, 0, True);
-        return "";
-      }
-      memcpy(p, layout, n);
-      XFree(layout);
-      p += n;
-      have_output = 1;
+    if (!AppendIndicatorAtomName(&p, &buf_remaining, &have_output, layouta)) {
+      FreeKeyboardDescription(&xkb);
+      return "";
     }
   }
 
   if (show_locks_and_latches) {
-#define ADD_INDICATOR(mask, name)                                \
-  do {                                                           \
-    if (!(implicit_mods & (mask))) {                             \
-      continue;                                                  \
-    }                                                            \
-    if (have_output) {                                           \
-      if (2 >= sizeof(buf) - (p - buf)) {                        \
-        Log("Not enough space to store another modifier name");  \
-        break;                                                   \
-      }                                                          \
-      memcpy(p, ", ", 2);                                        \
-      p += 2;                                                    \
-    }                                                            \
-    size_t n = strlen(name);                                     \
-    if (n >= sizeof(buf) - (p - buf)) {                          \
-      Log("Not enough space to store modifier name '%s'", name); \
-      XFree(name);                                               \
-      break;                                                     \
-    }                                                            \
-    memcpy(p, (name), n);                                        \
-    p += n;                                                      \
-    have_output = 1;                                             \
-  } while (0)
     // TODO(divVerent): There must be a better way to get the names of the
     // modifiers than explicitly enumerating them. Also, there may even be
     // something that knows that Mod1 is Alt/Meta and Mod2 is Num lock.
-    ADD_INDICATOR(ShiftMask, "Shift");
-    ADD_INDICATOR(LockMask, "Lock");
-    ADD_INDICATOR(ControlMask, "Control");
-    ADD_INDICATOR(Mod1Mask, "Mod1");
-    ADD_INDICATOR(Mod2Mask, "Mod2");
-    ADD_INDICATOR(Mod3Mask, "Mod3");
-    ADD_INDICATOR(Mod4Mask, "Mod4");
-    ADD_INDICATOR(Mod5Mask, "Mod5");
+#define APPEND_INDICATOR(mask, name)                                    \
+    do {                                                                \
+      if ((implicit_mods & (mask)) &&                                   \
+          !AppendIndicatorText(&p, &buf_remaining, &have_output,        \
+                               (name))) {                               \
+        Log("Not enough space to store modifier name '%s'", (name));    \
+        goto done;                                                      \
+      }                                                                 \
+    } while (0)
+    APPEND_INDICATOR(ShiftMask, "Shift");
+    APPEND_INDICATOR(LockMask, "Lock");
+    APPEND_INDICATOR(ControlMask, "Control");
+    APPEND_INDICATOR(Mod1Mask, "Mod1");
+    APPEND_INDICATOR(Mod2Mask, "Mod2");
+    APPEND_INDICATOR(Mod3Mask, "Mod3");
+    APPEND_INDICATOR(Mod4Mask, "Mod4");
+    APPEND_INDICATOR(Mod5Mask, "Mod5");
+#undef APPEND_INDICATOR
   } else {
     for (int i = 0; i < XkbNumIndicators; i++) {
       if (!(istate & (1U << i))) {
@@ -520,29 +607,14 @@ const char *GetIndicators(int *warning, int *have_multiple_layouts) {
       if (namea == None) {
         continue;
       }
-      if (have_output) {
-        if (2 >= sizeof(buf) - (p - buf)) {
-          Log("Not enough space to store another modifier name");
-          break;
-        }
-        memcpy(p, ", ", 2);
-        p += 2;
-      }
-      char *name = XGetAtomName(display, namea);
-      size_t n = strlen(name);
-      if (n >= sizeof(buf) - (p - buf)) {
-        Log("Not enough space to store modifier name '%s'", name);
-        XFree(name);
+      if (!AppendIndicatorAtomName(&p, &buf_remaining, &have_output, namea)) {
         break;
       }
-      memcpy(p, name, n);
-      XFree(name);
-      p += n;
-      have_output = 1;
     }
   }
+done:
   *p = 0;
-  XkbFreeKeyboard(xkb, 0, True);
+  FreeKeyboardDescription(&xkb);
   return have_output ? buf : "";
 #else
   *warning = *warning;                              // Shut up clang-analyzer.
@@ -551,21 +623,38 @@ const char *GetIndicators(int *warning, int *have_multiple_layouts) {
 #endif
 }
 
+static void CleanupPerMonitorWindow(size_t i) {
+  if (windows[i] == None) {
+    return;
+  }
+  // Once the window is unmapped or destroyed, nobody else is guaranteed to
+  // repaint the pixels it used to cover immediately.
+  XClearWindow(display, windows[i]);
+#ifdef HAVE_XFT_EXT
+  if (xft_draws[i] != NULL) {
+    XftDrawDestroy(xft_draws[i]);
+    xft_draws[i] = NULL;
+  }
+#endif
+  if (gcs_warning[i] != NULL) {
+    XFreeGC(display, gcs_warning[i]);
+    gcs_warning[i] = NULL;
+  }
+  if (gcs[i] != NULL) {
+    XFreeGC(display, gcs[i]);
+    gcs[i] = NULL;
+  }
+  if (i == MAIN_WINDOW) {
+    XUnmapWindow(display, windows[i]);
+  } else {
+    XDestroyWindow(display, windows[i]);
+  }
+  windows[i] = None;
+}
+
 void DestroyPerMonitorWindows(size_t keep_windows) {
   for (size_t i = keep_windows; i < num_windows; ++i) {
-    // Once the window is unmapped or destroyed, nobody else is guaranteed to
-    // repaint the pixels it used to cover immediately.
-    XClearWindow(display, windows[i]);
-#ifdef HAVE_XFT_EXT
-    XftDrawDestroy(xft_draws[i]);
-#endif
-    XFreeGC(display, gcs_warning[i]);
-    XFreeGC(display, gcs[i]);
-    if (i == MAIN_WINDOW) {
-      XUnmapWindow(display, windows[i]);
-    } else {
-      XDestroyWindow(display, windows[i]);
-    }
+    CleanupPerMonitorWindow(i);
   }
   if (num_windows > keep_windows) {
     num_windows = keep_windows;
@@ -582,9 +671,8 @@ static void ClearWindowUncoveredAreas(size_t i, Rect new_rect) {
   }
 }
 
-void CreateOrUpdatePerMonitorWindow(size_t i, const Monitor *monitor,
-                                    int region_w, int region_h, int x_offset,
-                                    int y_offset) {
+int CreateOrUpdatePerMonitorWindow(size_t i, const Monitor *monitor, int region_w,
+                                   int region_h, int x_offset, int y_offset) {
   // Desired box.
   int w = region_w;
   int h = region_h;
@@ -612,7 +700,7 @@ void CreateOrUpdatePerMonitorWindow(size_t i, const Monitor *monitor,
     ClearWindowUncoveredAreas(i, new_rect);
     XMoveResizeWindow(display, windows[i], x, y, w, h);
     window_rects[i] = new_rect;
-    return;
+    return 1;
   }
 
   if (i > num_windows) {
@@ -635,6 +723,10 @@ void CreateOrUpdatePerMonitorWindow(size_t i, const Monitor *monitor,
     windows[i] =
         XCreateWindow(display, parent_window, x, y, w, h, 0, CopyFromParent,
                       InputOutput, CopyFromParent, CWBackPixel, &attrs);
+    if (windows[i] == None) {
+      Log("XCreateWindow failed");
+      return 0;
+    }
     SetWMProperties(display, windows[i], "xsecurelock", "auth_x11_screen", argc,
                     argv);
     // We should always make sure that main_window stays on top of all others.
@@ -659,25 +751,41 @@ void CreateOrUpdatePerMonitorWindow(size_t i, const Monitor *monitor,
                      GCFunction | GCForeground | GCBackground |
                          (core_font != NULL ? GCFont : 0),
                      &gcattrs);
+  if (gcs[i] == NULL) {
+    Log("XCreateGC failed");
+    CleanupPerMonitorWindow(i);
+    return 0;
+  }
   gcattrs.foreground = xcolor_warning.pixel;
   gcs_warning[i] = XCreateGC(display, windows[i],
                              GCFunction | GCForeground | GCBackground |
                                  (core_font != NULL ? GCFont : 0),
                              &gcattrs);
+  if (gcs_warning[i] == NULL) {
+    Log("XCreateGC failed for warning GC");
+    CleanupPerMonitorWindow(i);
+    return 0;
+  }
 #ifdef HAVE_XFT_EXT
   xft_draws[i] = XftDrawCreate(
       display, windows[i], DefaultVisual(display, DefaultScreen(display)),
       DefaultColormap(display, DefaultScreen(display)));
+  if (xft_font != NULL && xft_draws[i] == NULL) {
+    Log("XftDrawCreate failed");
+    CleanupPerMonitorWindow(i);
+    return 0;
+  }
 #endif
 
   // This window is now ready to use.
   XMapWindow(display, windows[i]);
   window_rects[i] = new_rect;
   num_windows = i + 1;
+  return 1;
 }
 
-void UpdatePerMonitorWindows(int monitors_changed, int region_w, int region_h,
-                             int x_offset, int y_offset) {
+int UpdatePerMonitorWindows(int monitors_changed, int region_w, int region_h,
+                            int x_offset, int y_offset) {
   static size_t num_monitors = 0;
   static Monitor monitors[MAX_WINDOWS];
 
@@ -694,19 +802,25 @@ void UpdatePerMonitorWindows(int monitors_changed, int region_w, int region_h,
     for (size_t i = 0; i < num_monitors; ++i) {
       if (x >= monitors[i].x && x < monitors[i].x + monitors[i].width &&
           y >= monitors[i].y && y < monitors[i].y + monitors[i].height) {
-        CreateOrUpdatePerMonitorWindow(0, &monitors[i], region_w, region_h,
-                                       x_offset, y_offset);
-        return;
+        if (!CreateOrUpdatePerMonitorWindow(0, &monitors[i], region_w, region_h,
+                                           x_offset, y_offset)) {
+          DestroyPerMonitorWindows(0);
+          return 0;
+        }
+        return 1;
       }
     }
     if (num_monitors > 0) {
-      CreateOrUpdatePerMonitorWindow(0, &monitors[0], region_w, region_h,
-                                     x_offset, y_offset);
+      if (!CreateOrUpdatePerMonitorWindow(0, &monitors[0], region_w, region_h,
+                                          x_offset, y_offset)) {
+        DestroyPerMonitorWindows(0);
+        return 0;
+      }
       DestroyPerMonitorWindows(1);
     } else {
       DestroyPerMonitorWindows(0);
     }
-    return;
+    return 1;
   }
 
   // 1 window per monitor.
@@ -714,8 +828,11 @@ void UpdatePerMonitorWindows(int monitors_changed, int region_w, int region_h,
 
   // Update or create everything.
   for (size_t i = 0; i < new_num_windows; ++i) {
-    CreateOrUpdatePerMonitorWindow(i, &monitors[i], region_w, region_h,
-                                   x_offset, y_offset);
+    if (!CreateOrUpdatePerMonitorWindow(i, &monitors[i], region_w, region_h,
+                                        x_offset, y_offset)) {
+      DestroyPerMonitorWindows(0);
+      return 0;
+    }
   }
 
   // Kill all the old stuff.
@@ -725,6 +842,7 @@ void UpdatePerMonitorWindows(int monitors_changed, int region_w, int region_h,
     Log("Unreachable code - expected to get %d windows, got %d",
         (int)new_num_windows, (int)num_windows);
   }
+  return 1;
 }
 
 int TextAscent(void) {
@@ -864,7 +982,7 @@ void BuildTitle(char *output, size_t output_size, const char *input) {
  * \param str The message itself.
  * \param is_warning Whether to use the warning style to display the message.
  */
-void DisplayMessage(const char *title, const char *str, int is_warning) {
+int DisplayMessage(const char *title, const char *str, int is_warning) {
   char full_title[256];
   BuildTitle(full_title, sizeof(full_title), title);
 
@@ -958,8 +1076,11 @@ void DisplayMessage(const char *title, const char *str, int is_warning) {
     }
   }
 
-  UpdatePerMonitorWindows(per_monitor_windows_dirty, region_w, region_h,
-                          x_offset, y_offset);
+  if (!UpdatePerMonitorWindows(per_monitor_windows_dirty, region_w, region_h,
+                               x_offset, y_offset)) {
+    per_monitor_windows_dirty = 1;
+    return 0;
+  }
   per_monitor_windows_dirty = 0;
 
   for (size_t i = 0; i < num_windows; ++i) {
@@ -1001,6 +1122,7 @@ void DisplayMessage(const char *title, const char *str, int is_warning) {
 
   // Make the things just drawn appear on the screen as soon as possible.
   XFlush(display);
+  return 1;
 }
 
 void WaitForKeypress(int seconds) {
@@ -1169,7 +1291,9 @@ static enum StaticMessageResult WaitStaticMessage(const char *title,
   time_t deadline = time(NULL) + prompt_timeout;
 
   for (;;) {
-    DisplayMessage(title, message, is_warning);
+    if (!DisplayMessage(title, message, is_warning)) {
+      return STATIC_MESSAGE_RESULT_FAILED;
+    }
     if (!played_sound) {
       PlaySound(is_warning ? SOUND_ERROR : SOUND_INFO);
       played_sound = 1;
@@ -1195,6 +1319,15 @@ static enum StaticMessageResult WaitStaticMessage(const char *title,
         return STATIC_MESSAGE_RESULT_FAILED;
     }
   }
+}
+
+static void ClearFreeString(char **message) {
+  if (*message == NULL) {
+    return;
+  }
+  explicit_bzero(*message, strlen(*message));
+  free(*message);
+  *message = NULL;
 }
 
 static void TerminateAuthproto(pid_t childpid) {
@@ -1251,7 +1384,9 @@ enum PromptResult Prompt(const char *msg, char **response, int echo) {
     LogErrno("mlock");
     // We continue anyway, as the user being unable to unlock the screen is
     // worse. But let's alert the user.
-    DisplayMessage("Error", "Password will not be stored securely.", 1);
+    if (!DisplayMessage("Error", "Password will not be stored securely.", 1)) {
+      return PROMPT_RESULT_FAILED;
+    }
     WaitForKeypress(1);
   }
 
@@ -1371,7 +1506,11 @@ enum PromptResult Prompt(const char *msg, char **response, int echo) {
         }
       }
     }
-    DisplayMessage(msg, priv.displaybuf, 0);
+    if (!DisplayMessage(msg, priv.displaybuf, 0)) {
+      result = PROMPT_RESULT_FAILED;
+      done = 1;
+      break;
+    }
 
     if (!played_sound) {
       PlaySound(SOUND_PROMPT);
@@ -1474,8 +1613,12 @@ enum PromptResult Prompt(const char *msg, char **response, int echo) {
             LogErrno("mlock");
             // We continue anyway, as the user being unable to unlock the screen
             // is worse. But let's alert the user of this.
-            DisplayMessage("Error", "Password has not been stored securely.",
-                           1);
+            if (!DisplayMessage("Error",
+                                "Password has not been stored securely.", 1)) {
+              result = PROMPT_RESULT_FAILED;
+              done = 1;
+              break;
+            }
             WaitForKeypress(1);
           }
           if (priv.pwlen != 0) {
@@ -1600,6 +1743,13 @@ int Authenticate() {
   // Otherwise, we're in the parent process.
   close(requestfd[1]);
   close(responsefd[0]);
+#define SHOW_PROCESSING_OR_FAIL()        \
+  do {                                   \
+    if (!DisplayMessage("Processing...", "", 0)) { \
+      ClearFreeString(&message);         \
+      goto done;                         \
+    }                                    \
+  } while (0)
   for (;;) {
     char *message;
     char *response;
@@ -1611,16 +1761,13 @@ int Authenticate() {
             break;
           case STATIC_MESSAGE_RESULT_CANCELLED:
             TerminateAuthproto(childpid);
-            explicit_bzero(message, strlen(message));
-            free(message);
+            ClearFreeString(&message);
             goto done;
           case STATIC_MESSAGE_RESULT_FAILED:
-            explicit_bzero(message, strlen(message));
-            free(message);
+            ClearFreeString(&message);
             goto done;
         }
-        explicit_bzero(message, strlen(message));
-        free(message);
+        ClearFreeString(&message);
         break;
       case PTYPE_ERROR_MESSAGE:
         switch (WaitStaticMessage("Error", message, 1, requestfd[0])) {
@@ -1628,16 +1775,13 @@ int Authenticate() {
             break;
           case STATIC_MESSAGE_RESULT_CANCELLED:
             TerminateAuthproto(childpid);
-            explicit_bzero(message, strlen(message));
-            free(message);
+            ClearFreeString(&message);
             goto done;
           case STATIC_MESSAGE_RESULT_FAILED:
-            explicit_bzero(message, strlen(message));
-            free(message);
+            ClearFreeString(&message);
             goto done;
         }
-        explicit_bzero(message, strlen(message));
-        free(message);
+        ClearFreeString(&message);
         break;
       case PTYPE_PROMPT_LIKE_USERNAME:
         switch (Prompt(message, &response, 1)) {
@@ -1645,19 +1789,17 @@ int Authenticate() {
             WritePacket(responsefd[1], PTYPE_RESPONSE_LIKE_USERNAME, response);
             explicit_bzero(response, strlen(response));
             free(response);
-            DisplayMessage("Processing...", "", 0);
+            SHOW_PROCESSING_OR_FAIL();
             break;
           case PROMPT_RESULT_CANCELLED:
             WritePacket(responsefd[1], PTYPE_RESPONSE_CANCELLED, "");
-            DisplayMessage("Processing...", "", 0);
+            SHOW_PROCESSING_OR_FAIL();
             break;
           case PROMPT_RESULT_FAILED:
-            explicit_bzero(message, strlen(message));
-            free(message);
+            ClearFreeString(&message);
             goto done;
         }
-        explicit_bzero(message, strlen(message));
-        free(message);
+        ClearFreeString(&message);
         break;
       case PTYPE_PROMPT_LIKE_PASSWORD:
         switch (Prompt(message, &response, 0)) {
@@ -1665,29 +1807,27 @@ int Authenticate() {
             WritePacket(responsefd[1], PTYPE_RESPONSE_LIKE_PASSWORD, response);
             explicit_bzero(response, strlen(response));
             free(response);
-            DisplayMessage("Processing...", "", 0);
+            SHOW_PROCESSING_OR_FAIL();
             break;
           case PROMPT_RESULT_CANCELLED:
             WritePacket(responsefd[1], PTYPE_RESPONSE_CANCELLED, "");
-            DisplayMessage("Processing...", "", 0);
+            SHOW_PROCESSING_OR_FAIL();
             break;
           case PROMPT_RESULT_FAILED:
-            explicit_bzero(message, strlen(message));
-            free(message);
+            ClearFreeString(&message);
             goto done;
         }
-        explicit_bzero(message, strlen(message));
-        free(message);
+        ClearFreeString(&message);
         break;
       case 0:
         goto done;
       default:
         Log("Unknown message type %02x", (int)type);
-        explicit_bzero(message, strlen(message));
-        free(message);
+        ClearFreeString(&message);
         goto done;
     }
   }
+#undef SHOW_PROCESSING_OR_FAIL
 done:
   close(requestfd[0]);
   close(responsefd[1]);
@@ -1854,24 +1994,38 @@ int main(int argc_local, char **argv_local) {
   Window unused_root;
   Window *unused_children = NULL;
   unsigned int unused_nchildren;
-  XQueryTree(display, main_window, &unused_root, &parent_window,
-             &unused_children, &unused_nchildren);
-  XFree(unused_children);
+  if (!XQueryTree(display, main_window, &unused_root, &parent_window,
+                  &unused_children, &unused_nchildren)) {
+    Log("XQueryTree failed for auth window");
+    return 1;
+  }
+  if (unused_children != NULL) {
+    XFree(unused_children);
+  }
+  if (parent_window == None) {
+    Log("XQueryTree returned no parent window for auth window");
+    return 1;
+  }
 
   Colormap colormap = DefaultColormap(display, DefaultScreen(display));
 
-  XColor dummy;
-  XAllocNamedColor(
-      display, DefaultColormap(display, DefaultScreen(display)),
-      GetStringSetting("XSECURELOCK_AUTH_BACKGROUND_COLOR", "black"),
-      &xcolor_background, &dummy);
-  XAllocNamedColor(
-      display, DefaultColormap(display, DefaultScreen(display)),
-      GetStringSetting("XSECURELOCK_AUTH_FOREGROUND_COLOR", "white"),
-      &xcolor_foreground, &dummy);
-  XAllocNamedColor(display, DefaultColormap(display, DefaultScreen(display)),
-                   GetStringSetting("XSECURELOCK_AUTH_WARNING_COLOR", "red"),
-                   &xcolor_warning, &dummy);
+  const char *background_color =
+      GetStringSetting("XSECURELOCK_AUTH_BACKGROUND_COLOR", "black");
+  if (!AllocNamedColorOrLog("background", background_color,
+                            &xcolor_background)) {
+    return 1;
+  }
+  const char *foreground_color =
+      GetStringSetting("XSECURELOCK_AUTH_FOREGROUND_COLOR", "white");
+  if (!AllocNamedColorOrLog("foreground", foreground_color,
+                            &xcolor_foreground)) {
+    return 1;
+  }
+  const char *warning_color =
+      GetStringSetting("XSECURELOCK_AUTH_WARNING_COLOR", "red");
+  if (!AllocNamedColorOrLog("warning", warning_color, &xcolor_warning)) {
+    return 1;
+  }
 
   core_font = NULL;
 #ifdef HAVE_XFT_EXT
@@ -1917,23 +2071,19 @@ int main(int argc_local, char **argv_local) {
 
 #ifdef HAVE_XFT_EXT
   if (xft_font != NULL) {
-    XRenderColor xrcolor;
-    xrcolor.alpha = 65535;
-
-    // Translate the X11 colors to XRender colors.
-    xrcolor.red = xcolor_foreground.red;
-    xrcolor.green = xcolor_foreground.green;
-    xrcolor.blue = xcolor_foreground.blue;
-    XftColorAllocValue(display, DefaultVisual(display, DefaultScreen(display)),
-                       DefaultColormap(display, DefaultScreen(display)),
-                       &xrcolor, &xft_color_foreground);
-
-    xrcolor.red = xcolor_warning.red;
-    xrcolor.green = xcolor_warning.green;
-    xrcolor.blue = xcolor_warning.blue;
-    XftColorAllocValue(display, DefaultVisual(display, DefaultScreen(display)),
-                       DefaultColormap(display, DefaultScreen(display)),
-                       &xrcolor, &xft_color_warning);
+    if (!AllocXftColorOrLog("foreground", &xcolor_foreground,
+                            &xft_color_foreground,
+                            &xft_color_foreground_allocated)) {
+      return 1;
+    }
+    if (!AllocXftColorOrLog("warning", &xcolor_warning, &xft_color_warning,
+                            &xft_color_warning_allocated)) {
+      XftColorFree(display, DefaultVisual(display, DefaultScreen(display)),
+                   DefaultColormap(display, DefaultScreen(display)),
+                   &xft_color_foreground);
+      xft_color_foreground_allocated = 0;
+      return 1;
+    }
   }
 #endif
 
@@ -1948,12 +2098,16 @@ int main(int argc_local, char **argv_local) {
 
 #ifdef HAVE_XFT_EXT
   if (xft_font != NULL) {
-    XftColorFree(display, DefaultVisual(display, DefaultScreen(display)),
-                 DefaultColormap(display, DefaultScreen(display)),
-                 &xft_color_warning);
-    XftColorFree(display, DefaultVisual(display, DefaultScreen(display)),
-                 DefaultColormap(display, DefaultScreen(display)),
-                 &xft_color_foreground);
+    if (xft_color_warning_allocated) {
+      XftColorFree(display, DefaultVisual(display, DefaultScreen(display)),
+                   DefaultColormap(display, DefaultScreen(display)),
+                   &xft_color_warning);
+    }
+    if (xft_color_foreground_allocated) {
+      XftColorFree(display, DefaultVisual(display, DefaultScreen(display)),
+                   DefaultColormap(display, DefaultScreen(display)),
+                   &xft_color_foreground);
+    }
     XftFontClose(display, xft_font);
   }
 #endif

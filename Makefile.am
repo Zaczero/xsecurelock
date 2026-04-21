@@ -101,6 +101,7 @@ auth_x11_SOURCES = \
 	env_settings.c env_settings.h \
 	helpers/authproto.c helpers/authproto.h \
 	helpers/auth_x11.c \
+	helpers/indicator_text.c helpers/indicator_text.h \
 	helpers/monitors.c helpers/monitors.h \
 	helpers/prompt_display.c helpers/prompt_display.h \
 	logging.c logging.h \
@@ -146,7 +147,7 @@ CLEANFILES += xsecurelock.1.md xsecurelock.1
 endif
 
 # Some tools that we sure don't wan to install
-noinst_PROGRAMS = authproto_bounds_test cat_authproto nvidia_break_compositor get_compositor remap_all rect_test prompt_display_test explicit_bzero_test explicit_bzero_fallback_test retry_io_test
+noinst_PROGRAMS = authproto_bounds_test cat_authproto nvidia_break_compositor get_compositor remap_all rect_test prompt_display_test explicit_bzero_test explicit_bzero_fallback_test retry_io_test indicator_text_test
 authproto_bounds_test_SOURCES = \
 	logging.c logging.h \
 	helpers/authproto.c helpers/authproto.h \
@@ -180,6 +181,9 @@ explicit_bzero_fallback_test_CPPFLAGS = $(AM_CPPFLAGS) -DFORCE_EXPLICIT_BZERO_FA
 retry_io_test_SOURCES = \
 	test/retry_io_test.c \
 	util.c util.h
+indicator_text_test_SOURCES = \
+	helpers/indicator_text.c helpers/indicator_text.h \
+	test/indicator_text_test.c
 
 check-local:
 	@$(SHELL) "$(abs_srcdir)/test/check-local.sh" "$(abs_srcdir)"
