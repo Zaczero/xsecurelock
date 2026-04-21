@@ -17,6 +17,32 @@ define([nextversion],[1.9.0])
 AC_INIT([xsecurelock],[thisversion],[rpolzer@google.com])
 AM_INIT_AUTOMAKE([-Wall subdir-objects foreign])
 AC_PROG_CC
+AC_LANG([C])
+AC_COMPILE_IFELSE(
+  [AC_LANG_SOURCE([[
+    #if !defined(__STDC_VERSION__) || __STDC_VERSION__ < 199901L
+    #error A C99 language mode is required.
+    #endif
+
+    #include <stdint.h>
+
+    struct c99_probe {
+      int value;
+    };
+
+    int main(void) {
+      struct c99_probe probe = (struct c99_probe){ .value = 1 };
+      int64_t total = probe.value;
+
+      for (int i = 0; i < 1; ++i) {
+        total += i;
+      }
+
+      return (int)total;
+    }
+  ]])],
+  [],
+  [AC_MSG_ERROR([a C99-capable compiler is required])])
 AC_CONFIG_HEADERS([config.h])
 
 AC_DEFUN([RP_TRY_CC_FLAG], [
