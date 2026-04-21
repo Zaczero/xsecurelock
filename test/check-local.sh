@@ -50,6 +50,7 @@ echo "Running native smoke tests"
 "$builddir"/retry_io_test
 "$builddir"/indicator_text_test
 "$builddir"/mlock_page_test
+"$builddir"/prompt_random_test
 printf 'P 7\nhunter2\n' > "$builddir"/cat_authproto.fixture
 "$builddir"/cat_authproto < "$builddir"/cat_authproto.fixture > "$builddir"/cat_authproto.out
 cmp -s "$builddir"/cat_authproto.fixture "$builddir"/cat_authproto.out || {

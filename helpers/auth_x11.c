@@ -24,7 +24,7 @@ limitations under the License.
 #include <poll.h>      // for pollfd, POLLIN, POLLHUP, POLLNVAL
 #include <signal.h>    // for SIGTERM, kill
 #include <stdio.h>
-#include <stdlib.h>      // for free, rand, mblen, size_t, EXIT_...
+#include <stdlib.h>      // for free, mblen, size_t, EXIT_FAILURE
 #include <string.h>      // for strlen, memcpy, memset, strcspn
 #include <sys/time.h>    // for gettimeofday, timeval
 #include <time.h>        // for time, nanosleep, localtime_r
@@ -60,6 +60,7 @@ limitations under the License.
 #include "indicator_text.h"       // for AppendIndicatorText
 #include "monitors.h"             // for Monitor, GetMonitors, IsMonitorC...
 #include "prompt_display.h"       // for DISCO_PASSWORD_DANCERS, Format...
+#include "prompt_random.h"        // for PromptRng, NextDisplayMarker
 
 #if __STDC_VERSION__ >= 201112L
 #define STATIC_ASSERT(state, message) _Static_assert(state, message)
@@ -88,6 +89,9 @@ int prompt_timeout;
 
 //! Minimum distance the cursor shall move on keypress.
 #define PARANOID_PASSWORD_MIN_CHANGE 4
+STATIC_ASSERT(PARANOID_PASSWORD_MIN_CHANGE <=
+                  (PARANOID_PASSWORD_LENGTH - 2) / 2,
+              "Display marker movement must always leave a valid next choice");
 
 //! Extra line spacing.
 #define LINE_SPACING 4
@@ -224,6 +228,9 @@ static int x_offset = 0;
 
 //! The y offset to apply to the entire display (to mitigate burn-in).
 static int y_offset = 0;
+
+//! Local UI RNG state for display marker and burn-in mitigation jitter only.
+static struct PromptRng prompt_rng;
 
 //! Maximum offset value when dynamic changes are enabled.
 static int burnin_mitigation_max_offset = 0;
@@ -1058,22 +1065,12 @@ int DisplayMessage(const char *title, const char *str, int is_warning) {
   int region_h = box_h + 2 * region_inset;
 
   if (burnin_mitigation_max_offset_change > 0) {
-    x_offset += rand() % (2 * burnin_mitigation_max_offset_change + 1) -
-                burnin_mitigation_max_offset_change;
-    if (x_offset < -burnin_mitigation_max_offset) {
-      x_offset = -burnin_mitigation_max_offset;
-    }
-    if (x_offset > burnin_mitigation_max_offset) {
-      x_offset = burnin_mitigation_max_offset;
-    }
-    y_offset += rand() % (2 * burnin_mitigation_max_offset_change + 1) -
-                burnin_mitigation_max_offset_change;
-    if (y_offset < -burnin_mitigation_max_offset) {
-      y_offset = -burnin_mitigation_max_offset;
-    }
-    if (y_offset > burnin_mitigation_max_offset) {
-      y_offset = burnin_mitigation_max_offset;
-    }
+    x_offset = StepBurnInOffset(&prompt_rng, x_offset,
+                                burnin_mitigation_max_offset,
+                                burnin_mitigation_max_offset_change);
+    y_offset = StepBurnInOffset(&prompt_rng, y_offset,
+                                burnin_mitigation_max_offset,
+                                burnin_mitigation_max_offset_change);
   }
 
   if (!UpdatePerMonitorWindows(per_monitor_windows_dirty, region_w, region_h,
@@ -1158,15 +1155,8 @@ void BumpDisplayMarker(size_t pwlen, size_t *pos,
     return;
   }
 
-  // Otherwise: put in the range and fulfill the constraints.
-  for (;;) {
-    size_t new_pos = 1 + rand() % (PARANOID_PASSWORD_LENGTH - 1);
-    if (labs((ssize_t)new_pos - (ssize_t)*pos) >=
-        PARANOID_PASSWORD_MIN_CHANGE) {
-      *pos = new_pos;
-      break;
-    }
-  }
+  *pos = NextDisplayMarker(&prompt_rng, *pos, PARANOID_PASSWORD_LENGTH,
+                           PARANOID_PASSWORD_MIN_CHANGE);
 }
 
 //! The size of the buffer to store the password in. Not NUL terminated.
@@ -1898,13 +1888,15 @@ int main(int argc_local, char **argv_local) {
   setlocale(LC_CTYPE, "");
   setlocale(LC_TIME, "");
 
-  // This is used by displaymarker only; there is slight security relevance here
-  // as an attacker who has a screenshot and an exact startup time and PID can
-  // guess the password length. Of course, an attacker who records the screen
-  // as a video, or points a camera or a microphone at the keyboard, can too.
+  // This RNG only drives UI jitter, not authentication. An attacker with a
+  // screenshot plus an exact startup time and PID could still narrow down the
+  // display marker or burn-in offsets, just as they could by recording the
+  // screen or keyboard directly.
   struct timeval tv;
   gettimeofday(&tv, NULL);
-  srand(tv.tv_sec ^ tv.tv_usec ^ getpid());
+  SeedPromptRng(&prompt_rng,
+                (uint32_t)tv.tv_sec ^ (uint32_t)tv.tv_usec ^
+                    (uint32_t)getpid());
 
   authproto_executable = GetExecutablePathSetting("XSECURELOCK_AUTHPROTO",
                                                   AUTHPROTO_EXECUTABLE, 0);
@@ -1916,10 +1908,10 @@ int main(int argc_local, char **argv_local) {
   burnin_mitigation_max_offset =
       GetIntSetting("XSECURELOCK_BURNIN_MITIGATION", 16);
   if (burnin_mitigation_max_offset > 0) {
-    x_offset = rand() % (2 * burnin_mitigation_max_offset + 1) -
-               burnin_mitigation_max_offset;
-    y_offset = rand() % (2 * burnin_mitigation_max_offset + 1) -
-               burnin_mitigation_max_offset;
+    x_offset = RandomRangeInclusive(&prompt_rng, -burnin_mitigation_max_offset,
+                                    burnin_mitigation_max_offset);
+    y_offset = RandomRangeInclusive(&prompt_rng, -burnin_mitigation_max_offset,
+                                    burnin_mitigation_max_offset);
   }
 
   //! Deprecated flag for setting whether password display should hide the
