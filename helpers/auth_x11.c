@@ -1471,6 +1471,12 @@ enum PromptResult Prompt(const char *msg, char **response, int echo) {
         case '\r':  // Return.
         case '\n':  // Return.
           *response = malloc(priv.pwlen + 1);
+          if (*response == NULL) {
+            LogErrno("malloc");
+            result = PROMPT_RESULT_FAILED;
+            done = 1;
+            break;
+          }
           if (!echo && MLOCK_PAGE(*response, priv.pwlen + 1) < 0) {
             LogErrno("mlock");
             // We continue anyway, as the user being unable to unlock the screen

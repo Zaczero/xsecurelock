@@ -30,6 +30,11 @@ limitations under the License.
 //! Set if a conversation error has happened during the last PAM call.
 static int conv_error = 0;
 
+// Defensive ceiling for malformed or buggy Linux-PAM modules. Normal auth
+// flows use very small conversation batches, so keep this comfortably above
+// that without allowing unbounded allocation from num_msg.
+#define MAX_CONVERSE_MESSAGES 32
+
 static int ReadPromptResponse(char expected_type, char **response) {
   char type = ReadPacket(0, response, 0);
   if (type == expected_type) {
@@ -85,6 +90,7 @@ int ConverseOne(const struct pam_message *msg, struct pam_response *resp) {
 int Converse(int num_msg, const struct pam_message **msg,
              struct pam_response **resp, void *appdata_ptr) {
   (void)appdata_ptr;
+  *resp = NULL;
 
   if (conv_error) {
     Log("Converse() got called again with %d messages (first: %s) after "
@@ -93,8 +99,18 @@ int Converse(int num_msg, const struct pam_message **msg,
         num_msg, num_msg <= 0 ? "(none)" : msg[0]->msg);
     exit(1);
   }
+  if (num_msg <= 0 || num_msg > MAX_CONVERSE_MESSAGES) {
+    Log("Converse() got invalid message count %d", num_msg);
+    conv_error = 1;
+    return PAM_CONV_ERR;
+  }
 
-  *resp = calloc(num_msg, sizeof(struct pam_response));
+  *resp = calloc((size_t)num_msg, sizeof(struct pam_response));
+  if (*resp == NULL) {
+    LogErrno("calloc");
+    conv_error = 1;
+    return PAM_CONV_ERR;
+  }
 
   for (int i = 0; i < num_msg; ++i) {
     int status = ConverseOne(msg[i], &(*resp)[i]);
