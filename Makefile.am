@@ -15,6 +15,7 @@
 CLEANFILES =
 
 AM_CPPFLAGS = -I$(top_builddir) $(FEATURE_TEST_CPPFLAGS)
+AM_CFLAGS = $(WARNING_CFLAGS)
 
 bin_PROGRAMS = \
 	xsecurelock

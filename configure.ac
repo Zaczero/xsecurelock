@@ -45,16 +45,21 @@ AC_COMPILE_IFELSE(
   [AC_MSG_ERROR([a C99-capable compiler is required])])
 AC_CONFIG_HEADERS([config.h])
 
+WARNING_CFLAGS=
 AC_DEFUN([RP_TRY_CC_FLAG], [
 	AC_MSG_CHECKING([whether the compiler supports $1])
 	saved_CFLAGS=$CFLAGS
-	CFLAGS="$CFLAGS $1"
+	CFLAGS="$saved_CFLAGS $WARNING_CFLAGS $1"
 	AC_COMPILE_IFELSE([AC_LANG_PROGRAM([])],
-	                  [AC_MSG_RESULT([yes])],
-	                  [AC_MSG_RESULT([no])
-	                   CFLAGS=$saved_CFLAGS])])
+	                  [AC_MSG_RESULT([yes])
+	                   AS_IF([test "x$WARNING_CFLAGS" = x],
+	                         [WARNING_CFLAGS="$1"],
+	                         [WARNING_CFLAGS="$WARNING_CFLAGS $1"])],
+	                  [AC_MSG_RESULT([no])])
+	CFLAGS=$saved_CFLAGS])
 RP_TRY_CC_FLAG([-Wall])
 RP_TRY_CC_FLAG([-Wextra])
+AC_SUBST([WARNING_CFLAGS])
 
 dnl Feature-test macros must be compiler flags so they apply before any system
 dnl headers in translation units that start with build-config.h or system
