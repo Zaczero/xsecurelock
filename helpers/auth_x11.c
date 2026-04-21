@@ -1034,6 +1034,12 @@ void ShowFromArray(const char **array, size_t displaymarker, char *displaybuf,
   *displaylen = strlen(selection);
 }
 
+enum PromptResult {
+  PROMPT_RESULT_SUBMITTED,
+  PROMPT_RESULT_CANCELLED,
+  PROMPT_RESULT_FAILED,
+};
+
 /*! \brief Ask a question to the user.
  *
  * \param msg The message.
@@ -1041,9 +1047,9 @@ void ShowFromArray(const char **array, size_t displaymarker, char *displaybuf,
  *   The caller is supposed to eventually free() it.
  * \param echo If true, the input will be shown; otherwise it will be hidden
  *   (password entry).
- * \return 1 if successful, anything else otherwise.
+ * \return Whether the prompt was submitted, cancelled, or failed locally.
  */
-int Prompt(const char *msg, char **response, int echo) {
+enum PromptResult Prompt(const char *msg, char **response, int echo) {
   // Ask something. Return strdup'd string.
   struct {
     // The received X11 event.
@@ -1094,7 +1100,7 @@ int Prompt(const char *msg, char **response, int echo) {
   // Unfortunately we may have to break out of multiple loops at once here but
   // still do common cleanup work. So we have to track the return value in a
   // variable.
-  int status = 0;
+  enum PromptResult result = PROMPT_RESULT_CANCELLED;
   int done = 0;
   int played_sound = 0;
 
@@ -1236,12 +1242,14 @@ int Prompt(const char *msg, char **response, int echo) {
       int nfds = select(1, &set, NULL, NULL, &timeout);
       if (nfds < 0) {
         LogErrno("select");
+        result = PROMPT_RESULT_FAILED;
         done = 1;
         break;
       }
       time_t now = time(NULL);
       if (now > deadline) {
         Log("AUTH_TIMEOUT hit");
+        result = PROMPT_RESULT_CANCELLED;
         done = 1;
         break;
       }
@@ -1266,6 +1274,7 @@ int Prompt(const char *msg, char **response, int echo) {
       ssize_t nread = read(0, &priv.inputbuf, 1);
       if (nread <= 0) {
         Log("EOF on password input - bailing out");
+        result = PROMPT_RESULT_FAILED;
         done = 1;
         break;
       }
@@ -1310,8 +1319,12 @@ int Prompt(const char *msg, char **response, int echo) {
           BumpDisplayMarker(priv.pwlen, &priv.displaymarker,
                             &priv.last_keystroke);
           break;
-        case 0:       // Shouldn't happen.
+        case 0:  // Shouldn't happen.
+          result = PROMPT_RESULT_FAILED;
+          done = 1;
+          break;
         case '\033':  // Escape.
+          result = PROMPT_RESULT_CANCELLED;
           done = 1;
           break;
         case '\r':  // Return.
@@ -1329,7 +1342,7 @@ int Prompt(const char *msg, char **response, int echo) {
             memcpy(*response, priv.pwbuf, priv.pwlen);
           }
           (*response)[priv.pwlen] = 0;
-          status = 1;
+          result = PROMPT_RESULT_SUBMITTED;
           done = 1;
           break;
         default:
@@ -1346,6 +1359,7 @@ int Prompt(const char *msg, char **response, int echo) {
                               &priv.last_keystroke);
           } else {
             Log("Password entered is too long - bailing out");
+            result = PROMPT_RESULT_FAILED;
             done = 1;
             break;
           }
@@ -1367,7 +1381,7 @@ int Prompt(const char *msg, char **response, int echo) {
   if (!done) {
     Log("Unreachable code - the loop above must set done");
   }
-  return status;
+  return result;
 }
 
 /*! \brief Perform authentication using a helper proxy.
@@ -1468,28 +1482,44 @@ int Authenticate() {
         WaitForKeypress(1);
         break;
       case PTYPE_PROMPT_LIKE_USERNAME:
-        if (Prompt(message, &response, 1)) {
-          WritePacket(responsefd[1], PTYPE_RESPONSE_LIKE_USERNAME, response);
-          explicit_bzero(response, strlen(response));
-          free(response);
-        } else {
-          WritePacket(responsefd[1], PTYPE_RESPONSE_CANCELLED, "");
+        switch (Prompt(message, &response, 1)) {
+          case PROMPT_RESULT_SUBMITTED:
+            WritePacket(responsefd[1], PTYPE_RESPONSE_LIKE_USERNAME, response);
+            explicit_bzero(response, strlen(response));
+            free(response);
+            DisplayMessage("Processing...", "", 0);
+            break;
+          case PROMPT_RESULT_CANCELLED:
+            WritePacket(responsefd[1], PTYPE_RESPONSE_CANCELLED, "");
+            DisplayMessage("Processing...", "", 0);
+            break;
+          case PROMPT_RESULT_FAILED:
+            explicit_bzero(message, strlen(message));
+            free(message);
+            goto done;
         }
         explicit_bzero(message, strlen(message));
         free(message);
-        DisplayMessage("Processing...", "", 0);
         break;
       case PTYPE_PROMPT_LIKE_PASSWORD:
-        if (Prompt(message, &response, 0)) {
-          WritePacket(responsefd[1], PTYPE_RESPONSE_LIKE_PASSWORD, response);
-          explicit_bzero(response, strlen(response));
-          free(response);
-        } else {
-          WritePacket(responsefd[1], PTYPE_RESPONSE_CANCELLED, "");
+        switch (Prompt(message, &response, 0)) {
+          case PROMPT_RESULT_SUBMITTED:
+            WritePacket(responsefd[1], PTYPE_RESPONSE_LIKE_PASSWORD, response);
+            explicit_bzero(response, strlen(response));
+            free(response);
+            DisplayMessage("Processing...", "", 0);
+            break;
+          case PROMPT_RESULT_CANCELLED:
+            WritePacket(responsefd[1], PTYPE_RESPONSE_CANCELLED, "");
+            DisplayMessage("Processing...", "", 0);
+            break;
+          case PROMPT_RESULT_FAILED:
+            explicit_bzero(message, strlen(message));
+            free(message);
+            goto done;
         }
         explicit_bzero(message, strlen(message));
         free(message);
-        DisplayMessage("Processing...", "", 0);
         break;
       case 0:
         goto done;

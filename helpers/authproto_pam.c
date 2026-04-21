@@ -30,6 +30,19 @@ limitations under the License.
 //! Set if a conversation error has happened during the last PAM call.
 static int conv_error = 0;
 
+static int ReadPromptResponse(char expected_type, char **response) {
+  char type = ReadPacket(0, response, 0);
+  if (type == expected_type) {
+    return PAM_SUCCESS;
+  }
+  if (type == PTYPE_RESPONSE_CANCELLED) {
+    // Preserve explicit user cancellation instead of collapsing it into a
+    // generic conversation error that downstream PAM modules may mis-handle.
+    return PAM_ABORT;
+  }
+  return PAM_CONV_ERR;
+}
+
 /*! \brief Perform a single PAM conversation step.
  *
  * \param msg The PAM message.
@@ -43,13 +56,11 @@ int ConverseOne(const struct pam_message *msg, struct pam_response *resp) {
   switch (msg->msg_style) {
     case PAM_PROMPT_ECHO_OFF: {
       WritePacket(1, PTYPE_PROMPT_LIKE_PASSWORD, msg->msg);
-      char type = ReadPacket(0, &resp->resp, 0);
-      return type == PTYPE_RESPONSE_LIKE_PASSWORD ? PAM_SUCCESS : PAM_CONV_ERR;
+      return ReadPromptResponse(PTYPE_RESPONSE_LIKE_PASSWORD, &resp->resp);
     }
     case PAM_PROMPT_ECHO_ON: {
       WritePacket(1, PTYPE_PROMPT_LIKE_USERNAME, msg->msg);
-      char type = ReadPacket(0, &resp->resp, 0);
-      return type == PTYPE_RESPONSE_LIKE_USERNAME ? PAM_SUCCESS : PAM_CONV_ERR;
+      return ReadPromptResponse(PTYPE_RESPONSE_LIKE_USERNAME, &resp->resp);
     }
     case PAM_ERROR_MSG:
       WritePacket(1, PTYPE_ERROR_MESSAGE, msg->msg);
