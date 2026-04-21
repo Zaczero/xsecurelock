@@ -25,12 +25,19 @@ limitations under the License.
 void SetWMProperties(Display* dpy, Window w, const char* res_class,
                      const char* res_name, int argc, char* const* argv) {
   XClassHint* class_hint = XAllocClassHint();
+  if (class_hint == NULL) {
+    return;
+  }
   class_hint->res_name = (char*)res_name;
   class_hint->res_class = (char*)res_class;
   XTextProperty name_prop;
-  XStringListToTextProperty((char**)&res_name, 1, &name_prop);
+  if (!XStringListToTextProperty((char**)&res_name, 1, &name_prop)) {
+    XFree(class_hint);
+    return;
+  }
   XSetWMProperties(dpy, w, &name_prop, &name_prop, (char**)argv, argc, NULL,
                    NULL, class_hint);
+  XFree(name_prop.value);
   XFree(class_hint);
 }
 

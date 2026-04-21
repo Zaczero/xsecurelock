@@ -1959,9 +1959,18 @@ int main(int argc_local, char **argv_local) {
   }
 #endif
 
+  if (core_font != NULL) {
+    XFreeFont(display, core_font);
+  }
+
   XFreeColors(display, colormap, &xcolor_warning.pixel, 1, 0);
   XFreeColors(display, colormap, &xcolor_foreground.pixel, 1, 0);
   XFreeColors(display, colormap, &xcolor_background.pixel, 1, 0);
+
+#ifdef HAVE_FONTCONFIG
+  FcFini();
+#endif
+  XCloseDisplay(display);
 
   return status;
 }
