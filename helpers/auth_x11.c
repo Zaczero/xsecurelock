@@ -1012,7 +1012,7 @@ void WaitForKeypress(int seconds) {
   memset(&set, 0, sizeof(set));  // For clang-analyzer.
   FD_ZERO(&set);
   FD_SET(0, &set);
-  select(1, &set, NULL, NULL, &timeout);
+  (void)RetrySelect(1, &set, NULL, NULL, &timeout);
 }
 
 /*! \brief Bump the position for the password "cursor".
@@ -1118,7 +1118,7 @@ static enum AuthActivityResult WaitForAuthActivity(int extra_read_fd,
     }
   }
 
-  int nfds = select(max_fd + 1, &set, NULL, NULL, &timeout);
+  int nfds = RetrySelect(max_fd + 1, &set, NULL, NULL, &timeout);
   if (nfds < 0) {
     LogErrno("select");
     return AUTH_ACTIVITY_FAILED;
@@ -1139,8 +1139,12 @@ static enum AuthActivityResult WaitForAuthActivity(int extra_read_fd,
     return AUTH_ACTIVITY_EXTRA_FD_READY;
   }
 
-  ssize_t nread = read(0, inputbuf, 1);
-  if (nread <= 0) {
+  ssize_t nread = RetryRead(0, inputbuf, 1);
+  if (nread < 0) {
+    LogErrno("read");
+    return AUTH_ACTIVITY_FAILED;
+  }
+  if (nread == 0) {
     Log("EOF on password input - bailing out");
     return AUTH_ACTIVITY_FAILED;
   }

@@ -22,6 +22,7 @@ limitations under the License.
 
 #include "env_settings.h"      // for GetIntSetting
 #include "logging.h"           // for LogErrno, Log
+#include "util.h"              // for RetryWrite
 #include "wait_pgrp.h"         // for KillPgrp, WaitPgrp
 #include "xscreensaver_api.h"  // for ExportWindowID
 
@@ -165,7 +166,7 @@ int WatchAuthChild(Window w, const char *executable, int force_auth,
   if (stdinbuf != NULL && stdinbuf[0] != 0) {
     if (auth_child_pid != 0) {
       ssize_t to_write = (ssize_t)strlen(stdinbuf);
-      ssize_t written = write(auth_child_fd, stdinbuf, to_write);
+      ssize_t written = RetryWrite(auth_child_fd, stdinbuf, to_write);
       if (written < 0) {
         LogErrno("Failed to send all data to the auth child");
       } else if (written != to_write) {

@@ -14,8 +14,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <stddef.h>  // for size_t
+#include <stddef.h>      // for size_t
+#include <sys/select.h>  // for fd_set
+#include <sys/time.h>    // for timeval
+#include <sys/types.h>   // for ssize_t
 
 // Use the libc implementation when available; otherwise util.c provides a
 // local fallback with the same signature.
 void explicit_bzero(void *s, size_t len);
+
+ssize_t RetryRead(int fd, void *buf, size_t len);
+ssize_t RetryWrite(int fd, const void *buf, size_t len);
+int RetrySelect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
+                const struct timeval *timeout);

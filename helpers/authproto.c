@@ -31,7 +31,7 @@ limitations under the License.
 static size_t WriteChars(int fd, const char *buf, size_t n) {
   size_t total = 0;
   while (total < n) {
-    ssize_t got = write(fd, buf + total, n - total);
+    ssize_t got = RetryWrite(fd, buf + total, n - total);
     if (got < 0) {
       LogErrno("write");
       return 0;
@@ -81,7 +81,7 @@ void WritePacket(int fd, char type, const char *message) {
 static size_t ReadChars(int fd, char *buf, size_t n, int eof_permitted) {
   size_t total = 0;
   while (total < n) {
-    ssize_t got = read(fd, buf + total, n - total);
+    ssize_t got = RetryRead(fd, buf + total, n - total);
     if (got < 0) {
       LogErrno("read");
       return 0;
