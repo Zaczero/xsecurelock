@@ -17,6 +17,7 @@ limitations under the License.
 #include "env_settings.h"
 
 #include <errno.h>   // for errno, ERANGE
+#include <limits.h>  // for PATH_MAX
 #include <stdio.h>   // for fprintf, NULL, stderr
 #include <stdlib.h>  // for getenv, strtol, strtoull
 #include <string.h>  // for strchr
@@ -129,8 +130,20 @@ const char* GetExecutablePathSetting(const char* name, const char* def,
       return def;
     }
   }
-  if (access(value, X_OK)) {
-    Log("Executable '%s' must be executable", value);
+  const char* executable_path = value;
+  char helper_path[PATH_MAX];
+  if (basename == value) {
+    int helper_path_len =
+        snprintf(helper_path, sizeof(helper_path), "%s/%s", HELPER_PATH, value);
+    if (helper_path_len <= 0 || (size_t)helper_path_len >= sizeof(helper_path)) {
+      Log("Executable path '%s/%s' does not fit into the buffer",
+          HELPER_PATH, value);
+      return def;
+    }
+    executable_path = helper_path;
+  }
+  if (access(executable_path, X_OK)) {
+    Log("Executable '%s' must be executable", executable_path);
     return def;
   }
   return value;

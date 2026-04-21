@@ -1,0 +1,10 @@
+#preexec export XSECURELOCK_NO_COMPOSITE=1
+#preexec export XSECURELOCK_AUTH=auth_x11
+#preexec export XSECURELOCK_GLOBAL_SAVER=saver_blank
+
+# Assert that xsecurelock is running without spawning saver_multiplex.
+search --name background
+search --name saver
+sleep 1
+exec --sync /bin/sh -c '! pgrep -P "$XSECURELOCK_PID" -x saver_multiplex >/dev/null'
+exec --sync /bin/sh -c 'ps "$XSECURELOCK_PID" >/dev/null'
