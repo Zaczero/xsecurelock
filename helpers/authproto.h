@@ -56,7 +56,8 @@ void WritePacket(int fd, char type, const char *message);
  * \brief Reads a packet in above form.
  *
  * \param fd The file descriptor to write to.
- * \param message A pointer to store the message (will be mlock()d).
+ * \param message A pointer to store the message (will be locked in memory if
+ *   possible).
  *   Will always be set if function returns nonzero; caller must free it.
  * \param eof_permitted If enabled, encountering EOF at the beginning will not
  *   count as an error but return 0 silently.

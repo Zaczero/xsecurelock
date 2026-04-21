@@ -178,7 +178,7 @@ if test x$have_pam = xtrue; then
             [Enable support for the PAM library to authenticate the user.])
 fi
 
-AC_CHECK_FUNCS([explicit_bzero])
+AC_CHECK_FUNCS([explicit_bzero mlock mlockall])
 
 # Xft optionally provides nicer font rendering.
 PKG_PROG_PKG_CONFIG

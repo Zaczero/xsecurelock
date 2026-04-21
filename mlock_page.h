@@ -20,39 +20,64 @@ limitations under the License.
 #ifndef MLOCK_PAGE_H
 #define MLOCK_PAGE_H
 
-#include <limits.h>
+#include "config.h"
+
+#include <errno.h>
 #include <stdint.h>
 #include <sys/mman.h>
 #include <unistd.h>
 
-#if defined(_POSIX_MEMLOCK_RANGE)
-#ifndef PAGESIZE
-#define PAGESIZE sysconf(_SC_PAGESIZE)
+#ifndef HAVE_MLOCK
+#define HAVE_MLOCK 0
 #endif
+
+#ifndef HAVE_MLOCKALL
+#define HAVE_MLOCKALL 0
+#endif
+
+#ifndef FORCE_MLOCK_PAGE_UNAVAILABLE
+#define FORCE_MLOCK_PAGE_UNAVAILABLE 0
+#endif
+
 /*! \brief Lock the memory area given by a pointer and a size.
  *
- * The area is expanded to fill whole memory pages.
+ * The area is expanded to fill whole memory pages when mlock() is available.
  */
-#define MLOCK_PAGE(ptr, size)                                  \
-  mlock((void *)((((uintptr_t)(ptr)) / (uintptr_t)PAGESIZE) *  \
-                 (uintptr_t)PAGESIZE),                         \
-        (((uintptr_t)(ptr) + (size)-1) / (uintptr_t)PAGESIZE - \
-         ((uintptr_t)(ptr)) / (uintptr_t)PAGESIZE + 1) *       \
-            (uintptr_t)PAGESIZE)
-#elif _POSIX_MEMLOCK > 0
-#warning mlock() is unavailable. More memory will be locked than necessary.
-/*! \brief Lock the memory area given by a pointer and a size.
- *
- * The area is expanded to fill whole memory pages.
- */
-#define MLOCK_PAGE(ptr, size) mlockall(MCL_CURRENT)
+static inline int MlockPage(const void *ptr, size_t size) {
+  if (size == 0) {
+    return 0;
+  }
+
+#if FORCE_MLOCK_PAGE_UNAVAILABLE || !HAVE_MLOCK
+  (void)ptr;
+#endif
+
+#if FORCE_MLOCK_PAGE_UNAVAILABLE
+  errno = ENOSYS;
+  return -1;
+#elif HAVE_MLOCK
+  long page_size = sysconf(_SC_PAGESIZE);
+  if (page_size <= 0) {
+#if HAVE_MLOCKALL
+    return mlockall(MCL_CURRENT);
 #else
-#warning mlock() and mlockall() are unavailable. Passwords might leak to swap.
-/*! \brief Lock the memory area given by a pointer and a size.
- *
- * The area is expanded to fill whole memory pages.
- */
-#define MLOCK_PAGE(ptr, size) 0
+    errno = ENOSYS;
+    return -1;
 #endif
+  }
+
+  uintptr_t page_size_u = (uintptr_t)page_size;
+  uintptr_t start = ((uintptr_t)ptr / page_size_u) * page_size_u;
+  uintptr_t end = (((uintptr_t)ptr + size - 1) / page_size_u + 1) * page_size_u;
+  return mlock((void *)start, end - start);
+#elif HAVE_MLOCKALL
+  return mlockall(MCL_CURRENT);
+#else
+  errno = ENOSYS;
+  return -1;
+#endif
+}
+
+#define MLOCK_PAGE(ptr, size) MlockPage((ptr), (size))
 
 #endif
