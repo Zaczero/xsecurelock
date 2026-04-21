@@ -39,6 +39,7 @@ limitations under the License.
 #include <stdio.h>           // for printf, size_t, snprintf
 #include <stdlib.h>          // for exit, system, EXIT_FAILURE
 #include <string.h>          // for memset, strcmp, strncmp
+#include <sys/wait.h>        // for WEXITSTATUS, WIFEXITED, WIFSIGNALED
 #include <time.h>            // for nanosleep, timespec
 #include <unistd.h>          // for _exit, chdir, close, execvp
 
@@ -442,7 +443,7 @@ static void LoadDefaults(void) {
   composite_obscurer = GetIntSetting("XSECURELOCK_COMPOSITE_OBSCURER", 1);
 #endif
   have_switch_user_command =
-      *GetStringSetting("XSECURELOCK_SWITCH_USER_COMMAND", "");
+      GetStringSetting("XSECURELOCK_SWITCH_USER_COMMAND", "")[0] != '\0';
   force_grab = GetIntSetting("XSECURELOCK_FORCE_GRAB", 0);
   debug_window_info = GetIntSetting("XSECURELOCK_DEBUG_WINDOW_INFO", 0);
   blank_timeout = GetIntSetting("XSECURELOCK_BLANK_TIMEOUT", 600);
@@ -452,6 +453,8 @@ static void LoadDefaults(void) {
   saver_delay_ms = GetIntSetting("XSECURELOCK_SAVER_DELAY_MS", 0);
   saver_stop_on_blank = GetIntSetting("XSECURELOCK_SAVER_STOP_ON_BLANK", 1);
 }
+
+static void RunShellCommand(const char *command);
 
 /*! \brief Parse the command line arguments, or exit in case of failure.
  *
@@ -542,7 +545,26 @@ static void DebugDumpWindowInfo(Window w) {
     Log("Wow, pretty large integers you got there");
     return;
   }
-  system(buf);
+  RunShellCommand(buf);
+}
+
+static void RunShellCommand(const char *command) {
+  int status = system(command);
+  if (status == -1) {
+    LogErrno("system %s", command);
+    return;
+  }
+  if (WIFSIGNALED(status)) {
+    Log("Command terminated by signal %d: %s", WTERMSIG(status), command);
+    return;
+  }
+  if (!WIFEXITED(status)) {
+    Log("Command ended unexpectedly: %s", command);
+    return;
+  }
+  if (WEXITSTATUS(status) != 0) {
+    Log("Command exited with status %d: %s", WEXITSTATUS(status), command);
+  }
 }
 
 /*! \brief Raise a window if necessary.
@@ -1393,7 +1415,7 @@ int main(int argc, char **argv) {
                        (priv.ev.xkey.state & Mod1Mask)) ||
                       (priv.ev.xkey.state & Mod4Mask))) {
             // Switch to greeter on Ctrl-Alt-O or Win-O.
-            system("eval \"$XSECURELOCK_SWITCH_USER_COMMAND\" &");
+            RunShellCommand("eval \"$XSECURELOCK_SWITCH_USER_COMMAND\" &");
             // And send a Ctrl-U (clear entry line).
             priv.buf[0] = '\025';
             priv.buf[1] = 0;
@@ -1424,7 +1446,7 @@ int main(int argc, char **argv) {
                   if (buflen <= 0 || (size_t)buflen >= sizeof(buf)) {
                     Log("Wow, pretty long keysym names you got there");
                   } else {
-                    system(buf);
+                    RunShellCommand(buf);
                     do_wake_up = 0;
                   }
                 }

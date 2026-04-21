@@ -703,14 +703,18 @@ static int DisplayMessage(const char *title, const char *str, int is_warning) {
     struct tm timeinfo_buf;
     struct tm *timeinfo;
 
-    time(&rawtime);
-    timeinfo = localtime_r(&rawtime, &timeinfo_buf);
-    if (timeinfo == NULL ||
-        strftime(datetime, sizeof(datetime), datetime_format, timeinfo) == 0) {
-      // The datetime buffer was too small to fit the time format, and in this
-      // case the buffer contents are undefined. Let's just make it a valid
-      // empty string then so all else will go well.
+    if (time(&rawtime) == (time_t)-1) {
       datetime[0] = 0;
+    } else {
+      timeinfo = localtime_r(&rawtime, &timeinfo_buf);
+      if (timeinfo == NULL ||
+          strftime(datetime, sizeof(datetime), datetime_format, timeinfo) ==
+              0) {
+        // The datetime buffer was too small to fit the time format, and in
+        // this case the buffer contents are undefined. Let's just make it a
+        // valid empty string then so all else will go well.
+        datetime[0] = 0;
+      }
     }
   }
 
@@ -777,8 +781,8 @@ static int DisplayMessage(const char *title, const char *str, int is_warning) {
     DrawString(i, cx - tw_str / 2, y, is_warning, str, len_str);
     y += th;
 
-    DrawString(i, cx - tw_indicators / 2, y, indicators.warning, indicators.text,
-               len_indicators);
+    DrawString(i, cx - tw_indicators / 2, y, indicators.warning,
+               indicators.text, len_indicators);
     y += th;
 
     if (indicators.have_multiple_layouts) {

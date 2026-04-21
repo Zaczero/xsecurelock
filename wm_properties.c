@@ -14,13 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-#ifndef WM_PROPERTIES_H
-#define WM_PROPERTIES_H
+#include "wm_properties.h"
 
-#include <X11/X.h>      // for Window
-#include <X11/Xlib.h>   // for XFree, Display
 #include <X11/Xutil.h>  // for XClassHint, XAllocClassHint, XSetWMProperties
-#include <stddef.h>     // for NULL
+#include <stddef.h>     // for NULL, size_t
+#include <stdlib.h>     // for free, malloc
+#include <string.h>     // for memcpy, strdup
 
 void SetWMProperties(Display* dpy, Window w, const char* res_class,
                      const char* res_name, int argc, char* const* argv) {
@@ -28,17 +27,44 @@ void SetWMProperties(Display* dpy, Window w, const char* res_class,
   if (class_hint == NULL) {
     return;
   }
-  class_hint->res_name = (char*)res_name;
-  class_hint->res_class = (char*)res_class;
-  XTextProperty name_prop;
-  if (!XStringListToTextProperty((char**)&res_name, 1, &name_prop)) {
+
+  char* res_name_copy = strdup(res_name);
+  char* res_class_copy = strdup(res_class);
+  if (res_name_copy == NULL || res_class_copy == NULL) {
+    free(res_name_copy);
+    free(res_class_copy);
     XFree(class_hint);
     return;
   }
-  XSetWMProperties(dpy, w, &name_prop, &name_prop, (char**)argv, argc, NULL,
-                   NULL, class_hint);
+
+  char** argv_copy = NULL;
+  if (argc > 0 && argv != NULL) {
+    argv_copy = malloc((size_t)argc * sizeof(*argv_copy));
+    if (argv_copy == NULL) {
+      free(res_name_copy);
+      free(res_class_copy);
+      XFree(class_hint);
+      return;
+    }
+    memcpy(argv_copy, argv, (size_t)argc * sizeof(*argv_copy));
+  }
+
+  class_hint->res_name = res_name_copy;
+  class_hint->res_class = res_class_copy;
+  XTextProperty name_prop;
+  char* window_names[] = {res_name_copy};
+  if (!XStringListToTextProperty(window_names, 1, &name_prop)) {
+    free(argv_copy);
+    free(res_name_copy);
+    free(res_class_copy);
+    XFree(class_hint);
+    return;
+  }
+  XSetWMProperties(dpy, w, &name_prop, &name_prop, argv_copy, argc, NULL, NULL,
+                   class_hint);
   XFree(name_prop.value);
+  free(argv_copy);
+  free(res_name_copy);
+  free(res_class_copy);
   XFree(class_hint);
 }
-
-#endif
