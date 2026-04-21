@@ -45,6 +45,8 @@ echo "Running native smoke tests"
 "$builddir"/rect_test
 "$builddir"/authproto_bounds_test
 "$builddir"/prompt_display_test
+"$builddir"/explicit_bzero_test
+"$builddir"/explicit_bzero_fallback_test
 printf 'P 7\nhunter2\n' > "$builddir"/cat_authproto.fixture
 "$builddir"/cat_authproto < "$builddir"/cat_authproto.fixture > "$builddir"/cat_authproto.out
 cmp -s "$builddir"/cat_authproto.fixture "$builddir"/cat_authproto.out || {

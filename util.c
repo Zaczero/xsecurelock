@@ -36,13 +36,23 @@
 
 #include "config.h"
 
-#ifndef HAVE_EXPLICIT_BZERO
 #include <string.h>
 
-// Keep the wipe visible to the optimizer when libc does not provide
-// explicit_bzero().
+#ifndef HAVE_EXPLICIT_BZERO
+#define HAVE_EXPLICIT_BZERO 0
+#endif
+
+#ifndef FORCE_EXPLICIT_BZERO_FALLBACK
+#define FORCE_EXPLICIT_BZERO_FALLBACK 0
+#endif
+
+#if !HAVE_EXPLICIT_BZERO || FORCE_EXPLICIT_BZERO_FALLBACK
+// Prefer libc explicit_bzero() when it exists. Otherwise, route memset()
+// through a volatile function pointer so the wipe remains an observable call
+// without relying on compiler-specific inline assembly.
+static void *(*const volatile memset_impl)(void *, int, size_t) = memset;
+
 void explicit_bzero(void *s, size_t len) {
-  memset(s, '\0', len);
-  asm volatile("" ::: "memory");
+  memset_impl(s, 0, len);
 }
 #endif
