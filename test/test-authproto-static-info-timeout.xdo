@@ -1,5 +1,5 @@
 #preexec export XSECURELOCK_NO_COMPOSITE=1
-#preexec export XSECURELOCK_AUTH="$PWD/../auth_x11"
+#preexec export XSECURELOCK_AUTH=auth_x11
 #preexec export XSECURELOCK_AUTHPROTO="$PWD/fakeproto.py"
 #preexec export XSECURELOCK_FAKEPROTO_MODE=info-block
 #preexec export XSECURELOCK_AUTH_TIMEOUT=2

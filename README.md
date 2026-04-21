@@ -66,6 +66,41 @@ make
 sudo make install
 ```
 
+# Testing
+
+The default local runtime-correctness path is:
+
+```
+make check
+```
+
+This builds a temporary out-of-tree clang/ASan/UBSan install, runs the native
+smoke tests (`rect_test` and a `cat_authproto` packet round-trip), and then
+runs the default XDO smoke suite against the installed prefix. `make check`
+requires `clang`, `startx`, `Xephyr`, `xdotool`, and `htpasswd` to be present
+in `PATH`.
+
+For manual XDO runs, the existing harness stays available:
+
+```
+./test/run-tests.sh
+./test/run-tests.sh test-authproto-static-info-timeout
+```
+
+With no arguments, `./test/run-tests.sh` runs the full XDO suite. Any other
+arguments are treated as explicit
+test names, with or without the `.xdo` suffix.
+
+Valgrind is supported only as an ad hoc native debugging tool for the low-noise
+helpers:
+
+```
+valgrind ./rect_test
+printf 'P 7\nhunter2\n' > /tmp/cat_authproto.fixture && \
+  valgrind ./cat_authproto < /tmp/cat_authproto.fixture | \
+  cmp -s /tmp/cat_authproto.fixture -
+```
+
 ## Special notes for FreeBSD and NetBSD
 
 First of all, on BSD systems, `/usr/local` is owned by the ports system, so
