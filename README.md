@@ -253,6 +253,10 @@ Options to XSecureLock can be passed by environment variables:
     the screen saver.
 *   `XSECURELOCK_AUTH_WARNING_COLOR`: specifies the X11 color (see manpage of
     XParseColor) for the warning text of the auth dialog.
+*   `XSECURELOCK_AUTH_Y_POSITION`: vertical position of the auth dialog as a
+    percentage of screen height, from 0 (top) to 100 (bottom). Defaults to 50
+    (vertically centered). For example, set to 80 to position the dialog near
+    the bottom of the screen.
 *   `XSECURELOCK_BACKGROUND_COLOR`: specifies the X11 color (see manpage
     of XParseColor) for the background of the main and saver windows.
 *   `XSECURELOCK_BLANK_TIMEOUT`: specifies the time (in seconds) before telling
