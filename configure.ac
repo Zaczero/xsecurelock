@@ -26,7 +26,7 @@ AC_DEFUN([RP_TRY_CC_FLAG], [
 	AC_COMPILE_IFELSE([AC_LANG_PROGRAM([])],
 	                  [AC_MSG_RESULT([yes])],
 	                  [AC_MSG_RESULT([no])
-	                   CFLAGS_$saved_CFLAGS])])
+	                   CFLAGS=$saved_CFLAGS])])
 RP_TRY_CC_FLAG([-Wall])
 RP_TRY_CC_FLAG([-Wextra])
 AC_DEFINE([_POSIX_C_SOURCE], [200112L], [Request POSIX.1-2001 APIs.])
@@ -42,14 +42,14 @@ AC_LINK_IFELSE([AC_LANG_PROGRAM([])],
                [AC_MSG_RESULT([no])
                 LDFLAGS=$saved_LDFLAGS])
 
-AC_CHECK_HEADER([X11/Xlib.h],
+AC_CHECK_HEADER(X11/Xlib.h,
                 [], [AC_MSG_ERROR([X includes not found.])])
-AC_CHECK_LIB([X11], [XOpenDisplay],
+AC_CHECK_LIB(X11, XOpenDisplay,
              [], [AC_MSG_ERROR([X library not found.])])
-AC_CHECK_LIB([Xmuu], [XmuClientWindow],
-             [], [AC_CHECK_LIB([Xmu], [XmuClientWindow],
+AC_CHECK_LIB(Xmuu, XmuClientWindow,
+             [], [AC_CHECK_LIB(Xmu, XmuClientWindow,
              [], [AC_MSG_ERROR([Xmuu or Xmu library not found.])])])
-AC_CHECK_LIB([m], [sqrt],
+AC_CHECK_LIB(m, sqrt,
              [], [AC_MSG_ERROR([Math library not found.])])
 
 # RP_SEARCH_LIBS(sym, lib, macro, flag, default, description)
@@ -57,19 +57,15 @@ AC_DEFUN([RP_SEARCH_LIBS], [
           AC_ARG_WITH([$4],
                       [AS_HELP_STRING([--with-$4],
                                       [$6 @<:@default=$5@:>@])],
-                                      [with_$4=$withval],
-                                      [with_$4=$5])
-          if test "x$with_$4" = xno; then
-            have_$4=false
-          else
-            AC_SEARCH_LIBS([$1], [$2],
-                           [have_$4=true],
-                           [if test "x$with_$4" = xcheck; then
-                              have_$4=false
-                            else
-                              AC_MSG_ERROR([--with-$4 was enabled, but test for $4 failed])
-                            fi])
-          fi
+                      [with_$4=$withval],
+                      [with_$4=$5])
+          AS_IF([test "x$with_$4" = xno],
+                [have_$4=false],
+                [AC_SEARCH_LIBS([$1], [$2],
+                                [have_$4=true],
+                                [AS_IF([test "x$with_$4" = xcheck],
+                                       [have_$4=false],
+                                       [AC_MSG_ERROR([--with-$4 was enabled, but test for $4 failed])])])])
           AM_CONDITIONAL([$3], [test x$have_$4 = xtrue])])
 
 # RP_SEARCH_PROG(prog, path, macro, flag, default, description)
@@ -77,23 +73,17 @@ AC_DEFUN([RP_SEARCH_PROG], [
           AC_ARG_WITH([$4],
                       [AS_HELP_STRING([--with-$4],
                                       [$6 @<:@default=$5@:>@])],
-                                      [with_$4=$withval],
-                                      [with_$4=$5])
-          if test "x$with_$4" = xno; then
-            have_$4=false
-          else
-            path_to_$4=$with_$4
-            AC_PATH_PROG([path_to_$4], [$1], [], [$2])
-            if test "x$path_to_$4" = x; then
-              if test "x$with_$4" = xcheck; then
-                have_$4=false
-              else
-                AC_MSG_ERROR([--with-$4 was enabled, but test for $4 failed])
-              fi
-            else
-              have_$4=true
-            fi
-          fi
+                      [with_$4=$withval],
+                      [with_$4=$5])
+          AS_IF([test "x$with_$4" = xno],
+                [have_$4=false],
+                [path_to_$4=$with_$4
+                 AC_PATH_PROG([path_to_$4], [$1], [], [$2])
+                 AS_IF([test "x$path_to_$4" = x],
+                       [AS_IF([test "x$with_$4" = xcheck],
+                              [have_$4=false],
+                              [AC_MSG_ERROR([--with-$4 was enabled, but test for $4 failed])])],
+                       [have_$4=true])])
           AM_CONDITIONAL([$3], [test x$have_$4 = xtrue])])
 
 # The DPMS extension is used to save power of the screen when turned off. Saves
@@ -161,6 +151,7 @@ fi
 AC_CHECK_FUNCS([explicit_bzero])
 
 # Xft optionally provides nicer font rendering.
+PKG_PROG_PKG_CONFIG
 AC_ARG_WITH([fontconfig],
             [AS_HELP_STRING([--with-fontconfig],
                             [Use fontconfig @<:@default=check@:>@])],
@@ -171,11 +162,11 @@ if test "x$with_fontconfig" = xno; then
 else
   PKG_CHECK_MODULES([FONTCONFIG], [fontconfig],
                     [have_fontconfig=true],
-                    [if test "x$with_fontconfig" = xcheck; then
-                       have_fontconfig=false
-                     else
-                       AC_MSG_ERROR([--with-fontconfig was enabled, but test for fontconfig failed])
-                     fi])
+                    [have_fontconfig=false])
+  if test x$have_fontconfig != xtrue &&
+     test "x$with_fontconfig" != xcheck; then
+    AC_MSG_ERROR([--with-fontconfig was enabled, but test for fontconfig failed])
+  fi
 fi
 AM_CONDITIONAL([HAVE_FONTCONFIG], [test x$have_fontconfig = xtrue])
 if test x$have_fontconfig = xtrue; then
@@ -194,11 +185,11 @@ if test "x$with_xft" = xno; then
 else
   PKG_CHECK_MODULES([XFT], [xft],
                     [have_xft=true],
-                    [if test "x$with_xft" = xcheck; then
-                       have_xft=false
-                     else
-                       AC_MSG_ERROR([--with-xft was enabled, but test for xft failed])
-                     fi])
+                    [have_xft=false])
+  if test x$have_xft != xtrue &&
+     test "x$with_xft" != xcheck; then
+    AC_MSG_ERROR([--with-xft was enabled, but test for xft failed])
+  fi
 fi
 AM_CONDITIONAL([HAVE_XFT_EXT], [test x$have_xft = xtrue])
 if test x$have_xft = xtrue; then
