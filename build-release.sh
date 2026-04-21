@@ -25,9 +25,13 @@ if [ "$(git rev-parse --abbrev-ref HEAD)" != 'master' ]; then
 fi
 
 # Bump the version.
-sed -i -e '
+configure_tmp=configure.ac.tmp.$$
+trap 'rm -f "$configure_tmp"' EXIT HUP INT TERM
+sed '
 	s/^define(\[thisversion\],\[.*/define([thisversion],['"$nextversion"'])/
-' configure.ac
+' configure.ac >"$configure_tmp"
+mv "$configure_tmp" configure.ac
+trap - EXIT HUP INT TERM
 
 # Generate a tarball.
 tardir=xsecurelock-$nextversion

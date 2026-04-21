@@ -17,7 +17,17 @@
 : ${XSECURELOCK_LIST_VIDEOS_COMMAND:=find ~/Videos -type f}
 : ${XSECURELOCK_VIDEOS_FLAGS:=}
 
-sh -c "$XSECURELOCK_LIST_VIDEOS_COMMAND" | shuf | head -n 256 |\
+shuffle_lines() {
+  if command -v shuf >/dev/null 2>&1; then
+    shuf
+  else
+    awk 'BEGIN { srand() } { printf "%.17f\t%s\n", rand(), $0 }' |\
+      LC_ALL=C sort -n |\
+      cut -f 2-
+  fi
+}
+
+sh -c "$XSECURELOCK_LIST_VIDEOS_COMMAND" | shuffle_lines | head -n 256 |\
 @path_to_mplayer@ \
   -noconsolecontrols \
   -really-quiet \
