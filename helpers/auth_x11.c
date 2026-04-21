@@ -85,12 +85,6 @@ int prompt_timeout;
 //! Minimum distance the cursor shall move on keypress.
 #define PARANOID_PASSWORD_MIN_CHANGE 4
 
-//! Border of the window around the text.
-#define WINDOW_BORDER 16
-
-//! Draw border rectangle (mainly for debugging).
-#undef DRAW_BORDER
-
 //! Extra line spacing.
 #define LINE_SPACING 4
 
@@ -245,6 +239,12 @@ static int auth_sounds = 0;
 
 //! Whether to blink the cursor in the auth dialog.
 static int auth_cursor_blink = 1;
+
+//! Padding between auth dialog content and its optional border.
+static int auth_padding = 16;
+
+//! Border stroke width for the auth dialog. Zero disables the border.
+static int auth_border_size = 0;
 
 //! Horizontal position of the auth dialog as a percentage (0=left, 50=center,
 //! 100=right).
@@ -807,6 +807,21 @@ void DrawString(int monitor, int x, int y, int is_warning, const char *string,
               len);
 }
 
+static int AuthDialogInset(void) { return auth_padding + auth_border_size; }
+
+static void DrawDialogBorder(size_t window_index, int region_w, int region_h) {
+  if (auth_border_size <= 0) {
+    return;
+  }
+
+  XSetLineAttributes(display, gcs[window_index], auth_border_size, LineSolid,
+                     CapButt, JoinMiter);
+  int border_offset = auth_border_size / 2;
+  XDrawRectangle(display, windows[window_index], gcs[window_index],
+                 border_offset, border_offset, region_w - auth_border_size - 1,
+                 region_h - auth_border_size - 1);
+}
+
 void StrAppend(char **output, size_t *output_size, const char *input,
                size_t input_size) {
   if (*output_size <= input_size) {
@@ -926,8 +941,9 @@ void DisplayMessage(const char *title, const char *str, int is_warning) {
   int box_h = (4 + have_multiple_layouts + have_switch_user_command +
                show_datetime * 2) *
               th;
-  int region_w = box_w + 2 * WINDOW_BORDER;
-  int region_h = box_h + 2 * WINDOW_BORDER;
+  int region_inset = AuthDialogInset();
+  int region_w = box_w + 2 * region_inset;
+  int region_h = box_h + 2 * region_inset;
 
   if (burnin_mitigation_max_offset_change > 0) {
     x_offset += rand() % (2 * burnin_mitigation_max_offset_change + 1) -
@@ -958,12 +974,7 @@ void DisplayMessage(const char *title, const char *str, int is_warning) {
     int y = cy + to - box_h / 2;
 
     XClearWindow(display, windows[i]);
-
-#ifdef DRAW_BORDER
-    XDrawRectangle(display, windows[i], gcs[i],     //
-                   cx - box_w / 2, cy - box_h / 2,  //
-                   box_w - 1, box_h - 1);
-#endif
+    DrawDialogBorder(i, region_w, region_h);
 
     if (show_datetime) {
       DrawString(i, cx - tw_datetime / 2, y, 0, datetime, len_datetime);
@@ -1673,6 +1684,10 @@ int main(int argc_local, char **argv_local) {
   auth_sounds = GetIntSetting("XSECURELOCK_AUTH_SOUNDS", 0);
   single_auth_window = GetIntSetting("XSECURELOCK_SINGLE_AUTH_WINDOW", 0);
   auth_cursor_blink = GetIntSetting("XSECURELOCK_AUTH_CURSOR_BLINK", 1);
+  auth_padding = GetIntSetting("XSECURELOCK_AUTH_PADDING", 16);
+  if (auth_padding < 0) auth_padding = 0;
+  auth_border_size = GetIntSetting("XSECURELOCK_AUTH_BORDER_SIZE", 0);
+  if (auth_border_size < 0) auth_border_size = 0;
   auth_x_position = GetIntSetting("XSECURELOCK_AUTH_X_POSITION", 50);
   if (auth_x_position < 0) auth_x_position = 0;
   if (auth_x_position > 100) auth_x_position = 100;

@@ -253,6 +253,10 @@ Options to XSecureLock can be passed by environment variables:
     the screen saver.
 *   `XSECURELOCK_AUTH_WARNING_COLOR`: specifies the X11 color (see manpage of
     XParseColor) for the warning text of the auth dialog.
+*   `XSECURELOCK_AUTH_PADDING`: padding between auth dialog content and its
+    optional border. Defaults to 16. Set to 0 for a tighter dialog.
+*   `XSECURELOCK_AUTH_BORDER_SIZE`: border stroke width for the auth dialog.
+    Defaults to 0, which disables the border entirely.
 *   `XSECURELOCK_AUTH_X_POSITION`: horizontal position of the auth dialog as a
     percentage of screen width, from 0 (left) to 100 (right). Defaults to 50
     (horizontally centered). For example, set to 0 together with
