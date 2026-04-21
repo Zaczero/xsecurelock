@@ -14,47 +14,7 @@
 
 CLEANFILES =
 
-macros = \
-	-DHELPER_PATH=\"$(pkglibexecdir)\" \
-	-DDOCS_PATH=\"$(docdir)\" \
-	-DAUTH_EXECUTABLE=\"@auth_executable@\" \
-	-DAUTHPROTO_EXECUTABLE=\"@authproto_executable@\" \
-	-DGLOBAL_SAVER_EXECUTABLE=\"@global_saver_executable@\" \
-	-DSAVER_EXECUTABLE=\"@saver_executable@\" \
-	-DPAM_SERVICE_NAME=\"@pam_service_name@\"
-if PAM_CHECK_ACCOUNT_TYPE
-macros += -DPAM_CHECK_ACCOUNT_TYPE
-endif
-if HAVE_DPMS_EXT
-macros += -DHAVE_DPMS_EXT
-endif
-if HAVE_FONTCONFIG
-macros += -DHAVE_FONTCONFIG
-endif
-if HAVE_XSCREENSAVER_EXT
-macros += -DHAVE_XSCREENSAVER_EXT
-endif
-if HAVE_XSYNC_EXT
-macros += -DHAVE_XSYNC_EXT
-endif
-if HAVE_XCOMPOSITE_EXT
-macros += -DHAVE_XCOMPOSITE_EXT
-endif
-if HAVE_XF86MISC_EXT
-macros += -DHAVE_XF86MISC_EXT
-endif
-if HAVE_XFIXES_EXT
-macros += -DHAVE_XFIXES_EXT
-endif
-if HAVE_XFT_EXT
-macros += -DHAVE_XFT_EXT
-endif
-if HAVE_XRANDR_EXT
-macros += -DHAVE_XRANDR_EXT
-endif
-if HAVE_XKB_EXT
-macros += -DHAVE_XKB_EXT
-endif
+AM_CPPFLAGS = -I$(top_builddir)
 
 bin_PROGRAMS = \
 	xsecurelock
@@ -74,7 +34,6 @@ xsecurelock_SOURCES = \
 	incompatible_compositor.xbm
 nodist_xsecurelock_SOURCES = \
 	env_helpstr.inc
-xsecurelock_CPPFLAGS = $(macros)
 
 helpersdir = $(pkglibexecdir)
 helpers_SCRIPTS = \
@@ -116,7 +75,6 @@ saver_multiplex_SOURCES = \
 	wait_pgrp.c wait_pgrp.h \
 	wm_properties.c wm_properties.h \
 	xscreensaver_api.c xscreensaver_api.h
-saver_multiplex_CPPFLAGS = $(macros)
 
 helpers_PROGRAMS += \
 	dimmer
@@ -125,7 +83,6 @@ dimmer_SOURCES = \
 	helpers/dimmer.c \
 	logging.c logging.h \
 	wm_properties.c wm_properties.h
-dimmer_CPPFLAGS = $(macros)
 
 if HAVE_IDLE_TIMER
 helpers_PROGRAMS += \
@@ -135,7 +92,6 @@ until_nonidle_SOURCES = \
 	helpers/until_nonidle.c \
 	logging.c logging.h \
 	wait_pgrp.c wait_pgrp.h
-until_nonidle_CPPFLAGS = $(macros)
 endif
 
 helpers_PROGRAMS += \
@@ -153,7 +109,7 @@ auth_x11_SOURCES = \
 	wait_pgrp.c wait_pgrp.h \
 	wm_properties.c wm_properties.h \
 	xscreensaver_api.c xscreensaver_api.h
-auth_x11_CPPFLAGS = $(macros) $(FONTCONFIG_CFLAGS) $(XFT_CFLAGS)
+auth_x11_CPPFLAGS = $(AM_CPPFLAGS) $(FONTCONFIG_CFLAGS) $(XFT_CFLAGS)
 auth_x11_LDADD = $(FONTCONFIG_LIBS) $(XFT_LIBS)
 
 if HAVE_PAM
@@ -167,7 +123,6 @@ authproto_pam_SOURCES = \
 	logging.c logging.h \
 	mlock_page.h \
 	util.c util.h
-authproto_pam_CPPFLAGS = $(macros)
 endif
 
 doc_DATA = \
@@ -203,14 +158,11 @@ cat_authproto_SOURCES = \
 	util.c util.h
 nvidia_break_compositor_SOURCES = \
 	test/nvidia_break_compositor.c
-nvidia_break_compositor_CPPFLAGS = $(macros)
 get_compositor_SOURCES = \
 	test/get_compositor.c
-get_compositor_CPPFLAGS = $(macros)
 remap_all_SOURCES= \
 	test/remap_all.c \
 	unmap_all.c unmap_all.h
-remap_all_CPPFLAGS = $(macros)
 rect_test_SOURCES = \
 	rect.c rect.h \
 	test/rect_test.c
@@ -290,6 +242,7 @@ EXTRA_DIST = \
 	LICENSE \
 	README.md \
 	autogen.sh \
+	build-config.h.in \
 	doc/xsecurelock.1.md \
 	ensure-documented-settings.sh \
 	helpers/saver_blank \

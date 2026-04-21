@@ -26,6 +26,8 @@ limitations under the License.
  *   until_nonidle dim-screen || xsecurelock
  */
 
+#include "config.h"
+
 #include <X11/X.h>     // for Window
 #include <X11/Xlib.h>  // for Display, XOpenDisplay, Default...
 #include <signal.h>    // for sigaction, raise, sigemptyset

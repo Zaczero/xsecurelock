@@ -21,6 +21,9 @@ limitations under the License.
  *security.
  */
 
+#include "config.h"
+#include "build-config.h"
+
 #include <X11/X.h>           // for Window, None, CopyFromParent
 #include <X11/Xatom.h>       // for XA_CARDINAL, XA_ATOM
 #include <X11/Xlib.h>        // for XEvent, XMapRaised, XSelectInput

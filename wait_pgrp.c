@@ -16,6 +16,8 @@ limitations under the License.
 
 #include "wait_pgrp.h"
 
+#include "build-config.h"
+
 #include <errno.h>   // for errno, ECHILD, EINTR, ESRCH
 #include <signal.h>  // for kill, sigaddset, sigemptyset, sigprocmask,
                      // sigsuspend, SIGCHLD, SIGTERM

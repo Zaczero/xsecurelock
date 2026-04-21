@@ -34,6 +34,8 @@
  *****************************************************************************
  */
 
+#include "config.h"
+
 #ifndef HAVE_EXPLICIT_BZERO
 #include <string.h>
 

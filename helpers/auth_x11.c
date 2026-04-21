@@ -14,6 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+#include "config.h"
+#include "build-config.h"
+
 #include <X11/X.h>     // for Success, None, Atom, KBBellPitch
 #include <X11/Xlib.h>  // for DefaultScreen, Screen, XFree, True
 #include <errno.h>     // for errno, ESRCH

@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+#include "build-config.h"
+
 #include <X11/X.h>       // for Window, CopyFromParent, CWBackPixel
 #include <X11/Xlib.h>    // for XEvent, XFlush, XNextEvent, XOpenDi...
 #include <signal.h>      // for signal, SIGTERM

@@ -1,7 +1,22 @@
-#!/bin/bash
+#!/bin/sh
+
+set -eu
+
+refresh_configured_headers() {
+  if [ -x ./config.status ]; then
+    ./config.status config.h build-config.h >/dev/null
+    return
+  fi
+  if [ ! -f ./config.h ] || [ ! -f ./build-config.h ]; then
+    echo "error: run ./configure first so config.h and build-config.h exist" >&2
+    exit 1
+  fi
+}
+
+refresh_configured_headers
 
 # clang-tidy.
-if which clang-tidy; then
+if command -v clang-tidy >/dev/null 2>&1; then
   set -- \
     'bugprone-*' \
     'cert-*' \
@@ -16,50 +31,36 @@ if which clang-tidy; then
     '-clang-analyzer-alpha.core.PointerArithm' \
     '-clang-analyzer-alpha.deadcode.UnreachableCode'
   checks=$(echo "$*" | tr ' ' ,)
-  # Try once without extensions.
+  set -- \
+    "-extra-arg=-I$PWD" \
+    '-extra-arg=-include' \
+    "-extra-arg=$PWD/config.h" \
+    '-extra-arg=-include' \
+    "-extra-arg=$PWD/build-config.h"
+  # Try once without optional font includes.
   clang-tidy -checks="$checks" \
-    -extra-arg=-DHELPER_PATH=\"\" \
-    -extra-arg=-DDOCS_PATH=\"\" \
-    -extra-arg=-DAUTH_EXECUTABLE=\"\" \
-    -extra-arg=-DAUTHPROTO_EXECUTABLE=\"\" \
-    -extra-arg=-DGLOBAL_SAVER_EXECUTABLE=\"\" \
-    -extra-arg=-DSAVER_EXECUTABLE=\"\" \
-    -extra-arg=-DPAM_SERVICE_NAME=\"\" \
+    "$@" \
     ./*.[ch] ./*/*.[ch]
   # Try again with all extensions.
   clang-tidy -checks="$checks" \
     -extra-arg=-I/usr/include/freetype2 \
-    -extra-arg=-DHELPER_PATH=\"\" \
-    -extra-arg=-DDOCS_PATH=\"\" \
-    -extra-arg=-DAUTH_EXECUTABLE=\"\" \
-    -extra-arg=-DAUTHPROTO_EXECUTABLE=\"\" \
-    -extra-arg=-DGLOBAL_SAVER_EXECUTABLE=\"\" \
-    -extra-arg=-DSAVER_EXECUTABLE=\"\" \
-    -extra-arg=-DPAM_SERVICE_NAME=\"\" \
-    -extra-arg=-DHAVE_DPMS_EXT \
-    -extra-arg=-DHAVE_XCOMPOSITE_EXT \
-    -extra-arg=-DHAVE_XFIXES_EXT \
-    -extra-arg=-DHAVE_XKB_EXT \
-    -extra-arg=-DHAVE_XFT_EXT \
-    -extra-arg=-DHAVE_XRANDR_EXT \
-    -extra-arg=-DHAVE_XSCREENSAVER_EXT \
-    -extra-arg=-DHAVE_XSYNC_EXT \
+    "$@" \
     ./*.[ch] ./*/*.[ch]
 fi
 
 # CPPCheck.
-if which cppcheck; then
+if command -v cppcheck >/dev/null 2>&1; then
   cppcheck --enable=all --inconclusive --std=posix  .
 fi
 
 # Clang Analyzer.
-if which scan-build; then
+if command -v scan-build >/dev/null 2>&1; then
   make clean
   scan-build make
 fi
 
 # Build for Coverity Scan.
-if which cov-build; then
+if command -v cov-build >/dev/null 2>&1; then
   make clean
   rm -rf cov-int
   cov-build --dir cov-int make

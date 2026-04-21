@@ -16,6 +16,8 @@ limitations under the License.
 
 #include "env_settings.h"
 
+#include "build-config.h"
+
 #include <errno.h>   // for errno, ERANGE
 #include <limits.h>  // for PATH_MAX
 #include <stdio.h>   // for fprintf, NULL, stderr
