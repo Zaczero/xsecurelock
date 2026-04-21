@@ -21,11 +21,11 @@ limitations under the License.
 #include <X11/Xlib.h>  // for DefaultScreen, Screen, XFree, True
 #include <errno.h>     // for errno, ESRCH
 #include <locale.h>    // for NULL, setlocale, LC_CTYPE, LC_TIME
+#include <poll.h>      // for pollfd, POLLIN, POLLHUP, POLLNVAL
 #include <signal.h>    // for SIGTERM, kill
 #include <stdio.h>
 #include <stdlib.h>      // for free, rand, mblen, size_t, EXIT_...
 #include <string.h>      // for strlen, memcpy, memset, strcspn
-#include <sys/select.h>  // for timeval, select, fd_set, FD_SET
 #include <sys/time.h>    // for gettimeofday, timeval
 #include <time.h>        // for time, nanosleep, localtime_r
 #include <unistd.h>      // for close, _exit, dup2, pipe, dup
@@ -1005,14 +1005,11 @@ void DisplayMessage(const char *title, const char *str, int is_warning) {
 
 void WaitForKeypress(int seconds) {
   // Sleep for up to 1 second _or_ a key press.
-  struct timeval timeout;
-  timeout.tv_sec = seconds;
-  timeout.tv_usec = 0;
-  fd_set set;
-  memset(&set, 0, sizeof(set));  // For clang-analyzer.
-  FD_ZERO(&set);
-  FD_SET(0, &set);
-  (void)RetrySelect(1, &set, NULL, NULL, &timeout);
+  struct pollfd pfd;
+  pfd.fd = 0;
+  pfd.events = POLLIN | POLLHUP;
+  pfd.revents = 0;
+  (void)RetryPoll(&pfd, 1, seconds * 1000);
 }
 
 /*! \brief Bump the position for the password "cursor".
@@ -1097,30 +1094,28 @@ static enum AuthActivityResult WaitForAuthActivity(int extra_read_fd,
                                                    time_t *deadline,
                                                    int poll_only,
                                                    char *inputbuf) {
-  struct timeval timeout;
+  int timeout_ms;
   if (poll_only) {
-    timeout.tv_sec = 0;
-    timeout.tv_usec = 0;
+    timeout_ms = 0;
   } else {
-    timeout.tv_sec = BLINK_INTERVAL / 1000000;
-    timeout.tv_usec = BLINK_INTERVAL % 1000000;
+    timeout_ms = BLINK_INTERVAL / 1000;
   }
 
-  fd_set set;
-  memset(&set, 0, sizeof(set));  // For clang-analyzer.
-  FD_ZERO(&set);
-  FD_SET(0, &set);
-  int max_fd = 0;
+  struct pollfd fds[2];
+  nfds_t nfds = 1;
+  fds[0].fd = 0;
+  fds[0].events = POLLIN | POLLHUP;
+  fds[0].revents = 0;
   if (extra_read_fd >= 0) {
-    FD_SET(extra_read_fd, &set);
-    if (extra_read_fd > max_fd) {
-      max_fd = extra_read_fd;
-    }
+    fds[1].fd = extra_read_fd;
+    fds[1].events = POLLIN | POLLHUP;
+    fds[1].revents = 0;
+    nfds = 2;
   }
 
-  int nfds = RetrySelect(max_fd + 1, &set, NULL, NULL, &timeout);
-  if (nfds < 0) {
-    LogErrno("select");
+  int ready = RetryPoll(fds, nfds, timeout_ms);
+  if (ready < 0) {
+    LogErrno("poll");
     return AUTH_ACTIVITY_FAILED;
   }
 
@@ -1132,11 +1127,23 @@ static enum AuthActivityResult WaitForAuthActivity(int extra_read_fd,
     // Guard against the system clock stepping back.
     *deadline = now + prompt_timeout;
   }
-  if (nfds == 0) {
+  if (ready == 0) {
     return AUTH_ACTIVITY_REDRAW;
   }
-  if (extra_read_fd >= 0 && FD_ISSET(extra_read_fd, &set)) {
+  if (extra_read_fd >= 0 && (fds[1].revents & POLLNVAL)) {
+    Log("poll: invalid extra fd %d", extra_read_fd);
+    return AUTH_ACTIVITY_FAILED;
+  }
+  if (fds[0].revents & POLLNVAL) {
+    Log("poll: invalid stdin fd");
+    return AUTH_ACTIVITY_FAILED;
+  }
+  if (extra_read_fd >= 0 && (fds[1].revents & (POLLIN | POLLHUP))) {
     return AUTH_ACTIVITY_EXTRA_FD_READY;
+  }
+  if ((fds[0].revents & (POLLIN | POLLHUP)) == 0) {
+    Log("poll: unexpected auth activity event mask %#x", fds[0].revents);
+    return AUTH_ACTIVITY_FAILED;
   }
 
   ssize_t nread = RetryRead(0, inputbuf, 1);

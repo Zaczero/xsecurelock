@@ -37,8 +37,8 @@
 #include "config.h"
 
 #include <errno.h>
+#include <poll.h>
 #include <string.h>
-#include <sys/select.h>
 #include <sys/time.h>
 #include <unistd.h>
 
@@ -77,93 +77,43 @@ ssize_t RetryWrite(int fd, const void *buf, size_t len) {
   return ret;
 }
 
-static void ComputeRemainingTimeout(const struct timeval *timeout,
-                                    const struct timeval *start,
-                                    struct timeval *remaining) {
-  *remaining = *timeout;
-
+static int ComputeRemainingTimeoutMs(int timeout_ms,
+                                     const struct timeval *start) {
   struct timeval now;
   if (gettimeofday(&now, NULL) != 0) {
-    return;
+    return timeout_ms;
   }
 
-  remaining->tv_sec = timeout->tv_sec - (now.tv_sec - start->tv_sec);
-  remaining->tv_usec = timeout->tv_usec - (now.tv_usec - start->tv_usec);
-  if (remaining->tv_usec < 0) {
-    remaining->tv_usec += 1000000;
-    --remaining->tv_sec;
+  long elapsed_sec = now.tv_sec - start->tv_sec;
+  long elapsed_usec = now.tv_usec - start->tv_usec;
+  long elapsed_ms = elapsed_sec * 1000 + elapsed_usec / 1000;
+  if (elapsed_ms >= timeout_ms) {
+    return 0;
   }
-  if (remaining->tv_sec < 0) {
-    remaining->tv_sec = 0;
-    remaining->tv_usec = 0;
-  }
+  return timeout_ms - (int)elapsed_ms;
 }
 
-int RetrySelect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
-                const struct timeval *timeout) {
-  fd_set saved_readfds;
-  fd_set saved_writefds;
-  fd_set saved_exceptfds;
-  int have_timeout = (timeout != NULL);
+int RetryPoll(struct pollfd *fds, nfds_t nfds, int timeout_ms) {
+  int have_timeout = (timeout_ms >= 0);
   int have_start_time = 0;
   struct timeval start;
 
-  if (readfds != NULL) {
-    saved_readfds = *readfds;
-  }
-  if (writefds != NULL) {
-    saved_writefds = *writefds;
-  }
-  if (exceptfds != NULL) {
-    saved_exceptfds = *exceptfds;
-  }
   if (have_timeout && gettimeofday(&start, NULL) == 0) {
     have_start_time = 1;
   }
 
   for (;;) {
-    fd_set local_readfds;
-    fd_set local_writefds;
-    fd_set local_exceptfds;
-    fd_set *readfds_ptr = NULL;
-    fd_set *writefds_ptr = NULL;
-    fd_set *exceptfds_ptr = NULL;
-    struct timeval local_timeout;
-    struct timeval *timeout_ptr = NULL;
-
-    if (readfds != NULL) {
-      local_readfds = saved_readfds;
-      readfds_ptr = &local_readfds;
-    }
-    if (writefds != NULL) {
-      local_writefds = saved_writefds;
-      writefds_ptr = &local_writefds;
-    }
-    if (exceptfds != NULL) {
-      local_exceptfds = saved_exceptfds;
-      exceptfds_ptr = &local_exceptfds;
-    }
-    if (have_timeout) {
-      if (have_start_time) {
-        ComputeRemainingTimeout(timeout, &start, &local_timeout);
-      } else {
-        local_timeout = *timeout;
-      }
-      timeout_ptr = &local_timeout;
+    for (nfds_t i = 0; i < nfds; ++i) {
+      fds[i].revents = 0;
     }
 
-    int ret = select(nfds, readfds_ptr, writefds_ptr, exceptfds_ptr,
-                     timeout_ptr);
+    int local_timeout_ms = timeout_ms;
+    if (have_timeout && have_start_time) {
+      local_timeout_ms = ComputeRemainingTimeoutMs(timeout_ms, &start);
+    }
+
+    int ret = poll(fds, nfds, local_timeout_ms);
     if (ret >= 0) {
-      if (readfds != NULL) {
-        *readfds = local_readfds;
-      }
-      if (writefds != NULL) {
-        *writefds = local_writefds;
-      }
-      if (exceptfds != NULL) {
-        *exceptfds = local_exceptfds;
-      }
       return ret;
     }
     if (errno != EINTR) {

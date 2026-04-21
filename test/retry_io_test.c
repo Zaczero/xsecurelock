@@ -1,8 +1,11 @@
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <poll.h>
 #include <signal.h>
+#include <stdio.h>
 #include <string.h>
+#include <sys/select.h>
 #include <sys/time.h>
 #include <sys/wait.h>
 #include <time.h>
@@ -137,7 +140,7 @@ static void TestRetryWrite(void) {
   assert(signal_count > 0);
 }
 
-static void TestRetrySelect(void) {
+static void TestRetryPoll(void) {
   int fds[2];
   assert(pipe(fds) == 0);
 
@@ -155,19 +158,17 @@ static void TestRetrySelect(void) {
   signal_count = 0;
   StartTimerMs(50);
 
-  fd_set set;
-  FD_ZERO(&set);
-  FD_SET(fds[0], &set);
-  struct timeval timeout;
-  timeout.tv_sec = 1;
-  timeout.tv_usec = 0;
+  struct pollfd pfd;
+  pfd.fd = fds[0];
+  pfd.events = POLLIN | POLLHUP;
+  pfd.revents = 0;
 
-  int ready = RetrySelect(fds[0] + 1, &set, NULL, NULL, &timeout);
+  int ready = RetryPoll(&pfd, 1, 1000);
 
   StopTimer();
 
   assert(ready == 1);
-  assert(FD_ISSET(fds[0], &set));
+  assert(pfd.revents & (POLLIN | POLLHUP));
   assert(signal_count > 0);
 
   char ch;
@@ -177,10 +178,61 @@ static void TestRetrySelect(void) {
   WaitForChild(childpid);
 }
 
+static void TestRetryPollHighFd(void) {
+  int fds[2];
+  assert(pipe(fds) == 0);
+
+  int high_fd = fcntl(fds[0], F_DUPFD, FD_SETSIZE + 16);
+  if (high_fd < 0) {
+    if (errno == EINVAL || errno == EMFILE) {
+      fprintf(stderr, "retry_io_test: skipping high-fd poll case\n");
+      close(fds[0]);
+      close(fds[1]);
+      return;
+    }
+    assert(0);
+  }
+  close(fds[0]);
+
+  pid_t childpid = fork();
+  assert(childpid >= 0);
+  if (childpid == 0) {
+    close(high_fd);
+    SleepMs(200);
+    assert(write(fds[1], "D", 1) == 1);
+    close(fds[1]);
+    _exit(0);
+  }
+
+  close(fds[1]);
+  signal_count = 0;
+  StartTimerMs(50);
+
+  struct pollfd pfd;
+  pfd.fd = high_fd;
+  pfd.events = POLLIN | POLLHUP;
+  pfd.revents = 0;
+
+  int ready = RetryPoll(&pfd, 1, 1000);
+
+  StopTimer();
+
+  assert(ready == 1);
+  assert(pfd.revents & (POLLIN | POLLHUP));
+  assert(signal_count > 0);
+
+  char ch;
+  assert(read(high_fd, &ch, 1) == 1);
+  assert(ch == 'D');
+  close(high_fd);
+  WaitForChild(childpid);
+}
+
 int main(void) {
   InstallSignalHandler();
   TestRetryRead();
   TestRetryWrite();
-  TestRetrySelect();
+  TestRetryPoll();
+  TestRetryPollHighFd();
   return 0;
 }

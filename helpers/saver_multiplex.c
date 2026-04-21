@@ -18,11 +18,12 @@ limitations under the License.
 
 #include <X11/X.h>       // for Window, CopyFromParent, CWBackPixel
 #include <X11/Xlib.h>    // for XEvent, XFlush, XNextEvent, XOpenDi...
+#include <errno.h>       // for errno, EINTR
+#include <poll.h>        // for pollfd, POLLIN, POLLHUP
 #include <signal.h>      // for signal, SIGTERM
 #include <stdio.h>       // for fprintf, NULL, stderr
 #include <stdlib.h>      // for setenv
 #include <string.h>      // for memcmp, memcpy
-#include <sys/select.h>  // for select, FD_SET, FD_ZERO, fd_set
 #include <unistd.h>      // for sleep
 
 #include "../env_settings.h"      // for GetStringSetting
@@ -131,10 +132,14 @@ int main(int argc, char** argv) {
   InitWaitPgrp();
 
   for (;;) {
-    fd_set in_fds;
-    FD_ZERO(&in_fds);
-    FD_SET(x11_fd, &in_fds);
-    select(x11_fd + 1, &in_fds, 0, 0, NULL);
+    struct pollfd x11_pollfd;
+    x11_pollfd.fd = x11_fd;
+    x11_pollfd.events = POLLIN | POLLHUP;
+    x11_pollfd.revents = 0;
+    int ready = poll(&x11_pollfd, 1, -1);
+    if (ready < 0 && errno != EINTR) {
+      LogErrno("poll");
+    }
     WatchSavers();
     XEvent ev;
     while (XPending(display) && (XNextEvent(display, &ev), 1)) {

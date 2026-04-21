@@ -31,13 +31,14 @@ limitations under the License.
 #include <X11/Xutil.h>       // for XLookupString
 #include <X11/cursorfont.h>  // for XC_arrow
 #include <X11/keysym.h>      // for XK_BackSpace, XK_Tab, XK_o
+#include <errno.h>           // for errno, EINTR
 #include <fcntl.h>           // for fcntl, FD_CLOEXEC, F_GETFD
 #include <locale.h>          // for NULL, setlocale, LC_CTYPE
+#include <poll.h>            // for pollfd, POLLIN, POLLHUP
 #include <signal.h>          // for sigaction, raise, sa_handler
 #include <stdio.h>           // for printf, size_t, snprintf
 #include <stdlib.h>          // for exit, system, EXIT_FAILURE
 #include <string.h>          // for memset, strcmp, strncmp
-#include <sys/select.h>      // for select, timeval, fd_set, FD_SET
 #include <sys/time.h>        // for gettimeofday
 #include <time.h>            // for nanosleep, timespec
 #include <unistd.h>          // for _exit, chdir, close, execvp
@@ -1166,14 +1167,14 @@ int main(int argc, char **argv) {
       need_to_reinstate_grabs = 0, xss_lock_notified = 0;
   for (;;) {
     // Watch children WATCH_CHILDREN_HZ times per second.
-    fd_set in_fds;
-    memset(&in_fds, 0, sizeof(in_fds));  // For clang-analyzer.
-    FD_ZERO(&in_fds);
-    FD_SET(x11_fd, &in_fds);
-    struct timeval tv;
-    tv.tv_usec = 1000000 / WATCH_CHILDREN_HZ;
-    tv.tv_sec = 0;
-    select(x11_fd + 1, &in_fds, 0, 0, &tv);
+    struct pollfd x11_pollfd;
+    x11_pollfd.fd = x11_fd;
+    x11_pollfd.events = POLLIN | POLLHUP;
+    x11_pollfd.revents = 0;
+    int ready = poll(&x11_pollfd, 1, 1000 / WATCH_CHILDREN_HZ);
+    if (ready < 0 && errno != EINTR) {
+      LogErrno("poll");
+    }
 
     // Make sure to shut down the saver when blanked. Saves power.
     enum WatchChildrenState requested_saver_state =
