@@ -55,8 +55,12 @@ AC_DEFUN([RP_TRY_CC_FLAG], [
 	                   CFLAGS=$saved_CFLAGS])])
 RP_TRY_CC_FLAG([-Wall])
 RP_TRY_CC_FLAG([-Wextra])
-AC_DEFINE([_POSIX_C_SOURCE], [200112L], [Request POSIX.1-2001 APIs.])
-AC_DEFINE([_XOPEN_SOURCE], [600], [Request X/Open Issue 6 APIs.])
+
+dnl Feature-test macros must be compiler flags so they apply before any system
+dnl headers in translation units that start with build-config.h or system
+dnl includes instead of config.h.
+FEATURE_TEST_CPPFLAGS='-D_POSIX_C_SOURCE=200112L -D_XOPEN_SOURCE=600'
+AC_SUBST([FEATURE_TEST_CPPFLAGS])
 
 dnl We only detect libraries globally, but not all binaries need all of them.
 dnl So we use --as-needed to work around.
