@@ -37,10 +37,8 @@ limitations under the License.
 #include <poll.h>            // for pollfd, POLLIN, POLLHUP
 #include <signal.h>          // for sigaction, raise, sa_handler
 #include <stdio.h>           // for printf, size_t, snprintf
-#include <stdlib.h>          // for exit, system, EXIT_FAILURE
+#include <stdlib.h>          // for exit, EXIT_FAILURE
 #include <string.h>          // for memset, strcmp, strncmp
-#include <sys/wait.h>        // for WEXITSTATUS, WIFEXITED, WIFSIGNALED
-#include <time.h>            // for nanosleep, timespec
 #include <unistd.h>          // for _exit, chdir, close, execvp
 
 #ifdef HAVE_DPMS_EXT
@@ -66,6 +64,7 @@ limitations under the License.
 #endif
 
 #include "auth_child.h"     // for KillAuthChildSigHandler, Want...
+#include "configured_command.h"
 #include "env_settings.h"   // for GetIntSetting, GetExecutableP...
 #include "io_util.h"        // for RetryPoll
 #include "logging.h"        // for Log, LogErrno
@@ -456,8 +455,6 @@ static void LoadDefaults(void) {
   saver_stop_on_blank = GetIntSetting("XSECURELOCK_SAVER_STOP_ON_BLANK", 1);
 }
 
-static void RunShellCommand(const char *command);
-
 /*! \brief Parse the command line arguments, or exit in case of failure.
  *
  * This accepts saver_* or auth_* arguments, and puts them in their respective
@@ -538,35 +535,15 @@ static void DebugDumpWindowInfo(Window w) {
     return;
   }
   char buf[128];
-  // Note: process has to be backgrounded (&) because we may be within
-  // XGrabServer.
+  // Note: this has to run detached because we may be within XGrabServer.
   int buflen =
-      snprintf(buf, sizeof(buf),
-               "{ xwininfo -all -id %lu; xprop -id %lu; } >&2 &", w, w);
+      snprintf(buf, sizeof(buf), "{ xwininfo -all -id %lu; xprop -id %lu; } >&2",
+               w, w);
   if (buflen <= 0 || (size_t)buflen >= sizeof(buf)) {
     Log("Wow, pretty large integers you got there");
     return;
   }
-  RunShellCommand(buf);
-}
-
-static void RunShellCommand(const char *command) {
-  int status = system(command);
-  if (status == -1) {
-    LogErrno("system %s", command);
-    return;
-  }
-  if (WIFSIGNALED(status)) {
-    Log("Command terminated by signal %d: %s", WTERMSIG(status), command);
-    return;
-  }
-  if (!WIFEXITED(status)) {
-    Log("Command ended unexpectedly: %s", command);
-    return;
-  }
-  if (WEXITSTATUS(status) != 0) {
-    Log("Command exited with status %d: %s", WEXITSTATUS(status), command);
-  }
+  (void)RunShellCommandValue("debug window info", buf, 1);
 }
 
 /*! \brief Raise a window if necessary.
@@ -1419,7 +1396,7 @@ int main(int argc, char **argv) {
                        (priv.ev.xkey.state & Mod1Mask)) ||
                       (priv.ev.xkey.state & Mod4Mask))) {
             // Switch to greeter on Ctrl-Alt-O or Win-O.
-            RunShellCommand("eval \"$XSECURELOCK_SWITCH_USER_COMMAND\" &");
+            (void)RunShellCommandFromEnv("XSECURELOCK_SWITCH_USER_COMMAND", 1);
             // And send a Ctrl-U (clear entry line).
             priv.buf[0] = '\025';
             priv.buf[1] = 0;
@@ -1436,23 +1413,12 @@ int main(int argc, char **argv) {
             // though.
             const char *keyname = XKeysymToString(priv.keysym);
             if (keyname != NULL) {
-              char buf[64];
-              int buflen = snprintf(buf, sizeof(buf),
-                                    "XSECURELOCK_KEY_%s_COMMAND", keyname);
-              if (buflen <= 0 || (size_t)buflen >= sizeof(buf)) {
-                Log("Wow, pretty long keysym names you got there");
-              } else {
-                const char *command = GetStringSetting(buf, "");
+              char env_name[64];
+              if (FormatKeyCommandEnvName(env_name, sizeof(env_name), keyname)) {
+                const char *command = GetStringSetting(env_name, "");
                 if (*command) {
-                  buflen = snprintf(buf, sizeof(buf),
-                                    "eval \"$XSECURELOCK_KEY_%s_COMMAND\" &",
-                                    keyname);
-                  if (buflen <= 0 || (size_t)buflen >= sizeof(buf)) {
-                    Log("Wow, pretty long keysym names you got there");
-                  } else {
-                    RunShellCommand(buf);
-                    do_wake_up = 0;
-                  }
+                  (void)RunShellCommandFromEnv(env_name, 1);
+                  do_wake_up = 0;
                 }
               }
             }
