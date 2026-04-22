@@ -34,6 +34,77 @@ static int AddTrackedWindow(struct LockContext *ctx, Window window) {
   return 1;
 }
 
+static int ValidWindowSize(int width, int height) {
+  return width > 0 && height > 0;
+}
+
+static unsigned int ObscurerDimension(int size) {
+  return (size > 2) ? (unsigned int)(size - 2) : 1U;
+}
+
+static Window CreateCoverWindow(struct LockContext *ctx, Window parent, int x,
+                                int y, unsigned int width, unsigned int height,
+                                unsigned long valuemask,
+                                XSetWindowAttributes *attrs,
+                                const char *role) {
+  Window window = None;
+
+  if (!ValidWindowSize((int)width, (int)height)) {
+    Log("%s window has invalid size %ux%u", role, width, height);
+    return None;
+  }
+
+  window = XCreateWindow(ctx->runtime.display, parent, x, y, width, height, 0,
+                         CopyFromParent, InputOutput, CopyFromParent,
+                         valuemask, attrs);
+  if (window == None) {
+    Log("XCreateWindow failed for %s", role);
+  }
+  return window;
+}
+
+static int CreateTrackedCoverWindow(struct LockContext *ctx, Window *window,
+                                    Window parent, int x, int y,
+                                    unsigned int width, unsigned int height,
+                                    unsigned long valuemask,
+                                    XSetWindowAttributes *attrs,
+                                    const char *role) {
+  *window = CreateCoverWindow(ctx, parent, x, y, width, height, valuemask,
+                              attrs, role);
+  if (*window == None) {
+    return 0;
+  }
+  SetWMProperties(ctx->runtime.display, *window, "xsecurelock", role,
+                  ctx->config.argc, ctx->config.argv);
+  if (!AddTrackedWindow(ctx, *window)) {
+    XDestroyWindow(ctx->runtime.display, *window);
+    *window = None;
+    return 0;
+  }
+  return 1;
+}
+
+static void DestroyWindowIfAny(Display *display, Window *window) {
+  if (*window != None) {
+    XDestroyWindow(display, *window);
+    *window = None;
+  }
+}
+
+static void FreeCursorIfAny(Display *display, Cursor *cursor) {
+  if (*cursor != None) {
+    XFreeCursor(display, *cursor);
+    *cursor = None;
+  }
+}
+
+static void FreePixmapIfAny(Display *display, Pixmap *pixmap) {
+  if (*pixmap != None) {
+    XFreePixmap(display, *pixmap);
+    *pixmap = None;
+  }
+}
+
 static void SelectWindowInputs(struct LockContext *ctx) {
 #ifdef HAVE_XCOMPOSITE_EXT
   if (ctx->windows.composite_window != None) {
@@ -137,11 +208,23 @@ int LockWindowsInit(struct LockContext *ctx) {
   ctx->windows.bg =
       XCreateBitmapFromData(ctx->runtime.display, ctx->windows.root_window,
                             "\0", 1, 1);
+  if (ctx->windows.bg == None) {
+    Log("XCreateBitmapFromData failed");
+    return 0;
+  }
   ctx->windows.default_cursor =
       XCreateFontCursor(ctx->runtime.display, XC_arrow);
+  if (ctx->windows.default_cursor == None) {
+    Log("XCreateFontCursor failed");
+    return 0;
+  }
   ctx->windows.transparent_cursor = XCreatePixmapCursor(
       ctx->runtime.display, ctx->windows.bg, ctx->windows.bg, &black, &black,
       0, 0);
+  if (ctx->windows.transparent_cursor == None) {
+    Log("XCreatePixmapCursor failed");
+    return 0;
+  }
 
   XSetWindowAttributes coverattrs = {
       .background_pixel = background_pixel,
@@ -174,6 +257,12 @@ int LockWindowsInit(struct LockContext *ctx) {
   if (ctx->windows.have_xcomposite_ext) {
     ctx->windows.composite_window = XCompositeGetOverlayWindow(
         ctx->runtime.display, ctx->windows.root_window);
+    if (ctx->windows.composite_window == None) {
+      Log("XCompositeGetOverlayWindow failed");
+      ctx->windows.have_xcomposite_ext = false;
+    }
+  }
+  if (ctx->windows.have_xcomposite_ext) {
     XMapRaised(ctx->runtime.display, ctx->windows.composite_window);
 #ifdef HAVE_XFIXES_EXT
     {
@@ -191,7 +280,7 @@ int LockWindowsInit(struct LockContext *ctx) {
 
     if (ctx->config.composite_obscurer) {
       XSetWindowAttributes obscurerattrs = coverattrs;
-      obscurerattrs.background_pixmap = XCreatePixmapFromBitmapData(
+      ctx->windows.obscurer_background_pixmap = XCreatePixmapFromBitmapData(
           ctx->runtime.display, ctx->windows.root_window,
           incompatible_compositor_bits, incompatible_compositor_width,
           incompatible_compositor_height,
@@ -201,50 +290,42 @@ int LockWindowsInit(struct LockContext *ctx) {
                      DefaultScreen(ctx->runtime.display)),
           DefaultDepth(ctx->runtime.display,
                        DefaultScreen(ctx->runtime.display)));
-      ctx->windows.obscurer_window = XCreateWindow(
-          ctx->runtime.display, ctx->windows.root_window, 1, 1,
-          ctx->windows.width - 2, ctx->windows.height - 2, 0, CopyFromParent,
-          InputOutput, CopyFromParent,
-          CWBackPixmap | CWSaveUnder | CWOverrideRedirect | CWCursor,
-          &obscurerattrs);
-      SetWMProperties(ctx->runtime.display, ctx->windows.obscurer_window,
-                      "xsecurelock", "obscurer", ctx->config.argc,
-                      ctx->config.argv);
-      if (!AddTrackedWindow(ctx, ctx->windows.obscurer_window)) {
+      if (ctx->windows.obscurer_background_pixmap == None) {
+        Log("XCreatePixmapFromBitmapData failed");
+        return 0;
+      }
+      obscurerattrs.background_pixmap = ctx->windows.obscurer_background_pixmap;
+      if (!CreateTrackedCoverWindow(
+              ctx, &ctx->windows.obscurer_window, ctx->windows.root_window, 1,
+              1, ObscurerDimension(ctx->windows.width),
+              ObscurerDimension(ctx->windows.height),
+              CWBackPixmap | CWSaveUnder | CWOverrideRedirect | CWCursor,
+              &obscurerattrs, "obscurer")) {
         return 0;
       }
     }
   }
 #endif
 
-  ctx->windows.background_window = XCreateWindow(
-      ctx->runtime.display, ctx->windows.parent_window, 0, 0, ctx->windows.width,
-      ctx->windows.height, 0, CopyFromParent, InputOutput, CopyFromParent,
-      CWBackPixel | CWSaveUnder | CWOverrideRedirect | CWCursor, &coverattrs);
-  SetWMProperties(ctx->runtime.display, ctx->windows.background_window,
-                  "xsecurelock", "background", ctx->config.argc,
-                  ctx->config.argv);
-  if (!AddTrackedWindow(ctx, ctx->windows.background_window)) {
+  if (!CreateTrackedCoverWindow(
+          ctx, &ctx->windows.background_window, ctx->windows.parent_window, 0,
+          0, (unsigned int)ctx->windows.width, (unsigned int)ctx->windows.height,
+          CWBackPixel | CWSaveUnder | CWOverrideRedirect | CWCursor, &coverattrs,
+          "background")) {
     return 0;
   }
 
-  ctx->windows.saver_window = XCreateWindow(
-      ctx->runtime.display, ctx->windows.background_window, 0, 0,
-      ctx->windows.width, ctx->windows.height, 0, CopyFromParent, InputOutput,
-      CopyFromParent, CWBackPixel, &coverattrs);
-  SetWMProperties(ctx->runtime.display, ctx->windows.saver_window,
-                  "xsecurelock", "saver", ctx->config.argc, ctx->config.argv);
-  if (!AddTrackedWindow(ctx, ctx->windows.saver_window)) {
+  if (!CreateTrackedCoverWindow(
+          ctx, &ctx->windows.saver_window, ctx->windows.background_window, 0, 0,
+          (unsigned int)ctx->windows.width, (unsigned int)ctx->windows.height,
+          CWBackPixel, &coverattrs, "saver")) {
     return 0;
   }
 
-  ctx->windows.auth_window = XCreateWindow(
-      ctx->runtime.display, ctx->windows.background_window, 0, 0,
-      ctx->windows.width, ctx->windows.height, 0, CopyFromParent, InputOutput,
-      CopyFromParent, CWBackPixel, &coverattrs);
-  SetWMProperties(ctx->runtime.display, ctx->windows.auth_window, "xsecurelock",
-                  "auth", ctx->config.argc, ctx->config.argv);
-  if (!AddTrackedWindow(ctx, ctx->windows.auth_window)) {
+  if (!CreateTrackedCoverWindow(
+          ctx, &ctx->windows.auth_window, ctx->windows.background_window, 0, 0,
+          (unsigned int)ctx->windows.width, (unsigned int)ctx->windows.height,
+          CWBackPixel, &coverattrs, "auth")) {
     return 0;
   }
 
@@ -273,7 +354,7 @@ void LockWindowsResizeToRoot(struct LockContext *ctx, int width, int height) {
 #ifdef HAVE_XCOMPOSITE_EXT
   if (ctx->windows.obscurer_window != None) {
     XMoveResizeWindow(ctx->runtime.display, ctx->windows.obscurer_window, 1, 1,
-                      width - 2, height - 2);
+                      ObscurerDimension(width), ObscurerDimension(height));
   }
 #endif
   XMoveResizeWindow(ctx->runtime.display, ctx->windows.background_window, 0, 0,
@@ -406,23 +487,12 @@ void LockWindowsCleanup(struct LockContext *ctx) {
   }
 
 #ifdef HAVE_XCOMPOSITE_EXT
-  if (ctx->windows.obscurer_window != None) {
-    XDestroyWindow(ctx->runtime.display, ctx->windows.obscurer_window);
-    ctx->windows.obscurer_window = None;
-  }
+  DestroyWindowIfAny(ctx->runtime.display, &ctx->windows.obscurer_window);
+  FreePixmapIfAny(ctx->runtime.display, &ctx->windows.obscurer_background_pixmap);
 #endif
-  if (ctx->windows.auth_window != None) {
-    XDestroyWindow(ctx->runtime.display, ctx->windows.auth_window);
-    ctx->windows.auth_window = None;
-  }
-  if (ctx->windows.saver_window != None) {
-    XDestroyWindow(ctx->runtime.display, ctx->windows.saver_window);
-    ctx->windows.saver_window = None;
-  }
-  if (ctx->windows.background_window != None) {
-    XDestroyWindow(ctx->runtime.display, ctx->windows.background_window);
-    ctx->windows.background_window = None;
-  }
+  DestroyWindowIfAny(ctx->runtime.display, &ctx->windows.auth_window);
+  DestroyWindowIfAny(ctx->runtime.display, &ctx->windows.saver_window);
+  DestroyWindowIfAny(ctx->runtime.display, &ctx->windows.background_window);
 #ifdef HAVE_XCOMPOSITE_EXT
   if (ctx->windows.composite_window != None) {
     XCompositeReleaseOverlayWindow(ctx->runtime.display,
@@ -431,16 +501,7 @@ void LockWindowsCleanup(struct LockContext *ctx) {
   }
 #endif
 
-  if (ctx->windows.transparent_cursor != None) {
-    XFreeCursor(ctx->runtime.display, ctx->windows.transparent_cursor);
-    ctx->windows.transparent_cursor = None;
-  }
-  if (ctx->windows.default_cursor != None) {
-    XFreeCursor(ctx->runtime.display, ctx->windows.default_cursor);
-    ctx->windows.default_cursor = None;
-  }
-  if (ctx->windows.bg != None) {
-    XFreePixmap(ctx->runtime.display, ctx->windows.bg);
-    ctx->windows.bg = None;
-  }
+  FreeCursorIfAny(ctx->runtime.display, &ctx->windows.transparent_cursor);
+  FreeCursorIfAny(ctx->runtime.display, &ctx->windows.default_cursor);
+  FreePixmapIfAny(ctx->runtime.display, &ctx->windows.bg);
 }

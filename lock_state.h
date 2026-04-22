@@ -77,6 +77,7 @@ struct LockWindows {
   bool have_xcomposite_ext;
   Window composite_window;
   Window obscurer_window;
+  Pixmap obscurer_background_pixmap;
 #endif
 };
 
