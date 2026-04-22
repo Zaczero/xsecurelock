@@ -9,6 +9,10 @@ int main(void) {
   errno = 0;
   assert(MLOCK_PAGE((const void *)(uintptr_t)UINTPTR_MAX, 2) == -1);
   assert(errno == EINVAL);
+
+  errno = 0;
+  assert(MLOCK_PAGE((const void *)(uintptr_t)(UINTPTR_MAX - 1), 1) == -1);
+  assert(errno == EINVAL);
 #endif
   return 0;
 }

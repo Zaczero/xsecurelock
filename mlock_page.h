@@ -23,6 +23,7 @@ limitations under the License.
 #include "config.h"
 
 #include <errno.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <sys/mman.h>
 #include <unistd.h>
@@ -72,8 +73,14 @@ static inline int MlockPage(const void *ptr, size_t size) {
     errno = EINVAL;
     return -1;
   }
-  uintptr_t start = (ptr_u / page_size_u) * page_size_u;
-  uintptr_t end = ((ptr_u + size - 1) / page_size_u + 1) * page_size_u;
+  uintptr_t last = ptr_u + size - 1;
+  uintptr_t start = ptr_u - (ptr_u % page_size_u);
+  uintptr_t last_page = last - (last % page_size_u);
+  if (last_page > UINTPTR_MAX - page_size_u) {
+    errno = EINVAL;
+    return -1;
+  }
+  uintptr_t end = last_page + page_size_u;
   return mlock((void *)start, end - start);
 #elif HAVE_MLOCKALL
   return mlockall(MCL_CURRENT);
