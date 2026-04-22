@@ -18,12 +18,20 @@ int InitUnmapAllWindowsState(UnmapAllWindowsState* state, Display* display,
   state->n_windows = 0;
 
   Window unused_root_return, unused_parent_return;
-  XQueryTree(state->display, state->root_window, &unused_root_return,
-             &unused_parent_return, &state->windows, &state->n_windows);
+  if (!XQueryTree(state->display, state->root_window, &unused_root_return,
+                  &unused_parent_return, &state->windows, &state->n_windows)) {
+    state->windows = NULL;
+    state->n_windows = 0;
+    state->first_unmapped_window = 0;
+    return 0;
+  }
   state->first_unmapped_window = state->n_windows;  // That means none unmapped.
   for (unsigned int i = 0; i < state->n_windows; ++i) {
     XWindowAttributes xwa;
-    XGetWindowAttributes(display, state->windows[i], &xwa);
+    if (!XGetWindowAttributes(display, state->windows[i], &xwa)) {
+      state->windows[i] = None;
+      continue;
+    }
     // Not mapped -> nothing to do.
     if (xwa.map_state == IsUnmapped) {
       state->windows[i] = None;
@@ -45,18 +53,20 @@ int InitUnmapAllWindowsState(UnmapAllWindowsState* state, Display* display,
     }
     XClassHint cls;
     if (XGetClassHint(state->display, state->windows[i], &cls)) {
+      const char *res_class = cls.res_class != NULL ? cls.res_class : "";
+      const char *res_name = cls.res_name != NULL ? cls.res_name : "";
       // If any window has my window class, we better not proceed with
       // unmapping as doing so could accidentally unlock the screen or
       // otherwise cause more damage than good.
       if ((my_res_class || my_res_name) &&
-          (!my_res_class || strcmp(my_res_class, cls.res_class) == 0) &&
-          (!my_res_name || strcmp(my_res_name, cls.res_name) == 0)) {
+          (!my_res_class || strcmp(my_res_class, res_class) == 0) &&
+          (!my_res_name || strcmp(my_res_name, res_name) == 0)) {
         state->windows[i] = None;
         should_proceed = 0;
       }
       // HACK: Bspwm creates some subwindows of the root window that we
       // absolutely shouldn't ever unmap, as remapping them confuses Bspwm.
-      if (!strcmp(cls.res_class, "Bspwm")) {
+      if (!strcmp(res_class, "Bspwm")) {
         state->windows[i] = None;
       }
       XFree(cls.res_class);
