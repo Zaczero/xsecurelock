@@ -3,11 +3,12 @@
 #include "prompt_state.h"
 
 #include <assert.h>
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/time.h>
 
 #include "../util.h"
+#include "prompt_glyph.h"
 #include "prompt_random.h"
 
 void PromptStateInit(struct PromptState *state) {
@@ -29,22 +30,12 @@ int PromptStateAppendByte(struct PromptState *state, char input_byte) {
 
 void PromptStateDeleteLastGlyph(struct PromptState *state) {
   size_t old_length;
-  size_t previous_length = 0;
-  size_t offset = 0;
+  size_t previous_length;
 
   assert(state != NULL);
 
   old_length = state->password_length;
-  mblen(NULL, 0);
-  while (offset < state->password_length) {
-    previous_length = offset;
-    int glyph_length =
-        mblen(state->password + offset, state->password_length - offset);
-    if (glyph_length <= 0) {
-      break;
-    }
-    offset += (size_t)glyph_length;
-  }
+  previous_length = PromptPreviousGlyphStart(state->password, old_length);
   if (previous_length < old_length) {
     explicit_bzero(state->password + previous_length,
                    old_length - previous_length);
@@ -67,7 +58,7 @@ void PromptStateBumpDisplayMarker(struct PromptState *state,
   assert(rng != NULL);
 
   gettimeofday(&state->last_keystroke, NULL);
-  if (state->password_length == 0) {
+  if (state->password_length == 0 || marker_count <= 1) {
     state->display_marker = 0;
     return;
   }

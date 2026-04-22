@@ -1,5 +1,4 @@
 #include <assert.h>
-#include <locale.h>
 #include <stdint.h>
 #include <string.h>
 #include <sys/time.h>
@@ -60,6 +59,35 @@ static void ExpectDisplayModeParsing(void) {
   assert(mode == PROMPT_DISPLAY_MODE_CURSOR);
 }
 
+static void ExpectMarkerMetadata(void) {
+  assert(PromptDisplayMarkerCount(PROMPT_DISPLAY_MODE_CURSOR) == 32);
+  assert(PromptDisplayMinChange(PROMPT_DISPLAY_MODE_CURSOR) == 4);
+
+  assert(PromptDisplayMarkerCount(PROMPT_DISPLAY_MODE_DISCO) == 32);
+  assert(PromptDisplayMinChange(PROMPT_DISPLAY_MODE_DISCO) == 4);
+
+  assert(PromptDisplayMarkerCount(PROMPT_DISPLAY_MODE_EMOJI) == 32);
+  assert(PromptDisplayMinChange(PROMPT_DISPLAY_MODE_EMOJI) == 4);
+
+  assert(PromptDisplayMarkerCount(PROMPT_DISPLAY_MODE_EMOTICON) == 32);
+  assert(PromptDisplayMinChange(PROMPT_DISPLAY_MODE_EMOTICON) == 4);
+
+  assert(PromptDisplayMarkerCount(PROMPT_DISPLAY_MODE_KAOMOJI) == 32);
+  assert(PromptDisplayMinChange(PROMPT_DISPLAY_MODE_KAOMOJI) == 4);
+
+  assert(PromptDisplayMarkerCount(PROMPT_DISPLAY_MODE_ASTERISKS) == 0);
+  assert(PromptDisplayMinChange(PROMPT_DISPLAY_MODE_ASTERISKS) == 0);
+
+  assert(PromptDisplayMarkerCount(PROMPT_DISPLAY_MODE_HIDDEN) == 0);
+  assert(PromptDisplayMinChange(PROMPT_DISPLAY_MODE_HIDDEN) == 0);
+
+  assert(PromptDisplayMarkerCount(PROMPT_DISPLAY_MODE_TIME) == 0);
+  assert(PromptDisplayMinChange(PROMPT_DISPLAY_MODE_TIME) == 0);
+
+  assert(PromptDisplayMarkerCount(PROMPT_DISPLAY_MODE_TIME_HEX) == 0);
+  assert(PromptDisplayMinChange(PROMPT_DISPLAY_MODE_TIME_HEX) == 0);
+}
+
 static void ExpectCursorAndEchoRendering(void) {
   char displaybuf[PROMPT_DISPLAY_BUFFER_SIZE];
   size_t displaylen = 0;
@@ -111,6 +139,8 @@ static void ExpectEmojiAndTruncationRendering(void) {
   size_t displaylen = 0;
   struct PromptState emoji_state = MakePromptState(NULL, 0, 0, 0);
   struct PromptState emoticon_state = MakePromptState(NULL, 24, 0, 0);
+  struct PromptState kaomoji_state = MakePromptState(NULL, 31, 0, 0);
+  struct PromptState invalid_state = MakePromptState(NULL, 32, 0, 0);
 
   assert(RenderPromptDisplay(PROMPT_DISPLAY_MODE_EMOJI, &emoji_state, 0, 0,
                              '|', displaybuf, sizeof(displaybuf),
@@ -123,6 +153,17 @@ static void ExpectEmojiAndTruncationRendering(void) {
                              &displaylen) == 0);
   assert(strcmp(tinybuf, ":'-") == 0);
   assert(displaylen == 3);
+
+  assert(RenderPromptDisplay(PROMPT_DISPLAY_MODE_KAOMOJI, &kaomoji_state, 0, 0,
+                             '|', displaybuf, sizeof(displaybuf),
+                             &displaylen) == 0);
+  assert(strcmp(displaybuf, "❤(◍•ᴗ•◍)") == 0);
+
+  assert(RenderPromptDisplay(PROMPT_DISPLAY_MODE_EMOJI, &invalid_state, 0, 0,
+                             '|', displaybuf, sizeof(displaybuf),
+                             &displaylen) != 0);
+  assert(displaybuf[0] == '\0');
+  assert(displaylen == 0);
 }
 
 static void ExpectTimeRendering(void) {
@@ -151,8 +192,6 @@ static void ExpectTimeRendering(void) {
 }
 
 int main(void) {
-  setlocale(LC_CTYPE, "");
-
   ExpectDiscoPrompt(
       0,
       "┏(･o･)┛ ♪ ┏(･o･)┛ ♪ ┏(･o･)┛ ♪ ┏(･o･)┛ ♪ ┏(･o･)┛");
@@ -166,6 +205,7 @@ int main(void) {
   ExpectDiscoPromptFailure(0, 1);
 
   ExpectDisplayModeParsing();
+  ExpectMarkerMetadata();
   ExpectCursorAndEchoRendering();
   ExpectMaskedAndHiddenRendering();
   ExpectEmojiAndTruncationRendering();

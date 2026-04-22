@@ -1,7 +1,7 @@
 #include <assert.h>
-#include <locale.h>
 #include <string.h>
 
+#include "../helpers/prompt_display.h"
 #include "../helpers/prompt_random.h"
 #include "../helpers/prompt_state.h"
 
@@ -64,6 +64,38 @@ static void ExpectDeleteMalformedByteStillProgresses(void) {
   assert(state.password[0] == '\0');
 }
 
+static void ExpectDeleteTruncatedUtf8TailStillProgresses(void) {
+  struct PromptState state;
+
+  PromptStateInit(&state);
+  memcpy(state.password, "a\xE2\x82", 3);
+  state.password_length = 3;
+
+  PromptStateDeleteLastGlyph(&state);
+  assert(state.password_length == 2);
+  assert(memcmp(state.password, "a\xE2", 2) == 0);
+  assert(state.password[2] == '\0');
+
+  PromptStateDeleteLastGlyph(&state);
+  assert(state.password_length == 1);
+  assert(state.password[0] == 'a');
+  assert(state.password[1] == '\0');
+}
+
+static void ExpectDeleteStrayContinuationByteStillProgresses(void) {
+  struct PromptState state;
+
+  PromptStateInit(&state);
+  state.password[0] = 'a';
+  state.password[1] = '\x80';
+  state.password_length = 2;
+
+  PromptStateDeleteLastGlyph(&state);
+  assert(state.password_length == 1);
+  assert(state.password[0] == 'a');
+  assert(state.password[1] == '\0');
+}
+
 static void ExpectBufferFullRejectsAppend(void) {
   struct PromptState state;
 
@@ -99,14 +131,34 @@ static void ExpectDisplayMarkerUpdatesStayValid(void) {
   assert(state.display_marker == 0);
 }
 
-int main(void) {
-  setlocale(LC_CTYPE, "");
+static void ExpectNonMarkerModesKeepMarkerAtZero(void) {
+  struct PromptState state;
+  struct PromptRng rng;
 
+  PromptStateInit(&state);
+  SeedPromptRng(&rng, 7);
+  assert(PromptStateAppendByte(&state, 'x'));
+
+  PromptStateBumpDisplayMarker(&state, &rng,
+                               PromptDisplayMarkerCount(PROMPT_DISPLAY_MODE_TIME),
+                               PromptDisplayMinChange(PROMPT_DISPLAY_MODE_TIME));
+  assert(state.display_marker == 0);
+
+  PromptStateBumpDisplayMarker(
+      &state, &rng, PromptDisplayMarkerCount(PROMPT_DISPLAY_MODE_ASTERISKS),
+      PromptDisplayMinChange(PROMPT_DISPLAY_MODE_ASTERISKS));
+  assert(state.display_marker == 0);
+}
+
+int main(void) {
   ExpectInitStartsEmpty();
   ExpectAppendAndClear();
   ExpectDeleteLastGlyph();
   ExpectDeleteMalformedByteStillProgresses();
+  ExpectDeleteTruncatedUtf8TailStillProgresses();
+  ExpectDeleteStrayContinuationByteStillProgresses();
   ExpectBufferFullRejectsAppend();
   ExpectDisplayMarkerUpdatesStayValid();
+  ExpectNonMarkerModesKeepMarkerAtZero();
   return 0;
 }

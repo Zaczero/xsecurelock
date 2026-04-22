@@ -26,6 +26,9 @@ int GetPromptDisplayModeFromFlags(int paranoid_password_flag,
                                   const char *prompt_display_mode_name,
                                   enum PromptDisplayMode *mode);
 
+size_t PromptDisplayMarkerCount(enum PromptDisplayMode mode);
+size_t PromptDisplayMinChange(enum PromptDisplayMode mode);
+
 int FormatDiscoPrompt(size_t displaymarker, char *displaybuf,
                       size_t displaybufsize, size_t *displaylen);
 int RenderPromptDisplay(enum PromptDisplayMode mode,

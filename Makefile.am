@@ -113,6 +113,7 @@ auth_x11_SOURCES = \
 	helpers/authproto.c helpers/authproto.h \
 	helpers/auth_x11.c \
 	helpers/indicator_text.c helpers/indicator_text.h \
+	helpers/prompt_glyph.c helpers/prompt_glyph.h \
 	helpers/monitors.c helpers/monitors.h \
 	helpers/prompt_display.c helpers/prompt_display.h \
 	helpers/prompt_random.c helpers/prompt_random.h \
@@ -194,10 +195,13 @@ rect_test_SOURCES = \
 	rect.c rect.h \
 	test/rect_test.c
 prompt_display_test_SOURCES = \
+	helpers/prompt_glyph.c helpers/prompt_glyph.h \
 	helpers/prompt_display.c helpers/prompt_display.h \
 	helpers/prompt_state.h \
 	test/prompt_display_test.c
 prompt_state_test_SOURCES = \
+	helpers/prompt_glyph.c helpers/prompt_glyph.h \
+	helpers/prompt_display.c helpers/prompt_display.h \
 	helpers/prompt_random.c helpers/prompt_random.h \
 	helpers/prompt_state.c helpers/prompt_state.h \
 	test/prompt_state_test.c \
@@ -232,6 +236,8 @@ mlock_page_overflow_test_SOURCES = \
 	test/mlock_page_overflow_test.c \
 	mlock_page.h
 prompt_random_test_SOURCES = \
+	helpers/prompt_glyph.c helpers/prompt_glyph.h \
+	helpers/prompt_display.c helpers/prompt_display.h \
 	helpers/prompt_random.c helpers/prompt_random.h \
 	test/prompt_random_test.c
 env_settings_test_SOURCES = \

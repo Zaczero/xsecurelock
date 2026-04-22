@@ -9,7 +9,10 @@
 #include <string.h>
 
 #include "../util.h"
+#include "prompt_glyph.h"
 
+#define PROMPT_DISPLAY_ANIMATED_MARKER_COUNT (1u << DISCO_PASSWORD_DANCERS)
+#define PROMPT_DISPLAY_ANIMATED_MIN_CHANGE 4
 static const char *const kDiscoCombiner = " ♪ ";
 static const char *const kDiscoDancers[] = {
     "┏(･o･)┛",
@@ -29,6 +32,9 @@ static const char *const kPromptDisplayModeNames[] = {
 XSL_STATIC_ASSERT(ARRAY_LEN(kPromptDisplayModeNames) ==
                       PROMPT_DISPLAY_MODE_COUNT,
                   "Prompt display mode names must match the enum");
+XSL_STATIC_ASSERT(PROMPT_DISPLAY_ANIMATED_MIN_CHANGE <=
+                      (PROMPT_DISPLAY_ANIMATED_MARKER_COUNT - 2) / 2,
+                  "Animated prompt modes must always leave a valid next choice");
 static const char *const kEmoji[] = {
     "_____", "😂", "❤", "♻", "😍", "♥", "😭", "😊", "😒", "💕", "😘",
     "😩",     "☺", "👌", "😔", "😁", "😏", "😉", "👍", "⬅", "😅", "🙏",
@@ -49,6 +55,13 @@ static const char *const kKaomoji[] = {
     "(^0_0^)",   "(☞ﾟ∀ﾟ)☞",     "(-■_■)",   "(┛ಠ_ಠ)┛彡┻━┻", "┬─┬ノ(º_ºノ)",
     "(˘³˘)♥",    "❤(◍•ᴗ•◍)",
 };
+XSL_STATIC_ASSERT(ARRAY_LEN(kEmoji) == PROMPT_DISPLAY_ANIMATED_MARKER_COUNT,
+                  "Emoji prompt choices must match the animated marker count");
+XSL_STATIC_ASSERT(ARRAY_LEN(kEmoticons) ==
+                      PROMPT_DISPLAY_ANIMATED_MARKER_COUNT,
+                  "Emoticon prompt choices must match the animated marker count");
+XSL_STATIC_ASSERT(ARRAY_LEN(kKaomoji) == PROMPT_DISPLAY_ANIMATED_MARKER_COUNT,
+                  "Kaomoji prompt choices must match the animated marker count");
 
 static int WriteDisplayString(char *displaybuf, size_t displaybufsize,
                               const char *input, size_t input_length,
@@ -80,7 +93,7 @@ static int RenderCursorPromptDisplay(const struct PromptState *state,
     return -1;
   }
 
-  *displaylen = 1u << DISCO_PASSWORD_DANCERS;
+  *displaylen = PromptDisplayMarkerCount(PROMPT_DISPLAY_MODE_CURSOR);
   if (*displaylen + 1 > displaybufsize ||
       state->display_marker >= *displaylen) {
     goto fail;
@@ -97,23 +110,7 @@ fail:
 }
 
 static size_t GetMaskedPasswordLength(const struct PromptState *state) {
-  size_t display_length = 0;
-  size_t offset = 0;
-
-  mblen(NULL, 0);
-  while (offset < state->password_length) {
-    int glyph_length;
-
-    ++display_length;
-    glyph_length =
-        mblen(state->password + offset, state->password_length - offset);
-    if (glyph_length <= 0) {
-      break;
-    }
-    offset += (size_t)glyph_length;
-  }
-
-  return display_length;
+  return PromptGlyphCount(state->password, state->password_length);
 }
 
 static int RenderAsterisksPromptDisplay(const struct PromptState *state,
@@ -177,9 +174,20 @@ fail:
 }
 
 static int RenderArrayPromptDisplay(const char *const *choices,
+                                    size_t choices_count,
                                     const struct PromptState *state,
                                     char *displaybuf, size_t displaybufsize,
                                     size_t *displaylen) {
+  if (choices == NULL || state == NULL ||
+      state->display_marker >= choices_count) {
+    if (displaybuf != NULL && displaybufsize != 0) {
+      displaybuf[0] = '\0';
+    }
+    if (displaylen != NULL) {
+      *displaylen = 0;
+    }
+    return -1;
+  }
   return WriteDisplayString(displaybuf, displaybufsize,
                             choices[state->display_marker],
                             strlen(choices[state->display_marker]), displaylen);
@@ -204,9 +212,11 @@ static int RenderTimePromptDisplay(enum PromptDisplayMode mode,
                        (int64_t)state->last_keystroke.tv_sec,
                        (int64_t)state->last_keystroke.tv_usec);
   } else {
+    uint64_t time_hex =
+        (uint64_t)state->last_keystroke.tv_sec * UINT64_C(1000000) +
+        (uint64_t)state->last_keystroke.tv_usec;
     written = snprintf(displaybuf, displaybufsize, "%#" PRIx64,
-                       (int64_t)state->last_keystroke.tv_sec * 1000000 +
-                           (int64_t)state->last_keystroke.tv_usec);
+                       time_hex);
   }
 
   if (written < 0) {
@@ -242,6 +252,29 @@ int GetPromptDisplayModeFromFlags(int paranoid_password_flag,
 
   *mode = PROMPT_DISPLAY_MODE_CURSOR;
   return 0;
+}
+
+size_t PromptDisplayMarkerCount(enum PromptDisplayMode mode) {
+  switch (mode) {
+    case PROMPT_DISPLAY_MODE_CURSOR:
+    case PROMPT_DISPLAY_MODE_DISCO:
+    case PROMPT_DISPLAY_MODE_EMOJI:
+    case PROMPT_DISPLAY_MODE_EMOTICON:
+    case PROMPT_DISPLAY_MODE_KAOMOJI:
+      return PROMPT_DISPLAY_ANIMATED_MARKER_COUNT;
+    case PROMPT_DISPLAY_MODE_ASTERISKS:
+    case PROMPT_DISPLAY_MODE_HIDDEN:
+    case PROMPT_DISPLAY_MODE_TIME:
+    case PROMPT_DISPLAY_MODE_TIME_HEX:
+    case PROMPT_DISPLAY_MODE_COUNT:
+    default:
+      return 0;
+  }
+}
+
+size_t PromptDisplayMinChange(enum PromptDisplayMode mode) {
+  return PromptDisplayMarkerCount(mode) == 0 ? 0
+                                             : PROMPT_DISPLAY_ANIMATED_MIN_CHANGE;
 }
 
 static int AppendPromptFragment(char *displaybuf, size_t displaybufsize,
@@ -319,13 +352,15 @@ int RenderPromptDisplay(enum PromptDisplayMode mode,
       return FormatDiscoPrompt(state->display_marker, displaybuf,
                                displaybufsize, displaylen);
     case PROMPT_DISPLAY_MODE_EMOJI:
-      return RenderArrayPromptDisplay(kEmoji, state, displaybuf,
+      return RenderArrayPromptDisplay(kEmoji, ARRAY_LEN(kEmoji), state, displaybuf,
                                       displaybufsize, displaylen);
     case PROMPT_DISPLAY_MODE_EMOTICON:
-      return RenderArrayPromptDisplay(kEmoticons, state, displaybuf,
+      return RenderArrayPromptDisplay(kEmoticons, ARRAY_LEN(kEmoticons), state,
+                                      displaybuf,
                                       displaybufsize, displaylen);
     case PROMPT_DISPLAY_MODE_KAOMOJI:
-      return RenderArrayPromptDisplay(kKaomoji, state, displaybuf,
+      return RenderArrayPromptDisplay(kKaomoji, ARRAY_LEN(kKaomoji), state,
+                                      displaybuf,
                                       displaybufsize, displaylen);
     case PROMPT_DISPLAY_MODE_TIME:
     case PROMPT_DISPLAY_MODE_TIME_HEX:

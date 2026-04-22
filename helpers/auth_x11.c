@@ -71,15 +71,6 @@ static const char *authproto_executable;
 //! The maximum time to wait at a prompt for user input in seconds.
 static int prompt_timeout;
 
-//! Length of the "paranoid password display".
-#define PARANOID_PASSWORD_LENGTH (1 << DISCO_PASSWORD_DANCERS)
-
-//! Minimum distance the cursor shall move on keypress.
-#define PARANOID_PASSWORD_MIN_CHANGE 4
-XSL_STATIC_ASSERT(PARANOID_PASSWORD_MIN_CHANGE <=
-                      (PARANOID_PASSWORD_LENGTH - 2) / 2,
-                  "Display marker movement must always leave a valid next choice");
-
 //! Extra line spacing.
 #define LINE_SPACING 4
 
@@ -991,18 +982,21 @@ static int RenderPromptFrame(const char *message, const struct PromptState *stat
 static int HandlePromptInputByte(struct PromptState *state, char input_byte,
                                  int response_fd, char response_type,
                                  enum PromptSessionResult *result) {
+  size_t marker_count = PromptDisplayMarkerCount(prompt_display_mode);
+  size_t min_change = PromptDisplayMinChange(prompt_display_mode);
+
   switch (input_byte) {
     case '\b':
     case '\177':
       PromptStateDeleteLastGlyph(state);
-      PromptStateBumpDisplayMarker(state, &prompt_rng, PARANOID_PASSWORD_LENGTH,
-                                   PARANOID_PASSWORD_MIN_CHANGE);
+      PromptStateBumpDisplayMarker(state, &prompt_rng, marker_count,
+                                   min_change);
       return 0;
     case '\001':
     case '\025':
       PromptStateClear(state);
-      PromptStateBumpDisplayMarker(state, &prompt_rng, PARANOID_PASSWORD_LENGTH,
-                                   PARANOID_PASSWORD_MIN_CHANGE);
+      PromptStateBumpDisplayMarker(state, &prompt_rng, marker_count,
+                                   min_change);
       return 0;
     case '\023':
       SwitchToNextXkbLayout(display, have_xkb_ext);
@@ -1031,8 +1025,8 @@ static int HandlePromptInputByte(struct PromptState *state, char input_byte,
         *result = PROMPT_SESSION_RESULT_FAILED;
         return 1;
       }
-      PromptStateBumpDisplayMarker(state, &prompt_rng, PARANOID_PASSWORD_LENGTH,
-                                   PARANOID_PASSWORD_MIN_CHANGE);
+      PromptStateBumpDisplayMarker(state, &prompt_rng, marker_count,
+                                   min_change);
       return 0;
   }
 }

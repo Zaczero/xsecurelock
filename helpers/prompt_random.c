@@ -3,6 +3,10 @@
 #include <assert.h>
 #include <limits.h>
 
+enum {
+  kPromptRandomRetryLimit = 16,
+};
+
 static uint32_t NextPromptRandom(struct PromptRng *rng) {
   assert(rng != NULL);
   assert(rng->state != 0);
@@ -19,12 +23,15 @@ static uint32_t PromptRandomBelow(struct PromptRng *rng, uint32_t upper_bound) {
   assert(upper_bound != 0);
 
   uint32_t minimum = (uint32_t)(-upper_bound) % upper_bound;
-  for (;;) {
+  for (int attempt = 0; attempt < kPromptRandomRetryLimit; ++attempt) {
     uint32_t value = NextPromptRandom(rng);
     if (value >= minimum) {
       return value % upper_bound;
     }
   }
+
+  // Prompt RNG only drives UI jitter, so a bounded modulo fallback is fine.
+  return NextPromptRandom(rng) % upper_bound;
 }
 
 static size_t AbsDiff(size_t a, size_t b) {

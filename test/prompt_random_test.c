@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <stddef.h>
 
+#include "../helpers/prompt_display.h"
 #include "../helpers/prompt_random.h"
 
 static size_t AbsDiff(size_t a, size_t b) {
@@ -17,6 +18,33 @@ static void ExpectDisplayMarkersStayValid(void) {
       assert(next >= 1);
       assert(next < 32);
       assert(AbsDiff(next, current) >= 4);
+    }
+  }
+}
+
+static void ExpectAnimatedModeMetadataProducesValidMarkers(void) {
+  struct PromptRng rng;
+  enum PromptDisplayMode modes[] = {
+      PROMPT_DISPLAY_MODE_CURSOR,
+      PROMPT_DISPLAY_MODE_DISCO,
+      PROMPT_DISPLAY_MODE_EMOJI,
+      PROMPT_DISPLAY_MODE_EMOTICON,
+      PROMPT_DISPLAY_MODE_KAOMOJI,
+  };
+
+  SeedPromptRng(&rng, 11);
+  for (size_t mode_index = 0; mode_index < sizeof(modes) / sizeof(modes[0]);
+       ++mode_index) {
+    size_t marker_count = PromptDisplayMarkerCount(modes[mode_index]);
+    size_t min_change = PromptDisplayMinChange(modes[mode_index]);
+
+    assert(marker_count == 32);
+    assert(min_change == 4);
+    for (size_t current = 0; current < marker_count; ++current) {
+      size_t next = NextDisplayMarker(&rng, current, marker_count, min_change);
+      assert(next >= 1);
+      assert(next < marker_count);
+      assert(AbsDiff(next, current) >= min_change);
     }
   }
 }
@@ -56,6 +84,7 @@ static void ExpectZeroSeedStillWorks(void) {
 
 int main(void) {
   ExpectDisplayMarkersStayValid();
+  ExpectAnimatedModeMetadataProducesValidMarkers();
   ExpectBurnInOffsetsStayClamped();
   ExpectRandomRangesStayBounded();
   ExpectZeroSeedStillWorks();
