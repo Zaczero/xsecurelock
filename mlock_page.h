@@ -67,8 +67,13 @@ static inline int MlockPage(const void *ptr, size_t size) {
   }
 
   uintptr_t page_size_u = (uintptr_t)page_size;
-  uintptr_t start = ((uintptr_t)ptr / page_size_u) * page_size_u;
-  uintptr_t end = (((uintptr_t)ptr + size - 1) / page_size_u + 1) * page_size_u;
+  uintptr_t ptr_u = (uintptr_t)ptr;
+  if (ptr_u > UINTPTR_MAX - (size - 1)) {
+    errno = EINVAL;
+    return -1;
+  }
+  uintptr_t start = (ptr_u / page_size_u) * page_size_u;
+  uintptr_t end = ((ptr_u + size - 1) / page_size_u + 1) * page_size_u;
   return mlock((void *)start, end - start);
 #elif HAVE_MLOCKALL
   return mlockall(MCL_CURRENT);
