@@ -75,7 +75,7 @@ int KillPgrp(pid_t pid, int signo);
  * \param exit_status Variable that receives the exit status of the leader when
  *   it terminated. Will be negative for a signal, positive for a regular exit,
  *   or one of the WAIT_* constants.
- * \return True if the process group is still alive.
+ * \return True if the process group died, false if it is still alive.
  */
 int WaitPgrp(const char *name, pid_t *pid, int do_block, int already_killed,
              int *exit_status);
@@ -90,7 +90,7 @@ int WaitPgrp(const char *name, pid_t *pid, int do_block, int already_killed,
  *   Variable that receives the exit status of the leader when it terminated.
  *   Will be negative for a signal, positive for a regular exit, or one of the
  *   WAIT_* constants.
- * \return True if the process is still alive.
+ * \return True if the process died, false if it is still alive.
  */
 int WaitProc(const char *name, pid_t *pid, int do_block, int already_killed,
              int *exit_status);
