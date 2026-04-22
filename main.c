@@ -1140,11 +1140,16 @@ int main(int argc, char **argv) {
 #ifdef HAVE_XSCREENSAVER_EXT
   if (scrnsaver_event_base != 0) {
     XScreenSaverInfo *info = XScreenSaverAllocInfo();
-    XScreenSaverQueryInfo(display, root_window, info);
-    if (info->state == ScreenSaverOn && info->kind == ScreenSaverBlanked && saver_stop_on_blank) {
-      xss_requested_saver_state = WATCH_CHILDREN_SAVER_DISABLED;
+    if (info == NULL) {
+      Log("XScreenSaverAllocInfo failed");
+    } else {
+      XScreenSaverQueryInfo(display, root_window, info);
+      if (info->state == ScreenSaverOn && info->kind == ScreenSaverBlanked &&
+          saver_stop_on_blank) {
+        xss_requested_saver_state = WATCH_CHILDREN_SAVER_DISABLED;
+      }
+      XFree(info);
     }
-    XFree(info);
   }
 #endif
 
