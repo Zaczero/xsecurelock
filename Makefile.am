@@ -152,7 +152,7 @@ CLEANFILES += xsecurelock.1.md xsecurelock.1
 endif
 
 # Some tools that we sure don't wan to install
-noinst_PROGRAMS = authproto_bounds_test cat_authproto nvidia_break_compositor get_compositor remap_all rect_test prompt_display_test prompt_state_test xkb_test explicit_bzero_test explicit_bzero_fallback_test retry_io_test retry_io_fallback_test indicator_text_test mlock_page_test prompt_random_test env_settings_test
+noinst_PROGRAMS = authproto_bounds_test cat_authproto nvidia_break_compositor get_compositor remap_all rect_test prompt_display_test prompt_state_test xkb_test explicit_bzero_test explicit_bzero_fallback_test retry_io_test retry_io_fallback_test indicator_text_test mlock_page_test prompt_random_test env_settings_test xscreensaver_api_test
 authproto_bounds_test_SOURCES = \
 	logging.c logging.h \
 	helpers/authproto.c helpers/authproto.h \
@@ -215,6 +215,11 @@ env_settings_test_SOURCES = \
 	env_settings.c env_settings.h \
 	logging.c logging.h \
 	test/env_settings_test.c
+xscreensaver_api_test_SOURCES = \
+	env_settings.c env_settings.h \
+	logging.c logging.h \
+	test/xscreensaver_api_test.c \
+	xscreensaver_api.c xscreensaver_api.h
 
 check-local:
 	@$(SHELL) "$(abs_srcdir)/test/check-local.sh" "$(abs_srcdir)"
