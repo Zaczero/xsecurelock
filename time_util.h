@@ -21,5 +21,6 @@
 
 int GetMonotonicTimeMs(int64_t *time_ms);
 int SleepMs(int timeout_ms);
+int SleepNs(int64_t timeout_ns);
 
 #endif  // XSECURELOCK_TIME_UTIL_H

@@ -26,6 +26,7 @@ limitations under the License.
  *
  * This can be used from a signal handler.
  */
+void KillAllSaverChildren(int signo);
 void KillAllSaverChildrenSigHandler(int signo);
 
 /*! \brief Starts or stops the screen saver child process.

@@ -23,6 +23,8 @@
 
 int CloseIfValid(int *fd);
 int ClosePair(int fds[2]);
+int SetFdCloexec(int fd);
+int SetFdNonblocking(int fd);
 int PipeCloexec(int fds[2]);
 ssize_t RetryRead(int fd, void *buf, size_t len);
 ssize_t RetryWrite(int fd, const void *buf, size_t len);

@@ -44,6 +44,7 @@ export UBSAN_OPTIONS='print_stacktrace=1:halt_on_error=1'
 echo "Running native smoke tests"
 "$builddir"/rect_test
 "$builddir"/authproto_bounds_test
+"$builddir"/dimmer_bayer_test
 "$builddir"/prompt_display_test
 "$builddir"/prompt_state_test
 "$builddir"/explicit_bzero_test

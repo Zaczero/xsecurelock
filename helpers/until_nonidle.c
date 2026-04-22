@@ -28,14 +28,15 @@ limitations under the License.
 
 #include "config.h"
 
+#include <errno.h>      // for errno, ESRCH
 #include <X11/X.h>     // for Window
 #include <X11/Xlib.h>  // for Display, XOpenDisplay, Default...
 #include <signal.h>    // for sigaction, raise, sigemptyset
+#include <stdbool.h>   // for bool
 #include <stdint.h>    // for uint64_t
-#include <stdlib.h>    // for NULL, size_t, EXIT_FAILURE
-#include <string.h>    // for memcpy, NULL, strcmp, strcspn
-#include <time.h>      // for nanosleep, timespec
-#include <unistd.h>    // for _exit, execvp, fork, setsid
+#include <stdlib.h>    // for EXIT_FAILURE
+#include <string.h>    // for memcpy, strcmp, strcspn
+#include <unistd.h>    // for _exit, execvp
 
 #ifdef HAVE_XSCREENSAVER_EXT
 #include <X11/extensions/scrnsaver.h>  // for XScreenSaverAllocInfo, XScreen...
@@ -48,46 +49,93 @@ limitations under the License.
 
 #include "../env_settings.h"  // for GetIntSetting, GetStringSetting
 #include "../logging.h"       // for Log, LogErrno
-#include "../time_util.h"     // for GetMonotonicTimeMs
+#include "../time_util.h"     // for GetMonotonicTimeMs, SleepMs
 #include "../wait_pgrp.h"     // for KillPgrp, WaitPgrp
 
+#define MAX_IDLE_TIMERS 16
+
+struct UntilNonidleState {
+  Display *display;
+  Window root_window;
+  pid_t childpid;
+  int dim_time_ms;
+  int wait_time_ms;
+  const char *timers;
+  uint64_t prev_idle;
+  int64_t start_time_ms;
+  bool still_idle;
+  int terminate_signal;
+  int status;
 #ifdef HAVE_XSCREENSAVER_EXT
-static int have_xscreensaver_ext;
-static XScreenSaverInfo *saver_info;
+  bool have_xscreensaver_ext;
+  XScreenSaverInfo *saver_info;
+#endif
+#ifdef HAVE_XSYNC_EXT
+  bool have_xsync_ext;
+  int num_xsync_counters;
+  XSyncSystemCounter *xsync_counters;
+#endif
+};
+
+static volatile sig_atomic_t g_terminate_signal = 0;
+
+static void HandleSIGTERM(int signo) {
+  g_terminate_signal = signo;
+}
+
+static void InitState(struct UntilNonidleState *state) {
+  memset(state, 0, sizeof(*state));
+  state->status = EXIT_FAILURE;
+  state->still_idle = true;
+}
+
+static void InitializeExtensions(struct UntilNonidleState *state) {
+#ifdef HAVE_XSCREENSAVER_EXT
+  int scrnsaver_event_base = 0;
+  int scrnsaver_error_base = 0;
+  if (XScreenSaverQueryExtension(state->display, &scrnsaver_event_base,
+                                 &scrnsaver_error_base)) {
+    state->saver_info = XScreenSaverAllocInfo();
+    if (state->saver_info != NULL) {
+      state->have_xscreensaver_ext = true;
+    } else {
+      Log("XScreenSaverAllocInfo failed; disabling XScreenSaver idle timer");
+    }
+  }
 #endif
 
 #ifdef HAVE_XSYNC_EXT
-static int have_xsync_ext;
-static int num_xsync_counters;
-static XSyncSystemCounter *xsync_counters;
-#endif
-
-static pid_t childpid = 0;
-
-static void HandleSIGTERM(int signo) {
-  if (childpid != 0) {
-    KillPgrp(childpid, signo);  // Dirty, but quick.
+  int sync_event_base = 0;
+  int sync_error_base = 0;
+  if (XSyncQueryExtension(state->display, &sync_event_base, &sync_error_base)) {
+    state->xsync_counters =
+        XSyncListSystemCounters(state->display, &state->num_xsync_counters);
+    if (state->xsync_counters != NULL) {
+      state->have_xsync_ext = true;
+    } else {
+      Log("XSyncListSystemCounters failed; disabling XSync idle timers");
+    }
   }
-  raise(signo);
+#endif
 }
 
-static uint64_t GetIdleTimeForSingleTimer(Display *display, Window w,
+static uint64_t GetIdleTimeForSingleTimer(const struct UntilNonidleState *state,
                                           const char *timer) {
-  if (*timer == 0) {
+  if (*timer == '\0') {
 #ifdef HAVE_XSCREENSAVER_EXT
-    if (have_xscreensaver_ext) {
-      XScreenSaverQueryInfo(display, w, saver_info);
-      return saver_info->idle;
+    if (state->have_xscreensaver_ext) {
+      XScreenSaverQueryInfo(state->display, state->root_window, state->saver_info);
+      return state->saver_info->idle;
     }
 #endif
   } else {
 #ifdef HAVE_XSYNC_EXT
-    if (have_xsync_ext) {
-      for (int i = 0; i < num_xsync_counters; ++i) {
-        if (!strcmp(timer,
-                    xsync_counters[i].name)) {  // I know this is inefficient.
+    if (state->have_xsync_ext) {
+      for (int i = 0; i < state->num_xsync_counters; ++i) {
+        if (!strcmp(timer, state->xsync_counters[i].name)) {
           XSyncValue value;
-          XSyncQueryCounter(display, xsync_counters[i].counter, &value);
+          XSyncQueryCounter(state->display, state->xsync_counters[i].counter,
+                            &value);
           return (((uint64_t)XSyncValueHigh32(value)) << 32) |
                  (uint64_t)XSyncValueLow32(value);
         }
@@ -95,40 +143,87 @@ static uint64_t GetIdleTimeForSingleTimer(Display *display, Window w,
     }
 #endif
   }
+
   Log("Timer \"%s\" not supported", timer);
-  (void)display;
-  (void)w;
   return (uint64_t)-1;
 }
 
-static uint64_t GetIdleTime(Display *display, Window w, const char *timers) {
+static uint64_t GetIdleTime(const struct UntilNonidleState *state) {
+  const char *timers = state->timers;
   uint64_t min_idle_time = (uint64_t)-1;
+  size_t timer_count = 0;
+
   for (;;) {
+    char timer_name[64];
     size_t len = strcspn(timers, ",");
-    if (timers[len] == 0) {  // End of string.
-      uint64_t this_idle_time = GetIdleTimeForSingleTimer(display, w, timers);
-      if (this_idle_time < min_idle_time) {
-        min_idle_time = this_idle_time;
-      }
+
+    if (timer_count == MAX_IDLE_TIMERS) {
+      Log("Too many idle timers configured; ignoring extras after %d entries",
+          MAX_IDLE_TIMERS);
       return min_idle_time;
     }
-    char this_timer[64];
-    if (len < sizeof(this_timer)) {
-      memcpy(this_timer, timers, len);
-      this_timer[len] = 0;
-      uint64_t this_idle_time =
-          GetIdleTimeForSingleTimer(display, w, this_timer);
-      if (this_idle_time < min_idle_time) {
-        min_idle_time = this_idle_time;
+    ++timer_count;
+
+    if (len < sizeof(timer_name)) {
+      memcpy(timer_name, timers, len);
+      timer_name[len] = '\0';
+      {
+        uint64_t this_idle_time = GetIdleTimeForSingleTimer(state, timer_name);
+        if (this_idle_time < min_idle_time) {
+          min_idle_time = this_idle_time;
+        }
       }
     } else {
       Log("Too long timer name - skipping: %s", timers);
+    }
+
+    if (timers[len] == '\0') {
+      return min_idle_time;
     }
     timers += len + 1;
   }
 }
 
+static int SpawnChild(struct UntilNonidleState *state, char **argv) {
+  state->childpid = ForkWithoutSigHandlers();
+  if (state->childpid == -1) {
+    LogErrno("fork");
+    return 0;
+  }
+  if (state->childpid != 0) {
+    return 1;
+  }
+
+  StartPgrp();
+  execvp(argv[1], argv + 1);
+  LogErrno("execvp");
+  _exit(EXIT_FAILURE);
+}
+
+static int InstallSignalHandlers(void) {
+  struct sigaction sa = {.sa_flags = SA_RESETHAND, .sa_handler = HandleSIGTERM};
+  sigemptyset(&sa.sa_mask);
+  if (sigaction(SIGTERM, &sa, NULL) != 0) {
+    LogErrno("sigaction(SIGTERM)");
+    return 0;
+  }
+  return 1;
+}
+
+static int UpdateIdleStatus(struct UntilNonidleState *state) {
+  uint64_t cur_idle = GetIdleTime(state);
+  if (cur_idle == (uint64_t)-1) {
+    return 0;
+  }
+
+  state->still_idle = cur_idle >= state->prev_idle;
+  state->prev_idle = cur_idle;
+  return 1;
+}
+
 int main(int argc, char **argv) {
+  struct UntilNonidleState state;
+
   if (argc <= 1) {
     Log("Usage: %s program args... - runs the given program until non-idle",
         argv[0]);
@@ -138,105 +233,115 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  int dim_time_ms = GetIntSetting("XSECURELOCK_DIM_TIME_MS", 2000);
-  int wait_time_ms = GetIntSetting("XSECURELOCK_WAIT_TIME_MS", 5000);
-  const char *timers = GetStringSetting("XSECURELOCK_IDLE_TIMERS",
+  InitState(&state);
+  state.dim_time_ms = GetIntSetting("XSECURELOCK_DIM_TIME_MS", 2000);
+  state.wait_time_ms = GetIntSetting("XSECURELOCK_WAIT_TIME_MS", 5000);
+  state.timers = GetStringSetting("XSECURELOCK_IDLE_TIMERS",
 #ifdef HAVE_XSCREENSAVER_EXT
-                                        ""
+                                  ""
 #else
-                                        "IDLETIME"
+                                  "IDLETIME"
 #endif
   );
 
-  Display *display = XOpenDisplay(NULL);
-  if (display == NULL) {
+  state.display = XOpenDisplay(NULL);
+  if (state.display == NULL) {
     Log("Could not connect to $DISPLAY.");
-    return 1;
+    goto done;
   }
-  Window root_window = DefaultRootWindow(display);
+  state.root_window = DefaultRootWindow(state.display);
 
-  // Initialize the extensions.
-#ifdef HAVE_XSCREENSAVER_EXT
-  have_xscreensaver_ext = 0;
-  int scrnsaver_event_base, scrnsaver_error_base;
-  if (XScreenSaverQueryExtension(display, &scrnsaver_event_base,
-                                 &scrnsaver_error_base)) {
-    have_xscreensaver_ext = 1;
-    saver_info = XScreenSaverAllocInfo();
-  }
-#endif
-#ifdef HAVE_XSYNC_EXT
-  have_xsync_ext = 0;
-  int sync_event_base, sync_error_base;
-  if (XSyncQueryExtension(display, &sync_event_base, &sync_error_base)) {
-    have_xsync_ext = 1;
-    xsync_counters = XSyncListSystemCounters(display, &num_xsync_counters);
-  }
-#endif
-
-  // Capture the initial idle time.
-  uint64_t prev_idle = GetIdleTime(display, root_window, timers);
-  if (prev_idle == (uint64_t)-1) {
+  InitializeExtensions(&state);
+  state.prev_idle = GetIdleTime(&state);
+  if (state.prev_idle == (uint64_t)-1) {
     Log("Could not initialize idle timers. Bailing out.");
-    return 1;
+    goto done;
   }
 
-  // Start the subprocess.
-  childpid = ForkWithoutSigHandlers();
-  if (childpid == -1) {
-    LogErrno("fork");
-    return 1;
+  if (!SpawnChild(&state, argv)) {
+    goto done;
   }
-  if (childpid == 0) {
-    // Child process.
-    StartPgrp();
-    execvp(argv[1], argv + 1);
-    LogErrno("execvp");
-    _exit(EXIT_FAILURE);
-  }
-
-  // Parent process.
-  struct sigaction sa = {.sa_flags = SA_RESETHAND, .sa_handler = HandleSIGTERM};
-  sigemptyset(&sa.sa_mask);  // It re-raises to suicide.
-  if (sigaction(SIGTERM, &sa, NULL) != 0) {
-    LogErrno("sigaction(SIGTERM)");
+  if (!InstallSignalHandlers()) {
+    goto done;
   }
 
   InitWaitPgrp();
-
-  int64_t start_time_ms = 0;
-  if (GetMonotonicTimeMs(&start_time_ms) != 0) {
+  if (GetMonotonicTimeMs(&state.start_time_ms) != 0) {
     LogErrno("GetMonotonicTimeMs");
-    exit(EXIT_FAILURE);
+    goto done;
   }
-  int still_idle = 1;
-  while (childpid != 0) {
+
+  while (state.childpid != 0) {
+    if (g_terminate_signal != 0) {
+      state.terminate_signal = g_terminate_signal;
+      g_terminate_signal = 0;
+      goto done;
+    }
+
     (void)SleepMs(10);
 
-    uint64_t cur_idle = GetIdleTime(display, root_window, timers);
-    still_idle = cur_idle >= prev_idle;
-    prev_idle = cur_idle;
-
-    // Also exit when both dim and wait time expire. This allows using
-    // xss-lock's dim-screen.sh without changes.
-    int64_t current_time_ms = 0;
-    if (GetMonotonicTimeMs(&current_time_ms) != 0) {
-      LogErrno("GetMonotonicTimeMs");
-      exit(EXIT_FAILURE);
+    if (g_terminate_signal != 0) {
+      state.terminate_signal = g_terminate_signal;
+      g_terminate_signal = 0;
+      goto done;
     }
-    int active_ms = (int)(current_time_ms - start_time_ms);
-    int should_be_running =
-        still_idle && (active_ms <= dim_time_ms + wait_time_ms);
-
-    if (!should_be_running) {
-      KillPgrp(childpid, SIGTERM);
+    if (!UpdateIdleStatus(&state)) {
+      Log("Could not read idle timers");
+      goto done;
     }
-    int status = 0;
-    WaitPgrp("idle", &childpid, !should_be_running, !should_be_running,
-             &status);
+
+    {
+      int64_t current_time_ms = 0;
+      int status = 0;
+      bool should_be_running = false;
+
+      if (GetMonotonicTimeMs(&current_time_ms) != 0) {
+        LogErrno("GetMonotonicTimeMs");
+        goto done;
+      }
+
+      should_be_running =
+          state.still_idle &&
+          (current_time_ms - state.start_time_ms <=
+           (int64_t)state.dim_time_ms + (int64_t)state.wait_time_ms);
+      if (!should_be_running && state.childpid != 0 &&
+          KillPgrp(state.childpid, SIGTERM) != 0 && errno != ESRCH) {
+        LogErrno("KillPgrp");
+      }
+
+      (void)WaitPgrp("idle", &state.childpid, 0, !should_be_running, &status);
+    }
   }
 
-  // This is the point where we can exit.
-  return still_idle ? 1   // Dimmer exited - now it's time to lock.
-                    : 0;  // No longer idle - don't lock.
+  state.status = state.still_idle ? 1 : 0;
+
+done:
+  if (state.childpid != 0) {
+    int status = 0;
+    (void)KillPgrp(state.childpid, SIGTERM);
+    (void)WaitPgrp("idle", &state.childpid, 1, 1, &status);
+  }
+
+#ifdef HAVE_XSYNC_EXT
+  if (state.xsync_counters != NULL) {
+    XSyncFreeSystemCounterList(state.xsync_counters);
+  }
+#endif
+#ifdef HAVE_XSCREENSAVER_EXT
+  if (state.saver_info != NULL) {
+    XFree(state.saver_info);
+  }
+#endif
+  if (state.display != NULL) {
+    XCloseDisplay(state.display);
+  }
+
+  if (state.terminate_signal != 0) {
+    struct sigaction sa = {.sa_flags = 0, .sa_handler = SIG_DFL};
+    sigemptyset(&sa.sa_mask);
+    (void)sigaction(state.terminate_signal, &sa, NULL);
+    raise(state.terminate_signal);
+  }
+
+  return state.status;
 }

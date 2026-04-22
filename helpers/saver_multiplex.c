@@ -14,71 +14,224 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+#include "config.h"
 #include "build-config.h"
 
-#include <X11/X.h>       // for Window, CopyFromParent, CWBackPixel
+#include <X11/X.h>       // for Window, CopyFromParent
 #include <X11/Xlib.h>    // for XEvent, XFlush, XNextEvent, XOpenDi...
-#include <errno.h>       // for errno, EINTR
+#include <errno.h>       // for errno, EAGAIN, EINTR, EWOULDBLOCK
 #include <poll.h>        // for pollfd, POLLIN, POLLHUP
-#include <signal.h>      // for signal, SIGTERM
-#include <stdio.h>       // for fprintf, NULL, stderr
-#include <stdlib.h>      // for setenv
-#include <string.h>      // for memcmp, memcpy
-#include <unistd.h>      // for sleep
+#include <signal.h>      // for sigaction, SIGTERM, SIGUSR1
+#include <stdbool.h>     // for bool
+#include <stdlib.h>      // for EXIT_FAILURE, setenv
+#include <string.h>      // for memcmp, memcpy, memset
+#include <unistd.h>      // for read, write, ssize_t
 
-#include "../env_settings.h"      // for GetStringSetting
-#include "../io_util.h"           // for RetryPoll
+#include "../env_settings.h"      // for GetIntSetting, GetExecutablePathSet...
+#include "../io_util.h"           // for ClosePair, PipeCloexec, RetryPoll
 #include "../logging.h"           // for Log, LogErrno
-#include "../saver_child.h"       // for MAX_SAVERS
+#include "../saver_child.h"       // for KillAllSaverChildren, MAX_SAVERS
+#include "../time_util.h"         // for SleepMs
+#include "../util.h"              // for ARRAY_LEN
 #include "../wait_pgrp.h"         // for InitWaitPgrp
 #include "../wm_properties.h"     // for SetWMProperties
 #include "../xscreensaver_api.h"  // for ReadWindowID
 #include "monitors.h"             // for IsMonitorChangeEvent, Monitor, Sele...
 
-static void HandleSIGUSR1(int signo) {
-  KillAllSaverChildrenSigHandler(signo);  // Dirty, but quick.
+#define MAX_MONITORS MAX_SAVERS
+#define MAX_X_EVENTS_PER_TICK 128
+
+struct SaverMultiplexState {
+  int argc;
+  char **argv;
+  Display *display;
+  Window parent_window;
+  int x11_fd;
+  int signal_pipe[2];
+  const char *saver_executable;
+  Monitor monitors[MAX_MONITORS];
+  size_t num_monitors;
+  Window windows[MAX_MONITORS];
+  int terminate_signal;
+  bool have_pending_x_events;
+};
+
+static volatile sig_atomic_t g_reset_requested = 0;
+static volatile sig_atomic_t g_terminate_signal = 0;
+static int g_signal_pipe_write_fd = -1;
+
+static void SignalPipeWakeup(void) {
+  if (g_signal_pipe_write_fd < 0) {
+    return;
+  }
+
+  char signal_byte = 'x';
+  ssize_t unused = write(g_signal_pipe_write_fd, &signal_byte, 1);
+  (void)unused;
+}
+
+static void HandleSIGUSR1(int unused_signo) {
+  (void)unused_signo;
+  g_reset_requested = 1;
+  SignalPipeWakeup();
 }
 
 static void HandleSIGTERM(int signo) {
-  KillAllSaverChildrenSigHandler(signo);  // Dirty, but quick.
-  raise(signo);                           // Destroys windows we created anyway.
+  g_terminate_signal = signo;
+  SignalPipeWakeup();
 }
 
-#define MAX_MONITORS MAX_SAVERS
-
-static const char *saver_executable;
-
-static Display *display;
-static Monitor monitors[MAX_MONITORS];
-static size_t num_monitors;
-static Window windows[MAX_MONITORS];
-
-static void WatchSavers(void) {
-  for (size_t i = 0; i < num_monitors; ++i) {
-    WatchSaverChild(display, windows[i], i, saver_executable, 1);
+static void InitState(struct SaverMultiplexState *state, int argc, char **argv) {
+  memset(state, 0, sizeof(*state));
+  state->argc = argc;
+  state->argv = argv;
+  state->parent_window = None;
+  state->signal_pipe[0] = -1;
+  state->signal_pipe[1] = -1;
+  for (size_t i = 0; i < ARRAY_LEN(state->windows); ++i) {
+    state->windows[i] = None;
   }
 }
 
-static void SpawnSavers(Window parent, int argc, char* const* argv) {
-  for (size_t i = 0; i < num_monitors; ++i) {
-    windows[i] =
-        XCreateWindow(display, parent, monitors[i].x, monitors[i].y,
-                      monitors[i].width, monitors[i].height, 0, CopyFromParent,
-                      InputOutput, CopyFromParent, 0, NULL);
-    SetWMProperties(display, windows[i], "xsecurelock",
-                    "saver_multiplex_screen", argc, argv);
-    XMapRaised(display, windows[i]);
+static void DrainSignalPipe(int fd) {
+  for (;;) {
+    char buf[32];
+    ssize_t got = read(fd, buf, sizeof(buf));
+    if (got > 0) {
+      continue;
+    }
+    if (got == 0) {
+      return;
+    }
+    if (errno == EINTR) {
+      continue;
+    }
+    if (errno == EAGAIN || errno == EWOULDBLOCK) {
+      return;
+    }
+    LogErrno("read(signal pipe)");
+    return;
   }
-  // Need to flush the display so savers sure can access the window.
-  XFlush(display);
-  WatchSavers();
 }
 
-static void KillSavers(void) {
-  for (size_t i = 0; i < num_monitors; ++i) {
-    WatchSaverChild(display, windows[i], i, saver_executable, 0);
-    XDestroyWindow(display, windows[i]);
+static int InstallSignalHandlers(void) {
+  struct sigaction sa = {.sa_flags = 0, .sa_handler = HandleSIGUSR1};
+  sigemptyset(&sa.sa_mask);
+  if (sigaction(SIGUSR1, &sa, NULL) != 0) {
+    LogErrno("sigaction(SIGUSR1)");
+    return 0;
   }
+
+  sa.sa_flags = SA_RESETHAND;
+  sa.sa_handler = HandleSIGTERM;
+  if (sigaction(SIGTERM, &sa, NULL) != 0) {
+    LogErrno("sigaction(SIGTERM)");
+    return 0;
+  }
+
+  return 1;
+}
+
+static int HandleSignalFlags(struct SaverMultiplexState *state) {
+  if (g_terminate_signal != 0) {
+    state->terminate_signal = g_terminate_signal;
+    g_terminate_signal = 0;
+    return 1;
+  }
+  if (!g_reset_requested) {
+    return 0;
+  }
+
+  g_reset_requested = 0;
+  KillAllSaverChildren(SIGUSR1);
+  return 0;
+}
+
+static void WatchSavers(const struct SaverMultiplexState *state) {
+  for (size_t i = 0; i < state->num_monitors; ++i) {
+    if (state->windows[i] == None) {
+      continue;
+    }
+    WatchSaverChild(state->display, state->windows[i], (int)i,
+                    state->saver_executable, 1);
+  }
+}
+
+static void StopSavers(struct SaverMultiplexState *state) {
+  for (size_t i = 0; i < ARRAY_LEN(state->windows); ++i) {
+    if (state->windows[i] == None) {
+      continue;
+    }
+    WatchSaverChild(state->display, state->windows[i], (int)i,
+                    state->saver_executable, 0);
+    XDestroyWindow(state->display, state->windows[i]);
+    state->windows[i] = None;
+  }
+}
+
+static void SpawnSavers(struct SaverMultiplexState *state) {
+  for (size_t i = 0; i < state->num_monitors; ++i) {
+    state->windows[i] =
+        XCreateWindow(state->display, state->parent_window, state->monitors[i].x,
+                      state->monitors[i].y, state->monitors[i].width,
+                      state->monitors[i].height, 0, CopyFromParent, InputOutput,
+                      CopyFromParent, 0, NULL);
+    SetWMProperties(state->display, state->windows[i], "xsecurelock",
+                    "saver_multiplex_screen", state->argc, state->argv);
+    XMapRaised(state->display, state->windows[i]);
+  }
+
+  XFlush(state->display);
+  WatchSavers(state);
+}
+
+static int LoadMonitorSnapshot(struct SaverMultiplexState *state,
+                               Monitor monitors[MAX_MONITORS],
+                               size_t *num_monitors) {
+  memset(monitors, 0, sizeof(*monitors) * MAX_MONITORS);
+  *num_monitors =
+      GetMonitors(state->display, state->parent_window, monitors, MAX_MONITORS);
+  return *num_monitors != 0;
+}
+
+static void ReloadMonitorsIfChanged(struct SaverMultiplexState *state) {
+  Monitor new_monitors[MAX_MONITORS];
+  size_t new_num_monitors = 0;
+
+  if (!LoadMonitorSnapshot(state, new_monitors, &new_num_monitors)) {
+    Log("Could not refresh monitors; keeping current layout");
+    return;
+  }
+
+  if (new_num_monitors == state->num_monitors &&
+      memcmp(new_monitors, state->monitors, sizeof(new_monitors)) == 0) {
+    return;
+  }
+
+  StopSavers(state);
+  memcpy(state->monitors, new_monitors, sizeof(new_monitors));
+  state->num_monitors = new_num_monitors;
+  SpawnSavers(state);
+}
+
+static void ProcessOneXEvent(struct SaverMultiplexState *state,
+                             const XEvent *event) {
+  if (IsMonitorChangeEvent(state->display, event->type)) {
+    ReloadMonitorsIfChanged(state);
+  }
+}
+
+static void ProcessPendingXEvents(struct SaverMultiplexState *state) {
+  XEvent event;
+  int drained = 0;
+
+  while (drained < MAX_X_EVENTS_PER_TICK && XPending(state->display) > 0) {
+    XNextEvent(state->display, &event);
+    ++drained;
+    ProcessOneXEvent(state, &event);
+  }
+
+  state->have_pending_x_events = XPending(state->display) > 0;
 }
 
 /*! \brief The main program.
@@ -88,75 +241,100 @@ static void KillSavers(void) {
  * Spawns spearate saver subprocesses, one on each screen.
  */
 int main(int argc, char **argv) {
+  struct SaverMultiplexState state;
+  int status = EXIT_FAILURE;
+
+  InitState(&state, argc, argv);
+
   if (GetIntSetting("XSECURELOCK_INSIDE_SAVER_MULTIPLEX", 0)) {
     Log("Starting saver_multiplex inside saver_multiplex?!?");
-    // If we die, the parent process will revive us, so let's sleep a while to
-    // conserve battery and avoid log spam in this case.
-    sleep(60);
-    return 1;
+    (void)SleepMs(60000);
+    goto done;
   }
   setenv("XSECURELOCK_INSIDE_SAVER_MULTIPLEX", "1", 1);
 
-  if ((display = XOpenDisplay(NULL)) == NULL) {
+  state.display = XOpenDisplay(NULL);
+  if (state.display == NULL) {
     Log("Could not connect to $DISPLAY");
-    return 1;
+    goto done;
   }
-  int x11_fd = ConnectionNumber(display);
+  state.x11_fd = ConnectionNumber(state.display);
 
-  Window parent = ReadWindowID();
-  if (parent == None) {
+  state.parent_window = ReadWindowID();
+  if (state.parent_window == None) {
     Log("Invalid/no parent ID in XSCREENSAVER_WINDOW");
-    return 1;
+    goto done;
   }
 
-  saver_executable =
+  state.saver_executable =
       GetExecutablePathSetting("XSECURELOCK_SAVER", SAVER_EXECUTABLE, 0);
 
-  SelectMonitorChangeEvents(display, parent);
-  num_monitors = GetMonitors(display, parent, monitors, MAX_MONITORS);
-
-  SpawnSavers(parent, argc, argv);
-
-  struct sigaction sa = {.sa_flags = 0, .sa_handler = HandleSIGUSR1};
-  sigemptyset(&sa.sa_mask);  // To kill children.
-  if (sigaction(SIGUSR1, &sa, NULL) != 0) {
-    LogErrno("sigaction(SIGUSR1)");
+  SelectMonitorChangeEvents(state.display, state.parent_window);
+  if (!LoadMonitorSnapshot(&state, state.monitors, &state.num_monitors)) {
+    Log("Could not determine monitor layout");
+    goto done;
   }
-  sa.sa_flags = SA_RESETHAND;     // It re-raises to suicide.
-  sa.sa_handler = HandleSIGTERM;  // To kill children.
-  if (sigaction(SIGTERM, &sa, NULL) != 0) {
-    LogErrno("sigaction(SIGTERM)");
+
+  SpawnSavers(&state);
+
+  if (PipeCloexec(state.signal_pipe) != 0) {
+    LogErrno("PipeCloexec");
+    goto done;
+  }
+  if (SetFdNonblocking(state.signal_pipe[0]) != 0 ||
+      SetFdNonblocking(state.signal_pipe[1]) != 0) {
+    LogErrno("fcntl(signal pipe)");
+    goto done;
+  }
+  g_signal_pipe_write_fd = state.signal_pipe[1];
+
+  if (!InstallSignalHandlers()) {
+    goto done;
   }
 
   InitWaitPgrp();
+  status = 0;
 
   for (;;) {
-    struct pollfd x11_pollfd = {
-        .fd = x11_fd,
-        .events = POLLIN | POLLHUP,
-        .revents = 0,
+    struct pollfd fds[2] = {
+        {.fd = state.x11_fd, .events = POLLIN | POLLHUP, .revents = 0},
+        {.fd = state.signal_pipe[0], .events = POLLIN | POLLHUP, .revents = 0},
     };
-    int ready = RetryPoll(&x11_pollfd, 1, -1);
+    int ready = RetryPoll(fds, ARRAY_LEN(fds),
+                          state.have_pending_x_events ? 0 : -1);
     if (ready < 0) {
       LogErrno("poll");
     }
-    WatchSavers();
-    XEvent ev;
-    while (XPending(display) && (XNextEvent(display, &ev), 1)) {
-      if (IsMonitorChangeEvent(display, ev.type)) {
-        Monitor new_monitors[MAX_SAVERS];
-        size_t new_num_monitors =
-            GetMonitors(display, parent, new_monitors, MAX_SAVERS);
-        if (new_num_monitors != num_monitors ||
-            memcmp(new_monitors, monitors, sizeof(monitors)) != 0) {
-          KillSavers();
-          num_monitors = new_num_monitors;
-          memcpy(monitors, new_monitors, sizeof(monitors));
-          SpawnSavers(parent, argc, argv);
-        }
-      }
+
+    if (fds[1].revents & (POLLIN | POLLHUP)) {
+      DrainSignalPipe(state.signal_pipe[0]);
     }
+    if (HandleSignalFlags(&state)) {
+      goto done;
+    }
+
+    WatchSavers(&state);
+    ProcessPendingXEvents(&state);
   }
 
-  return 0;
+done:
+  g_signal_pipe_write_fd = -1;
+
+  if (state.display != NULL) {
+    if (state.terminate_signal != 0) {
+      KillAllSaverChildren(state.terminate_signal);
+    }
+    StopSavers(&state);
+    XCloseDisplay(state.display);
+  }
+  (void)ClosePair(state.signal_pipe);
+
+  if (state.terminate_signal != 0) {
+    struct sigaction sa = {.sa_flags = 0, .sa_handler = SIG_DFL};
+    sigemptyset(&sa.sa_mask);
+    (void)sigaction(state.terminate_signal, &sa, NULL);
+    raise(state.terminate_signal);
+  }
+
+  return status;
 }

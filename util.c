@@ -218,6 +218,22 @@ static int SetCloexec(int fd) {
   return fcntl(fd, F_SETFD, flags | FD_CLOEXEC);
 }
 
+static int SetFdFlag(int fd, int get_cmd, int set_cmd, int bit) {
+  int flags = fcntl(fd, get_cmd);
+  if (flags < 0) {
+    return -1;
+  }
+  return fcntl(fd, set_cmd, flags | bit);
+}
+
+int SetFdCloexec(int fd) {
+  return SetCloexec(fd);
+}
+
+int SetFdNonblocking(int fd) {
+  return SetFdFlag(fd, F_GETFL, F_SETFL, O_NONBLOCK);
+}
+
 int PipeCloexec(int fds[2]) {
 #if HAVE_PIPE2 && !FORCE_PIPE2_FALLBACK && defined(O_CLOEXEC)
   if (pipe2(fds, O_CLOEXEC) == 0) {
@@ -291,6 +307,24 @@ int SleepMs(int timeout_ms) {
   struct timespec delay = {
       .tv_sec = timeout_ms / 1000,
       .tv_nsec = (timeout_ms % 1000) * 1000000L,
+  };
+  while (nanosleep(&delay, &delay) != 0) {
+    if (errno != EINTR) {
+      return -1;
+    }
+  }
+  return 0;
+}
+
+int SleepNs(int64_t timeout_ns) {
+  if (timeout_ns < 0) {
+    errno = EINVAL;
+    return -1;
+  }
+
+  struct timespec delay = {
+      .tv_sec = timeout_ns / 1000000000,
+      .tv_nsec = timeout_ns % 1000000000,
   };
   while (nanosleep(&delay, &delay) != 0) {
     if (errno != EINTR) {

@@ -336,25 +336,13 @@ static void ReapNotifyCommand(struct LockContext *ctx) {
   WaitProc("notify", &ctx->runtime.notify_command_pid, 0, 0, &status);
 }
 
-static int SetFdFlag(int fd, int get_cmd, int set_cmd, int bit) {
-  int flags = fcntl(fd, get_cmd);
-  if (flags == -1) {
-    return -1;
-  }
-  return fcntl(fd, set_cmd, flags | bit);
-}
-
 static void MakeSleepLockFdCloexec(int fd) {
   if (fd == -1) {
     return;
   }
-  if (SetFdFlag(fd, F_GETFD, F_SETFD, FD_CLOEXEC) == -1) {
+  if (SetFdCloexec(fd) == -1) {
     LogErrno("fcntl(XSS_SLEEP_LOCK_FD)");
   }
-}
-
-static int SetFdNonblocking(int fd) {
-  return SetFdFlag(fd, F_GETFL, F_SETFL, O_NONBLOCK);
 }
 
 static void DrainSignalPipe(int fd) {

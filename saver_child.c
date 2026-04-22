@@ -27,14 +27,18 @@ limitations under the License.
 //! The PIDs of currently running saver children, or 0 if not running.
 static pid_t saver_child_pid[MAX_SAVERS] = {0};
 
-void KillAllSaverChildrenSigHandler(int signo) {
-  // This is a signal handler, so we're not going to make this too
-  // complicated. Just kill 'em all.
+void KillAllSaverChildren(int signo) {
   for (int i = 0; i < MAX_SAVERS; ++i) {
     if (saver_child_pid[i] != 0) {
       KillPgrp(saver_child_pid[i], signo);
     }
   }
+}
+
+void KillAllSaverChildrenSigHandler(int signo) {
+  // This is a signal handler, so we're not going to make this too
+  // complicated. Just kill 'em all.
+  KillAllSaverChildren(signo);
 }
 
 void WatchSaverChild(Display* dpy, Window w, int index, const char* executable,
