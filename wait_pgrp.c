@@ -22,11 +22,17 @@ limitations under the License.
 #include <signal.h>  // for kill, sigaddset, sigemptyset, sigprocmask,
                      // sigsuspend, SIGCHLD, SIGTERM
 #include <stdlib.h>  // for EXIT_SUCCESS, WEXITSTATUS, WIFEXITED, WIFSIGNALED
-#include <string.h>
+#include <string.h>  // for memcpy
 #include <sys/wait.h>  // for waitpid, WNOHANG
 #include <unistd.h>    // for pid_t
 
 #include "logging.h"  // for Log, LogErrno
+
+static char *const *BorrowExecvArgv(const char *const argv[]) {
+  char *const *execv_argv = NULL;
+  memcpy(&execv_argv, &argv, sizeof(execv_argv));
+  return execv_argv;
+}
 
 static void HandleSIGCHLD(int unused_signo) {
   // No handling needed - we just want to interrupt select() or sigsuspend()
@@ -122,24 +128,11 @@ int ExecvHelper(const char *path, const char *const argv[]) {
     return -1;
   }
 
-  size_t argc = 0;
-  while (argv[argc] != NULL) {
-    ++argc;
-  }
-
-  char **exec_argv = malloc((argc + 1) * sizeof(*exec_argv));
-  if (exec_argv == NULL) {
-    LogErrno("malloc");
-    return -1;
-  }
-  memcpy(exec_argv, argv, (argc + 1) * sizeof(*exec_argv));
-
   // Now execute the program.
-  execv(path, exec_argv);
-  // If we get here, we know it failed. We still log the error and free the
-  // allocated path if any.
+  // execv takes a mutable vector type, but it does not modify argv.
+  execv(path, BorrowExecvArgv(argv));
+  // If we get here, we know it failed.
   int saved_errno = errno;
-  free(exec_argv);
   LogErrno("execv %s", path);
   errno = saved_errno;
   return -1;

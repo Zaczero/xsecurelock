@@ -6,9 +6,9 @@
 #include <string.h>  // for memcpy, strlen
 #include <unistd.h>  // for gethostname, getuid, read, sysconf
 
+#include "buf_util.h"
 #include "logging.h"
 #include "mlock_page.h"
-#include "util.h"
 
 int GetHostName(char* hostname_buf, size_t hostname_buflen) {
   if (gethostname(hostname_buf, hostname_buflen)) {
@@ -22,13 +22,14 @@ int GetHostName(char* hostname_buf, size_t hostname_buflen) {
 int GetUserName(char* username_buf, size_t username_buflen) {
   struct passwd* pwd = NULL;
   struct passwd pwd_storage;
-  char* pwd_buf;
+  char* pwd_buf = NULL;
   int ok = 0;
-  long pwd_bufsize = sysconf(_SC_GETPW_R_SIZE_MAX);
-  if (pwd_bufsize < 0) {
-    pwd_bufsize = 1 << 20;
+  size_t pwd_bufsize = 1 << 20;
+  long sysconf_bufsize = sysconf(_SC_GETPW_R_SIZE_MAX);
+  if (sysconf_bufsize > 0) {
+    pwd_bufsize = (size_t)sysconf_bufsize;
   }
-  pwd_buf = malloc((size_t)pwd_bufsize);
+  pwd_buf = malloc(pwd_bufsize);
   if (!pwd_buf) {
     LogErrno("malloc(pwd_bufsize)");
     return 0;
@@ -39,7 +40,7 @@ int GetUserName(char* username_buf, size_t username_buflen) {
     LogErrno("mlock");
   }
   int status =
-      getpwuid_r(getuid(), &pwd_storage, pwd_buf, (size_t)pwd_bufsize, &pwd);
+      getpwuid_r(getuid(), &pwd_storage, pwd_buf, pwd_bufsize, &pwd);
   if (status != 0) {
     errno = status;
     LogErrno("getpwuid_r");
@@ -59,7 +60,6 @@ int GetUserName(char* username_buf, size_t username_buflen) {
   ok = 1;
 
 done:
-  explicit_bzero(pwd_buf, pwd_bufsize);
-  free(pwd_buf);
+  ClearFreeBuffer(&pwd_buf, pwd_bufsize);
   return ok;
 }

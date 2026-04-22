@@ -155,6 +155,41 @@ static void ExpectInterruptedReadSuccess(void) {
   free(message);
 }
 
+static void ExpectWritePacketBytesRoundTrip(void) {
+  static const char payload[] = {'a', 'b', 'c'};
+  int fds[2];
+  if (pipe(fds) != 0) {
+    perror("pipe");
+    exit(1);
+  }
+
+  if (!WritePacketBytes(fds[1], PTYPE_RESPONSE_LIKE_USERNAME, payload,
+                        sizeof(payload))) {
+    fprintf(stderr, "write-packet-bytes: write failed\n");
+    exit(1);
+  }
+  close(fds[1]);
+
+  char *message = NULL;
+  char type = ReadPacket(fds[0], &message, 0);
+  close(fds[0]);
+
+  if (type != PTYPE_RESPONSE_LIKE_USERNAME) {
+    fprintf(stderr, "write-packet-bytes: unexpected type %d\n", (int)type);
+    free(message);
+    exit(1);
+  }
+  if (message == NULL || memcmp(message, payload, sizeof(payload)) != 0 ||
+      message[sizeof(payload)] != '\0') {
+    fprintf(stderr, "write-packet-bytes: unexpected payload\n");
+    free(message);
+    exit(1);
+  }
+
+  explicit_bzero(message, sizeof(payload));
+  free(message);
+}
+
 int main(void) {
   InstallSignalHandler();
   ExpectReadFailure("missing-length", "P \n", 3);
@@ -162,5 +197,6 @@ int main(void) {
   ExpectReadFailure("length-above-cap", "P 65535\nx\n", 10);
   ExpectReadFailure("bad-trailing-newline", "P 1\naX", 6);
   ExpectInterruptedReadSuccess();
+  ExpectWritePacketBytesRoundTrip();
   return 0;
 }

@@ -17,6 +17,8 @@ limitations under the License.
 #ifndef AUTHPROTO_H
 #define AUTHPROTO_H
 
+#include <stddef.h>
+
 // Packet format:
 //
 //   <ptype> <SPC> <len> <NEWLINE> <message> <NEWLINE>
@@ -42,6 +44,17 @@ limitations under the License.
 #define PTYPE_RESPONSE_LIKE_USERNAME 'u'
 #define PTYPE_RESPONSE_LIKE_PASSWORD 'p'
 #define PTYPE_RESPONSE_CANCELLED 'x'
+
+/**
+ * \brief Writes a packet in above form from a byte buffer.
+ *
+ * \param fd The file descriptor to write to.
+ * \param type The packet type from above macros.
+ * \param message The message bytes to include with the packet.
+ * \param len The number of bytes in message.
+ * \return Whether the full packet was written successfully.
+ */
+int WritePacketBytes(int fd, char type, const char *message, size_t len);
 
 /**
  * \brief Writes a packet in above form.

@@ -37,34 +37,33 @@ static int WriteExact(int fd, const void *buf, size_t len) {
   return 0;
 }
 
-void WritePacket(int fd, char type, const char *message) {
-  size_t len_s = strlen(message);
-  if (len_s >= 0xFFFF) {
+int WritePacketBytes(int fd, char type, const char *message, size_t len) {
+  if (len > MAX_PACKET_LENGTH) {
     Log("overlong message, cannot write (hardcoded limit)");
-    return;
-  }
-  int len = len_s;
-  if (len < 0 || (size_t)len != len_s) {
-    Log("overlong message, cannot write (does not fit in int)");
-    return;
+    return 0;
   }
   char prefix[16];
-  int prefixlen = snprintf(prefix, sizeof(prefix), "%c %d\n", type, len);
+  int prefixlen = snprintf(prefix, sizeof(prefix), "%c %zu\n", type, len);
   if (prefixlen <= 0 || (size_t)prefixlen >= sizeof(prefix)) {
     Log("overlong prefix, cannot write");
-    return;
+    return 0;
   }
   // Yes, we're wasting syscalls here. This doesn't need to be fast though, and
   // this way we can avoid an extra buffer.
   if (!WriteExact(fd, prefix, (size_t)prefixlen)) {
-    return;
+    return 0;
   }
-  if (len != 0 && !WriteExact(fd, message, (size_t)len)) {
-    return;
+  if (len != 0 && !WriteExact(fd, message, len)) {
+    return 0;
   }
   if (!WriteExact(fd, "\n", 1)) {
-    return;
+    return 0;
   }
+  return 1;
+}
+
+void WritePacket(int fd, char type, const char *message) {
+  (void)WritePacketBytes(fd, type, message, strlen(message));
 }
 
 static int ReadExact(int fd, void *buf, size_t len, int eof_permitted) {

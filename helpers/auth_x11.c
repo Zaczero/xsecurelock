@@ -988,31 +988,8 @@ static int RenderPromptFrame(const char *message, const struct PromptState *stat
   return DisplayMessage(message, displaybuf, 0);
 }
 
-static int BuildPromptResponse(const struct PromptState *state, int echo,
-                               char **response) {
-  *response = malloc(state->password_length + 1);
-  if (*response == NULL) {
-    LogErrno("malloc");
-    return 0;
-  }
-  if (state->password_length != 0) {
-    memcpy(*response, state->password, state->password_length);
-  }
-  (*response)[state->password_length] = '\0';
-
-  if (!echo && MLOCK_PAGE(*response, state->password_length + 1) < 0) {
-    LogErrno("mlock");
-    if (!ShowPromptStorageWarning("Password has not been stored securely.")) {
-      ClearFreeString(response);
-      return 0;
-    }
-  }
-
-  return 1;
-}
-
 static int HandlePromptInputByte(struct PromptState *state, char input_byte,
-                                 int echo, char **response,
+                                 int response_fd, char response_type,
                                  enum PromptSessionResult *result) {
   switch (input_byte) {
     case '\b':
@@ -1038,7 +1015,8 @@ static int HandlePromptInputByte(struct PromptState *state, char input_byte,
       return 1;
     case '\r':
     case '\n':
-      if (!BuildPromptResponse(state, echo, response)) {
+      if (!WritePacketBytes(response_fd, response_type, state->password,
+                            state->password_length)) {
         *result = PROMPT_SESSION_RESULT_FAILED;
       } else {
         *result = PROMPT_SESSION_RESULT_SUBMITTED;
@@ -1062,14 +1040,13 @@ static int HandlePromptInputByte(struct PromptState *state, char input_byte,
 /*! \brief Ask a question to the user.
  *
  * \param msg The message.
- * \param response The response will be stored in a newly allocated buffer here.
- *   The caller is supposed to eventually free() it.
  * \param echo If true, the input will be shown; otherwise it will be hidden
  *   (password entry).
  * \return Whether the prompt was submitted, cancelled, or failed locally.
  */
 static enum PromptSessionResult RunPromptSession(const char *message,
-                                                 char **response, int echo) {
+                                                 int echo, int response_fd,
+                                                 char response_type) {
   struct PromptState state;
   char input_byte = 0;
   int blink_state = 0;
@@ -1134,7 +1111,8 @@ static enum PromptSessionResult RunPromptSession(const char *message,
       if (done) {
         break;
       }
-      done = HandlePromptInputByte(&state, input_byte, echo, response, &result);
+      done = HandlePromptInputByte(&state, input_byte, response_fd,
+                                   response_type, &result);
     }
 
 redraw:
@@ -1246,7 +1224,6 @@ static int Authenticate(void) {
   } while (0)
   for (;;) {
     char *message;
-    char *response;
     char type = ReadPacket(requestfd[0], &message, 1);
     switch (type) {
       case PTYPE_INFO_MESSAGE:
@@ -1278,14 +1255,17 @@ static int Authenticate(void) {
         ClearFreeString(&message);
         break;
       case PTYPE_PROMPT_LIKE_USERNAME:
-        switch (RunPromptSession(message, &response, 1)) {
+        switch (RunPromptSession(message, 1, responsefd[1],
+                                 PTYPE_RESPONSE_LIKE_USERNAME)) {
           case PROMPT_SESSION_RESULT_SUBMITTED:
-            WritePacket(responsefd[1], PTYPE_RESPONSE_LIKE_USERNAME, response);
-            ClearFreeString(&response);
             SHOW_PROCESSING_OR_FAIL();
             break;
           case PROMPT_SESSION_RESULT_CANCELLED:
-            WritePacket(responsefd[1], PTYPE_RESPONSE_CANCELLED, "");
+            if (!WritePacketBytes(responsefd[1], PTYPE_RESPONSE_CANCELLED, "",
+                                  0)) {
+              ClearFreeString(&message);
+              goto done;
+            }
             SHOW_PROCESSING_OR_FAIL();
             break;
           case PROMPT_SESSION_RESULT_FAILED:
@@ -1295,14 +1275,17 @@ static int Authenticate(void) {
         ClearFreeString(&message);
         break;
       case PTYPE_PROMPT_LIKE_PASSWORD:
-        switch (RunPromptSession(message, &response, 0)) {
+        switch (RunPromptSession(message, 0, responsefd[1],
+                                 PTYPE_RESPONSE_LIKE_PASSWORD)) {
           case PROMPT_SESSION_RESULT_SUBMITTED:
-            WritePacket(responsefd[1], PTYPE_RESPONSE_LIKE_PASSWORD, response);
-            ClearFreeString(&response);
             SHOW_PROCESSING_OR_FAIL();
             break;
           case PROMPT_SESSION_RESULT_CANCELLED:
-            WritePacket(responsefd[1], PTYPE_RESPONSE_CANCELLED, "");
+            if (!WritePacketBytes(responsefd[1], PTYPE_RESPONSE_CANCELLED, "",
+                                  0)) {
+              ClearFreeString(&message);
+              goto done;
+            }
             SHOW_PROCESSING_OR_FAIL();
             break;
           case PROMPT_SESSION_RESULT_FAILED:
