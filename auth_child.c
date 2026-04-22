@@ -132,18 +132,13 @@ int WatchAuthChild(Window w, const char *executable, int force_auth,
         StartPgrp();
         ExportWindowID(w);
         (void)CloseIfValid(&pc[1]);
-        if (pc[0] != 0) {
-          if (dup2(pc[0], 0) == -1) {
-            LogErrno("dup2");
-            _exit(EXIT_FAILURE);
-          }
-          (void)CloseIfValid(&pc[0]);
+        if (MoveFdTo(&pc[0], STDIN_FILENO) != 0) {
+          LogErrno("MoveFdTo");
+          _exit(EXIT_FAILURE);
         }
         {
           const char *args[2] = {executable, NULL};
-          ExecvHelper(executable, args);
-          sleep(2);  // Reduce log spam or other effects from failed execv.
-          _exit(EXIT_FAILURE);
+          ExecvHelperOrExit(executable, args);
         }
       } else {
         // Parent process after successful fork.

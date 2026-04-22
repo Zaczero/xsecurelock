@@ -58,6 +58,7 @@ limitations under the License.
 #include "logging.h"
 #include "mlock_page.h"
 #include "saver_child.h"
+#include "signal_pipe.h"
 #include "time_util.h"
 #include "util.h"
 #include "version.h"
@@ -71,27 +72,16 @@ limitations under the License.
 
 static volatile sig_atomic_t g_wakeup_requested = 0;
 static volatile sig_atomic_t g_terminate_signal = 0;
-static int g_signal_pipe_write_fd = -1;
-
-static void SignalPipeWakeup(void) {
-  if (g_signal_pipe_write_fd < 0) {
-    return;
-  }
-
-  char signal_byte = 'x';
-  ssize_t unused = write(g_signal_pipe_write_fd, &signal_byte, 1);
-  (void)unused;
-}
 
 static void HandleSIGTERM(int signo) {
   g_terminate_signal = signo;
-  SignalPipeWakeup();
+  SignalPipeNotifyFromHandler();
 }
 
 static void HandleSIGUSR2(int unused_signo) {
   (void)unused_signo;
   g_wakeup_requested = 1;
-  SignalPipeWakeup();
+  SignalPipeNotifyFromHandler();
 }
 
 static void InitLockContext(struct LockContext *ctx, int argc, char **argv) {
@@ -102,8 +92,8 @@ static void InitLockContext(struct LockContext *ctx, int argc, char **argv) {
   ctx->config.blank_dpms_state = "off";
   ctx->config.background_color = "black";
   ctx->runtime.xss_sleep_lock_fd = -1;
-  ctx->runtime.signal_pipe[0] = -1;
-  ctx->runtime.signal_pipe[1] = -1;
+  ctx->runtime.signal_pipe.fds[0] = -1;
+  ctx->runtime.signal_pipe.fds[1] = -1;
   ctx->runtime.xss_requested_saver_state = WATCH_CHILDREN_NORMAL;
   ctx->windows.root_window = None;
   ctx->windows.parent_window = None;
@@ -343,27 +333,6 @@ static void MakeSleepLockFdCloexec(int fd) {
   }
   if (SetFdCloexec(fd) == -1) {
     LogErrno("fcntl(XSS_SLEEP_LOCK_FD)");
-  }
-}
-
-static void DrainSignalPipe(int fd) {
-  for (;;) {
-    char buf[32];
-    ssize_t got = read(fd, buf, sizeof(buf));
-    if (got > 0) {
-      continue;
-    }
-    if (got == 0) {
-      return;
-    }
-    if (errno == EINTR) {
-      continue;
-    }
-    if (errno == EAGAIN || errno == EWOULDBLOCK) {
-      return;
-    }
-    LogErrno("read(signal pipe)");
-    return;
   }
 }
 
@@ -701,16 +670,11 @@ int main(int argc, char **argv) {
     goto done;
   }
 
-  if (PipeCloexec(ctx.runtime.signal_pipe) != 0) {
-    LogErrno("PipeCloexec");
+  if (SignalPipeInit(&ctx.runtime.signal_pipe) != 0) {
+    LogErrno("SignalPipeInit");
     goto done;
   }
-  if (SetFdNonblocking(ctx.runtime.signal_pipe[0]) != 0 ||
-      SetFdNonblocking(ctx.runtime.signal_pipe[1]) != 0) {
-    LogErrno("fcntl(signal pipe)");
-    goto done;
-  }
-  g_signal_pipe_write_fd = ctx.runtime.signal_pipe[1];
+  SignalPipeSetWriteFdForHandler(ctx.runtime.signal_pipe.fds[1]);
 
   if (!InstallSignalHandlers()) {
     goto done;
@@ -759,7 +723,7 @@ int main(int argc, char **argv) {
   for (;;) {
     struct pollfd fds[2] = {
         {.fd = ctx.runtime.x11_fd, .events = POLLIN | POLLHUP, .revents = 0},
-        {.fd = ctx.runtime.signal_pipe[0],
+        {.fd = ctx.runtime.signal_pipe.fds[0],
          .events = POLLIN | POLLHUP,
          .revents = 0},
     };
@@ -770,7 +734,7 @@ int main(int argc, char **argv) {
     }
 
     if (fds[1].revents & (POLLIN | POLLHUP)) {
-      DrainSignalPipe(ctx.runtime.signal_pipe[0]);
+      SignalPipeDrain(ctx.runtime.signal_pipe.fds[0], "signal pipe");
     }
     if (HandleSignalFlags(&ctx)) {
       goto done;
@@ -818,8 +782,6 @@ int main(int argc, char **argv) {
   }
 
 done:
-  g_signal_pipe_write_fd = -1;
-
   if (ctx.runtime.terminate_signal != 0) {
     KillAllSaverChildrenSigHandler(ctx.runtime.terminate_signal);
     KillAuthChildSigHandler(ctx.runtime.terminate_signal);
@@ -839,7 +801,7 @@ done:
 
   explicit_bzero(&ctx.runtime.sensitive, sizeof(ctx.runtime.sensitive));
   (void)CloseIfValid(&ctx.runtime.xss_sleep_lock_fd);
-  (void)ClosePair(ctx.runtime.signal_pipe);
+  SignalPipeClose(&ctx.runtime.signal_pipe);
   LockWindowsCleanup(&ctx);
   if (ctx.runtime.display != NULL) {
     XCloseDisplay(ctx.runtime.display);

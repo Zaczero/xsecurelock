@@ -23,6 +23,7 @@
 
 int CloseIfValid(int *fd);
 int ClosePair(int fds[2]);
+int MoveFdTo(int *fd, int target_fd);
 int SetFdCloexec(int fd);
 int SetFdNonblocking(int fd);
 int PipeCloexec(int fds[2]);

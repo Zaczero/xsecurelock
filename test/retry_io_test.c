@@ -341,6 +341,102 @@ static void TestClosePair(void) {
   assert(errno == EBADF);
 }
 
+static void TestMoveFdToSameFd(void) {
+  int fds[2];
+  assert(pipe(fds) == 0);
+
+  int fd = fds[0];
+  assert(MoveFdTo(&fd, fds[0]) == 0);
+  assert(fd == fds[0]);
+
+  close(fds[0]);
+  close(fds[1]);
+}
+
+static void TestMoveFdToOccupiedTarget(void) {
+  int source_pipe[2];
+  int target_pipe[2];
+  assert(pipe(source_pipe) == 0);
+  assert(pipe(target_pipe) == 0);
+
+  int original_source_fd = source_pipe[1];
+  int target_fd = target_pipe[0];
+  assert(MoveFdTo(&source_pipe[1], target_fd) == 0);
+  assert(source_pipe[1] == target_fd);
+  assert(fcntl(original_source_fd, F_GETFD) < 0);
+  assert(errno == EBADF);
+
+  assert(write(source_pipe[1], "J", 1) == 1);
+  char ch = 0;
+  assert(read(source_pipe[0], &ch, 1) == 1);
+  assert(ch == 'J');
+
+  close(source_pipe[0]);
+  close(source_pipe[1]);
+  close(target_pipe[1]);
+}
+
+static void TestMoveFdToInvalid(void) {
+  int fd = -1;
+  errno = 0;
+  assert(MoveFdTo(&fd, STDIN_FILENO) < 0);
+  assert(errno == EBADF);
+}
+
+static void TestMoveFdToFromStdin(void) {
+  int saved_stdin = dup(STDIN_FILENO);
+  assert(saved_stdin >= 0);
+
+  int source_pipe[2];
+  int target_pipe[2];
+  assert(pipe(source_pipe) == 0);
+  assert(pipe(target_pipe) == 0);
+  assert(dup2(source_pipe[0], STDIN_FILENO) == STDIN_FILENO);
+  close(source_pipe[0]);
+
+  int fd = STDIN_FILENO;
+  assert(MoveFdTo(&fd, target_pipe[0]) == 0);
+  assert(fd == target_pipe[0]);
+
+  assert(write(source_pipe[1], "K", 1) == 1);
+  char ch = 0;
+  assert(read(fd, &ch, 1) == 1);
+  assert(ch == 'K');
+
+  assert(dup2(saved_stdin, STDIN_FILENO) == STDIN_FILENO);
+  close(saved_stdin);
+  close(source_pipe[1]);
+  close(fd);
+  close(target_pipe[1]);
+}
+
+static void TestMoveFdToFromStdout(void) {
+  int saved_stdout = dup(STDOUT_FILENO);
+  assert(saved_stdout >= 0);
+
+  int source_pipe[2];
+  int target_pipe[2];
+  assert(pipe(source_pipe) == 0);
+  assert(pipe(target_pipe) == 0);
+  assert(dup2(source_pipe[1], STDOUT_FILENO) == STDOUT_FILENO);
+  close(source_pipe[1]);
+
+  int fd = STDOUT_FILENO;
+  assert(MoveFdTo(&fd, target_pipe[1]) == 0);
+  assert(fd == target_pipe[1]);
+
+  assert(write(fd, "L", 1) == 1);
+  char ch = 0;
+  assert(read(source_pipe[0], &ch, 1) == 1);
+  assert(ch == 'L');
+
+  assert(dup2(saved_stdout, STDOUT_FILENO) == STDOUT_FILENO);
+  close(saved_stdout);
+  close(source_pipe[0]);
+  close(fd);
+  close(target_pipe[0]);
+}
+
 static void TestGetMonotonicTimeMs(void) {
   int64_t start_ms = 0;
   int64_t end_ms = 0;
@@ -384,6 +480,11 @@ int main(void) {
   TestPipeCloexec();
   TestCloseIfValid();
   TestClosePair();
+  TestMoveFdToSameFd();
+  TestMoveFdToOccupiedTarget();
+  TestMoveFdToInvalid();
+  TestMoveFdToFromStdin();
+  TestMoveFdToFromStdout();
   TestGetMonotonicTimeMs();
   TestSleepMs();
   return 0;

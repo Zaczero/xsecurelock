@@ -125,6 +125,28 @@ int ClosePair(int fds[2]) {
   return ret;
 }
 
+int MoveFdTo(int *fd, int target_fd) {
+  if (fd == NULL) {
+    errno = EINVAL;
+    return -1;
+  }
+  if (*fd < 0) {
+    errno = EBADF;
+    return -1;
+  }
+  if (*fd == target_fd) {
+    return 0;
+  }
+  if (dup2(*fd, target_fd) < 0) {
+    return -1;
+  }
+  if (CloseIfValid(fd) != 0) {
+    return -1;
+  }
+  *fd = target_fd;
+  return 0;
+}
+
 ssize_t RetryRead(int fd, void *buf, size_t len) {
   ssize_t ret;
   do {

@@ -31,6 +31,7 @@ limitations under the License.
 #include "../io_util.h"           // for ClosePair, PipeCloexec, RetryPoll
 #include "../logging.h"           // for Log, LogErrno
 #include "../saver_child.h"       // for KillAllSaverChildren, MAX_SAVERS
+#include "../signal_pipe.h"       // for SignalPipe, SignalPipeInit
 #include "../time_util.h"         // for SleepMs
 #include "../util.h"              // for ARRAY_LEN
 #include "../wait_pgrp.h"         // for InitWaitPgrp
@@ -47,7 +48,7 @@ struct SaverMultiplexState {
   Display *display;
   Window parent_window;
   int x11_fd;
-  int signal_pipe[2];
+  struct SignalPipe signal_pipe;
   const char *saver_executable;
   Monitor monitors[MAX_MONITORS];
   size_t num_monitors;
@@ -58,27 +59,16 @@ struct SaverMultiplexState {
 
 static volatile sig_atomic_t g_reset_requested = 0;
 static volatile sig_atomic_t g_terminate_signal = 0;
-static int g_signal_pipe_write_fd = -1;
-
-static void SignalPipeWakeup(void) {
-  if (g_signal_pipe_write_fd < 0) {
-    return;
-  }
-
-  char signal_byte = 'x';
-  ssize_t unused = write(g_signal_pipe_write_fd, &signal_byte, 1);
-  (void)unused;
-}
 
 static void HandleSIGUSR1(int unused_signo) {
   (void)unused_signo;
   g_reset_requested = 1;
-  SignalPipeWakeup();
+  SignalPipeNotifyFromHandler();
 }
 
 static void HandleSIGTERM(int signo) {
   g_terminate_signal = signo;
-  SignalPipeWakeup();
+  SignalPipeNotifyFromHandler();
 }
 
 static void InitState(struct SaverMultiplexState *state, int argc, char **argv) {
@@ -86,31 +76,10 @@ static void InitState(struct SaverMultiplexState *state, int argc, char **argv) 
   state->argc = argc;
   state->argv = argv;
   state->parent_window = None;
-  state->signal_pipe[0] = -1;
-  state->signal_pipe[1] = -1;
+  state->signal_pipe.fds[0] = -1;
+  state->signal_pipe.fds[1] = -1;
   for (size_t i = 0; i < ARRAY_LEN(state->windows); ++i) {
     state->windows[i] = None;
-  }
-}
-
-static void DrainSignalPipe(int fd) {
-  for (;;) {
-    char buf[32];
-    ssize_t got = read(fd, buf, sizeof(buf));
-    if (got > 0) {
-      continue;
-    }
-    if (got == 0) {
-      return;
-    }
-    if (errno == EINTR) {
-      continue;
-    }
-    if (errno == EAGAIN || errno == EWOULDBLOCK) {
-      return;
-    }
-    LogErrno("read(signal pipe)");
-    return;
   }
 }
 
@@ -277,16 +246,11 @@ int main(int argc, char **argv) {
 
   SpawnSavers(&state);
 
-  if (PipeCloexec(state.signal_pipe) != 0) {
-    LogErrno("PipeCloexec");
+  if (SignalPipeInit(&state.signal_pipe) != 0) {
+    LogErrno("SignalPipeInit");
     goto done;
   }
-  if (SetFdNonblocking(state.signal_pipe[0]) != 0 ||
-      SetFdNonblocking(state.signal_pipe[1]) != 0) {
-    LogErrno("fcntl(signal pipe)");
-    goto done;
-  }
-  g_signal_pipe_write_fd = state.signal_pipe[1];
+  SignalPipeSetWriteFdForHandler(state.signal_pipe.fds[1]);
 
   if (!InstallSignalHandlers()) {
     goto done;
@@ -298,7 +262,9 @@ int main(int argc, char **argv) {
   for (;;) {
     struct pollfd fds[2] = {
         {.fd = state.x11_fd, .events = POLLIN | POLLHUP, .revents = 0},
-        {.fd = state.signal_pipe[0], .events = POLLIN | POLLHUP, .revents = 0},
+        {.fd = state.signal_pipe.fds[0],
+         .events = POLLIN | POLLHUP,
+         .revents = 0},
     };
     int ready = RetryPoll(fds, ARRAY_LEN(fds),
                           state.have_pending_x_events ? 0 : -1);
@@ -307,7 +273,7 @@ int main(int argc, char **argv) {
     }
 
     if (fds[1].revents & (POLLIN | POLLHUP)) {
-      DrainSignalPipe(state.signal_pipe[0]);
+      SignalPipeDrain(state.signal_pipe.fds[0], "signal pipe");
     }
     if (HandleSignalFlags(&state)) {
       goto done;
@@ -318,8 +284,6 @@ int main(int argc, char **argv) {
   }
 
 done:
-  g_signal_pipe_write_fd = -1;
-
   if (state.display != NULL) {
     if (state.terminate_signal != 0) {
       KillAllSaverChildren(state.terminate_signal);
@@ -327,7 +291,7 @@ done:
     StopSavers(&state);
     XCloseDisplay(state.display);
   }
-  (void)ClosePair(state.signal_pipe);
+  SignalPipeClose(&state.signal_pipe);
 
   if (state.terminate_signal != 0) {
     struct sigaction sa = {.sa_flags = 0, .sa_handler = SIG_DFL};

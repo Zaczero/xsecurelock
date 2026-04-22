@@ -16,6 +16,7 @@ limitations under the License.
 
 #include "config.h"
 
+#include <fcntl.h>
 #include <errno.h>
 #include <locale.h>
 #include <signal.h>
@@ -68,6 +69,46 @@ static int ShowProcessingMessage(struct AuthUiContext *ctx) {
   return AuthDisplayMessage(ctx, "Processing...", "", false);
 }
 
+static int DuplicateAwayFromStdio(int *fd) {
+  if (fd == NULL) {
+    errno = EINVAL;
+    return 0;
+  }
+  if (*fd != STDIN_FILENO && *fd != STDOUT_FILENO) {
+    return 1;
+  }
+
+  int dupfd = fcntl(*fd, F_DUPFD, STDERR_FILENO + 1);
+  if (dupfd < 0) {
+    return 0;
+  }
+  if (CloseIfValid(fd) != 0) {
+    close(dupfd);
+    return 0;
+  }
+  *fd = dupfd;
+  return 1;
+}
+
+static int PrepareAuthprotoChildFds(int requestfd[2], int responsefd[2]) {
+  if (CloseIfValid(&requestfd[0]) != 0 || CloseIfValid(&responsefd[1]) != 0) {
+    return 0;
+  }
+  if (requestfd[1] == STDIN_FILENO && !DuplicateAwayFromStdio(&requestfd[1])) {
+    return 0;
+  }
+  if (responsefd[0] == STDOUT_FILENO && !DuplicateAwayFromStdio(&responsefd[0])) {
+    return 0;
+  }
+  if (MoveFdTo(&responsefd[0], STDIN_FILENO) != 0) {
+    return 0;
+  }
+  if (MoveFdTo(&requestfd[1], STDOUT_FILENO) != 0) {
+    return 0;
+  }
+  return 1;
+}
+
 static int Authenticate(struct AuthUiContext *ctx) {
   int status = 1;
   int requestfd[2] = {-1, -1};
@@ -91,49 +132,13 @@ static int Authenticate(struct AuthUiContext *ctx) {
     goto done;
   }
   if (childpid == 0) {
-    (void)CloseIfValid(&requestfd[0]);
-    (void)CloseIfValid(&responsefd[1]);
-
-    if (requestfd[1] == 0) {
-      int requestfd1 = dup(requestfd[1]);
-      if (requestfd1 == -1) {
-        LogErrno("dup");
-        _exit(EXIT_FAILURE);
-      }
-      (void)CloseIfValid(&requestfd[1]);
-      if (dup2(responsefd[0], 0) == -1) {
-        LogErrno("dup2");
-        _exit(EXIT_FAILURE);
-      }
-      (void)CloseIfValid(&responsefd[0]);
-      if (requestfd1 != 1) {
-        if (dup2(requestfd1, 1) == -1) {
-          LogErrno("dup2");
-          _exit(EXIT_FAILURE);
-        }
-        close(requestfd1);
-      }
-    } else {
-      if (responsefd[0] != 0) {
-        if (dup2(responsefd[0], 0) == -1) {
-          LogErrno("dup2");
-          _exit(EXIT_FAILURE);
-        }
-        (void)CloseIfValid(&responsefd[0]);
-      }
-      if (requestfd[1] != 1) {
-        if (dup2(requestfd[1], 1) == -1) {
-          LogErrno("dup2");
-          _exit(EXIT_FAILURE);
-        }
-        (void)CloseIfValid(&requestfd[1]);
-      }
+    if (!PrepareAuthprotoChildFds(requestfd, responsefd)) {
+      LogErrno("PrepareAuthprotoChildFds");
+      _exit(EXIT_FAILURE);
     }
     {
       const char *args[2] = {ctx->config.authproto_executable, NULL};
-      ExecvHelper(ctx->config.authproto_executable, args);
-      sleep(2);
-      _exit(EXIT_FAILURE);
+      ExecvHelperOrExit(ctx->config.authproto_executable, args);
     }
   }
 

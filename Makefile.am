@@ -26,6 +26,7 @@ noinst_HEADERS = \
 	io_util.h \
 	lock_state.h \
 	lock_windows.h \
+	signal_pipe.h \
 	time_util.h \
 	util.h
 
@@ -43,6 +44,7 @@ xsecurelock_SOURCES = \
 	mlock_page.h \
 	main.c \
 	saver_child.c saver_child.h \
+	signal_pipe.c signal_pipe.h \
 	unmap_all.c unmap_all.h \
 	util.c util.h \
 	version.c version.h \
@@ -90,6 +92,7 @@ saver_multiplex_SOURCES = \
 	helpers/saver_multiplex.c \
 	logging.c logging.h \
 	saver_child.c saver_child.h \
+	signal_pipe.c signal_pipe.h \
 	util.c util.h \
 	wait_pgrp.c wait_pgrp.h \
 	wm_properties.c wm_properties.h \
@@ -179,7 +182,7 @@ CLEANFILES += xsecurelock.1.md xsecurelock.1
 endif
 
 # Some tools that we sure don't wan to install
-noinst_PROGRAMS = authproto_bounds_test buf_util_test cat_authproto configured_command_test dimmer_bayer_test nvidia_break_compositor get_compositor remap_all rect_test prompt_display_test prompt_state_test xkb_test explicit_bzero_test explicit_bzero_fallback_test retry_io_test retry_io_fallback_test indicator_text_test mlock_page_test mlock_page_overflow_test prompt_random_test env_settings_test wait_pgrp_test xscreensaver_api_test
+noinst_PROGRAMS = authproto_bounds_test buf_util_test cat_authproto configured_command_test dimmer_bayer_test nvidia_break_compositor get_compositor remap_all rect_test prompt_display_test prompt_state_test xkb_test explicit_bzero_test explicit_bzero_fallback_test retry_io_test retry_io_fallback_test signal_pipe_test indicator_text_test mlock_page_test mlock_page_overflow_test prompt_random_test env_settings_test wait_pgrp_test xscreensaver_api_test
 authproto_bounds_test_SOURCES = \
 	logging.c logging.h \
 	helpers/authproto.c helpers/authproto.h \
@@ -240,6 +243,11 @@ retry_io_fallback_test_SOURCES = \
 	test/retry_io_test.c \
 	util.c util.h
 retry_io_fallback_test_CPPFLAGS = $(AM_CPPFLAGS) -DFORCE_PIPE2_FALLBACK=1
+signal_pipe_test_SOURCES = \
+	logging.c logging.h \
+	signal_pipe.c signal_pipe.h \
+	test/signal_pipe_test.c \
+	util.c util.h
 indicator_text_test_SOURCES = \
 	helpers/indicator_text.c helpers/indicator_text.h \
 	test/indicator_text_test.c
@@ -267,6 +275,7 @@ env_settings_test_SOURCES = \
 wait_pgrp_test_SOURCES = \
 	logging.c logging.h \
 	test/wait_pgrp_test.c \
+	util.c util.h \
 	wait_pgrp.c wait_pgrp.h
 xscreensaver_api_test_SOURCES = \
 	env_settings.c env_settings.h \

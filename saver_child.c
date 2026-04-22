@@ -76,9 +76,7 @@ void WatchSaverChild(Display* dpy, Window w, int index, const char* executable,
             executable,
             "-root",  // For XScreenSaver hacks, unused by our own.
             NULL};
-        ExecvHelper(executable, args);
-        sleep(2);  // Reduce log spam or other effects from failed execv.
-        _exit(EXIT_FAILURE);
+        ExecvHelperOrExit(executable, args);
       }
     } else {
       // Parent process after successful fork.

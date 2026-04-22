@@ -7,6 +7,8 @@
 #include <stdint.h>
 #include <sys/types.h>
 
+#include "signal_pipe.h"
+
 #define LOCK_TRACKED_WINDOW_CAPACITY 4
 
 enum WatchChildrenState {
@@ -85,7 +87,7 @@ struct LockRuntime {
   Display *display;
   int x11_fd;
   int xss_sleep_lock_fd;
-  int signal_pipe[2];
+  struct SignalPipe signal_pipe;
   int need_to_reinstate_grabs;
   pid_t notify_command_pid;
   enum WatchChildrenState xss_requested_saver_state;

@@ -27,6 +27,7 @@ limitations under the License.
 #include <unistd.h>    // for pid_t
 
 #include "logging.h"  // for Log, LogErrno
+#include "time_util.h"
 
 static char *const *BorrowExecvArgv(const char *const argv[]) {
   char *const *execv_argv = NULL;
@@ -111,9 +112,7 @@ void StartPgrp(void) {
     }
 
     const char *args[2] = {"pgrp_placeholder", NULL};
-    ExecvHelper("pgrp_placeholder", args);
-    sleep(2);  // Reduce log spam or other effects from failed execv.
-    _exit(EXIT_FAILURE);
+    ExecvHelperOrExit("pgrp_placeholder", args);
   }
 }
 
@@ -133,6 +132,12 @@ int ExecvHelper(const char *path, const char *const argv[]) {
   LogErrno("execv %s", path);
   errno = saved_errno;
   return -1;
+}
+
+void ExecvHelperOrExit(const char *path, const char *const argv[]) {
+  ExecvHelper(path, argv);
+  (void)SleepMs(2000);
+  _exit(EXIT_FAILURE);
 }
 
 int KillPgrp(pid_t pid, int signo) {

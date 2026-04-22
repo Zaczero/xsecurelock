@@ -55,6 +55,7 @@ void StartPgrp(void);
  * failed.
  */
 int ExecvHelper(const char *path, const char *const argv[]);
+void ExecvHelperOrExit(const char *path, const char *const argv[]);
 
 /*! \brief Kills the given process group.
  *
