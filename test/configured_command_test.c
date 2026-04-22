@@ -25,7 +25,7 @@ static void WriteFileOrAbort(const char *path, const char *expected) {
 }
 
 static void ExpectKeyCommandEnvFormats(void) {
-  char buf[64];
+  char buf[64] = "";
   if (!FormatKeyCommandEnvName(buf, sizeof(buf), "XF86AudioPlay")) {
     abort();
   }
@@ -35,15 +35,15 @@ static void ExpectKeyCommandEnvFormats(void) {
 }
 
 static void ExpectKeyCommandEnvRejectsTruncation(void) {
-  char buf[16];
+  char buf[16] = "";
   if (FormatKeyCommandEnvName(buf, sizeof(buf), "XF86AudioPlay")) {
     abort();
   }
 }
 
 static void ExpectForegroundShellCommandSucceeds(const char *tmpbase) {
-  char path[PATH_MAX];
-  char command[PATH_MAX + 64];
+  char path[PATH_MAX] = "";
+  char command[PATH_MAX + 64] = "";
 
   if (snprintf(path, sizeof(path), "%s.foreground", tmpbase) <= 0) {
     abort();
@@ -74,8 +74,8 @@ static void ExpectUnsetEnvDoesNothing(void) {
 }
 
 static void ExpectEnvShellCommandRuns(const char *tmpbase) {
-  char path[PATH_MAX];
-  char command[PATH_MAX + 96];
+  char path[PATH_MAX] = "";
+  char command[PATH_MAX + 96] = "";
 
   if (snprintf(path, sizeof(path), "%s.env", tmpbase) <= 0) {
     abort();
@@ -95,8 +95,8 @@ static void ExpectEnvShellCommandRuns(const char *tmpbase) {
 }
 
 static void ExpectBackgroundShellCommandDetaches(const char *tmpbase) {
-  char path[PATH_MAX];
-  char command[PATH_MAX + 128];
+  char path[PATH_MAX] = "";
+  char command[PATH_MAX + 128] = "";
 
   if (snprintf(path, sizeof(path), "%s.background", tmpbase) <= 0) {
     abort();

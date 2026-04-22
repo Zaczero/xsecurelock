@@ -41,10 +41,8 @@ static void HandleSIGCHLD(int unused_signo) {
 }
 
 void InitWaitPgrp(void) {
-  struct sigaction sa;
-  sigemptyset(&sa.sa_mask);
-  sa.sa_flags = 0;
-  sa.sa_handler = HandleSIGCHLD;  // To interrupt select().
+  struct sigaction sa = {.sa_flags = 0, .sa_handler = HandleSIGCHLD};
+  sigemptyset(&sa.sa_mask);  // To interrupt select().
   if (sigaction(SIGCHLD, &sa, NULL) != 0) {
     LogErrno("sigaction(SIGCHLD)");
   }
@@ -65,10 +63,8 @@ pid_t ForkWithoutSigHandlers(void) {
   int fork_errno = errno;
   if (pid == 0) {
     // Clear all our custom signal handlers in the subprocess.
-    struct sigaction sa;
+    struct sigaction sa = {.sa_flags = 0, .sa_handler = SIG_DFL};
     sigemptyset(&sa.sa_mask);
-    sa.sa_flags = 0;
-    sa.sa_handler = SIG_DFL;
     if (sigaction(SIGUSR1, &sa, NULL)) {
       LogErrno("sigaction(SIGUSR1)");
     }
@@ -104,19 +100,16 @@ void StartPgrp(void) {
   } else if (pid == 0) {
     // Child process.
     // Just wait forever. We'll get SIGTERM'd when it's time to go.
-    struct sigaction sa;
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = 0;
-    sa.sa_handler = SIG_IGN;  // Don't die of SIGUSR1 (saver reset).
+    struct sigaction sa = {.sa_flags = 0, .sa_handler = SIG_IGN};
+    sigemptyset(&sa.sa_mask);  // Don't die of SIGUSR1 (saver reset).
     if (sigaction(SIGUSR1, &sa, NULL) != 0) {
       LogErrno("sigaction(SIGUSR1)");
     }
-    {
-      const char *args[2] = {"pgrp_placeholder", NULL};
-      ExecvHelper("pgrp_placeholder", args);
-      sleep(2);  // Reduce log spam or other effects from failed execv.
-      _exit(EXIT_FAILURE);
-    }
+
+    const char *args[2] = {"pgrp_placeholder", NULL};
+    ExecvHelper("pgrp_placeholder", args);
+    sleep(2);  // Reduce log spam or other effects from failed execv.
+    _exit(EXIT_FAILURE);
   }
 }
 
@@ -156,7 +149,7 @@ int KillPgrp(pid_t pid, int signo) {
 
 int WaitPgrp(const char *name, pid_t *pid, int do_block, int already_killed,
              int *exit_status) {
-  int pid_saved = *pid;
+  pid_t pid_saved = *pid;
   int result = WaitProc(name, pid, do_block, already_killed, exit_status);
   if (result && !already_killed) {
     if (KillPgrp(pid_saved, SIGTERM) < 0) {
@@ -187,7 +180,7 @@ int WaitProc(const char *name, pid_t *pid, int do_block, int already_killed,
   }
   int result = -1;
   while (result == -1) {
-    int status;
+    int status = 0;
     pid_t gotpid = waitpid(*pid, &status, WNOHANG);
     if (gotpid < 0) {
       switch (errno) {

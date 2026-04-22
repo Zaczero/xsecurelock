@@ -20,9 +20,7 @@ static void HandleSignal(int signo) {
 }
 
 static void InstallSignalHandler(void) {
-  struct sigaction sa;
-  memset(&sa, 0, sizeof(sa));
-  sa.sa_handler = HandleSignal;
+  struct sigaction sa = {.sa_handler = HandleSignal};
   if (sigaction(SIGALRM, &sa, NULL) != 0) {
     perror("sigaction");
     exit(1);
@@ -30,10 +28,13 @@ static void InstallSignalHandler(void) {
 }
 
 static void StartTimerMs(int milliseconds) {
-  struct itimerval timer;
-  memset(&timer, 0, sizeof(timer));
-  timer.it_value.tv_sec = milliseconds / 1000;
-  timer.it_value.tv_usec = (milliseconds % 1000) * 1000;
+  struct itimerval timer = {
+      .it_value =
+          {
+              .tv_sec = milliseconds / 1000,
+              .tv_usec = (milliseconds % 1000) * 1000,
+          },
+  };
   if (setitimer(ITIMER_REAL, &timer, NULL) != 0) {
     perror("setitimer");
     exit(1);
@@ -41,16 +42,14 @@ static void StartTimerMs(int milliseconds) {
 }
 
 static void StopTimer(void) {
-  struct itimerval timer;
-  memset(&timer, 0, sizeof(timer));
-  if (setitimer(ITIMER_REAL, &timer, NULL) != 0) {
+  if (setitimer(ITIMER_REAL, &(struct itimerval){0}, NULL) != 0) {
     perror("setitimer");
     exit(1);
   }
 }
 
 static void WaitForChildOrDie(pid_t childpid) {
-  int status;
+  int status = 0;
   while (waitpid(childpid, &status, 0) < 0) {
     if (errno != EINTR) {
       perror("waitpid");

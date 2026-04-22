@@ -117,10 +117,8 @@ int main(int argc, char **argv) {
 
   SpawnSavers(parent, argc, argv);
 
-  struct sigaction sa;
-  sigemptyset(&sa.sa_mask);
-  sa.sa_flags = 0;
-  sa.sa_handler = HandleSIGUSR1;  // To kill children.
+  struct sigaction sa = {.sa_flags = 0, .sa_handler = HandleSIGUSR1};
+  sigemptyset(&sa.sa_mask);  // To kill children.
   if (sigaction(SIGUSR1, &sa, NULL) != 0) {
     LogErrno("sigaction(SIGUSR1)");
   }
@@ -133,10 +131,11 @@ int main(int argc, char **argv) {
   InitWaitPgrp();
 
   for (;;) {
-    struct pollfd x11_pollfd;
-    x11_pollfd.fd = x11_fd;
-    x11_pollfd.events = POLLIN | POLLHUP;
-    x11_pollfd.revents = 0;
+    struct pollfd x11_pollfd = {
+        .fd = x11_fd,
+        .events = POLLIN | POLLHUP,
+        .revents = 0,
+    };
     int ready = RetryPoll(&x11_pollfd, 1, -1);
     if (ready < 0) {
       LogErrno("poll");

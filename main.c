@@ -534,7 +534,7 @@ static void DebugDumpWindowInfo(Window w) {
   if (!debug_window_info) {
     return;
   }
-  char buf[128];
+  char buf[128] = "";
   // Note: this has to run detached because we may be within XGrabServer.
   int buflen =
       snprintf(buf, sizeof(buf), "{ xwininfo -all -id %lu; xprop -id %lu; } >&2",
@@ -560,12 +560,15 @@ static void DebugDumpWindowInfo(Window w) {
 static void MaybeRaiseWindow(Display *display, Window w, int silent,
                              int force) {
   int need_raise = force;
-  Window root, parent;
-  Window *children, *siblings;
-  unsigned int nchildren, nsiblings;
+  Window root = None;
+  Window parent = None;
+  Window *children = NULL;
+  Window *siblings = NULL;
+  unsigned int nchildren = 0;
+  unsigned int nsiblings = 0;
   if (XQueryTree(display, w, &root, &parent, &children, &nchildren)) {
     XFree(children);
-    Window grandparent;
+    Window grandparent = None;
     if (!XQueryTree(display, parent, &root, &grandparent, &siblings,
                     &nsiblings)) {
       Log("XQueryTree failed on the parent");
@@ -650,11 +653,12 @@ static int AcquireGrabs(Display *display, Window root_window,
                         Window *ignored_windows,
                         unsigned int n_ignored_windows, Cursor cursor,
                         int silent, int force) {
-  AcquireGrabsState grab_state;
-  grab_state.display = display;
-  grab_state.root_window = root_window;
-  grab_state.cursor = cursor;
-  grab_state.silent = silent;
+  AcquireGrabsState grab_state = {
+      .display = display,
+      .root_window = root_window,
+      .cursor = cursor,
+      .silent = silent,
+  };
 
   if (!force) {
     // Easy case.
@@ -663,7 +667,7 @@ static int AcquireGrabs(Display *display, Window root_window,
 
   XGrabServer(display);  // Critical section.
   UnmapAllWindowsState unmap_state;
-  int ok;
+  int ok = 0;
   if (InitUnmapAllWindowsState(&unmap_state, display, root_window,
                                ignored_windows, n_ignored_windows,
                                "xsecurelock", NULL, force > 1)) {

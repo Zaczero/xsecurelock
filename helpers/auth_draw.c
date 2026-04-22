@@ -167,6 +167,50 @@ static void BuildTitle(const struct AuthUiContext *ctx, char *output,
   TruncatingAppendBytes(&output, &output_size, input, strlen(input));
 }
 
+enum { AUTH_MESSAGE_MAX_ROWS = 6 };
+
+struct AuthTextRow {
+  const char *text;
+  int len;
+  int width;
+  bool warning;
+  int advance_lines;
+};
+
+static struct AuthTextRow MeasureTextRow(const struct AuthUiContext *ctx,
+                                         const char *text, bool warning,
+                                         int advance_lines) {
+  int len = (int)strlen(text);
+  return (struct AuthTextRow){
+      .text = text,
+      .len = len,
+      .width = TextWidth(ctx, text, len),
+      .warning = warning,
+      .advance_lines = advance_lines,
+  };
+}
+
+static int MaxMessageRowWidth(const struct AuthTextRow *rows, size_t row_count) {
+  int max_width = 0;
+
+  for (size_t i = 0; i < row_count; ++i) {
+    if (max_width < rows[i].width) {
+      max_width = rows[i].width;
+    }
+  }
+  return max_width;
+}
+
+static int TotalMessageRowHeight(const struct AuthTextRow *rows, size_t row_count,
+                                 int line_height) {
+  int total_height = 0;
+
+  for (size_t i = 0; i < row_count; ++i) {
+    total_height += rows[i].advance_lines * line_height;
+  }
+  return total_height;
+}
+
 void AuthPlaySound(struct AuthUiContext *ctx, enum AuthSound sound) {
   XKeyboardState state;
   XKeyboardControl control;
@@ -206,61 +250,21 @@ int AuthDisplayMessage(struct AuthUiContext *ctx, const char *title,
   char full_title[256];
   char datetime[80] = "";
   struct XkbIndicators indicators = {0};
-  const char *switch_layout;
-  const char *switch_user;
-  int th;
-  int to;
-  int len_full_title;
-  int tw_full_title;
-  int len_message;
-  int tw_message;
-  int len_indicators;
-  int tw_indicators;
-  int len_switch_layout;
-  int tw_switch_layout;
-  int len_switch_user;
-  int tw_switch_user;
-  int len_datetime;
-  int tw_datetime;
-  int box_w;
-  int box_h;
-  int region_w;
-  int region_h;
+  struct AuthTextRow rows[AUTH_MESSAGE_MAX_ROWS];
+  size_t row_count = 0;
 
   BuildTitle(ctx, full_title, sizeof(full_title), title);
-
-  th = TextAscent(ctx) + TextDescent(ctx) + LINE_SPACING;
-  to = TextAscent(ctx) + LINE_SPACING / 2;
-  len_full_title = strlen(full_title);
-  tw_full_title = TextWidth(ctx, full_title, len_full_title);
-  len_message = strlen(message);
-  tw_message = TextWidth(ctx, message, len_message);
 
   (void)GetXkbIndicators(ctx->resources.display, ctx->resources.have_xkb_ext,
                          ctx->config.show_keyboard_layout,
                          ctx->config.show_locks_and_latches, &indicators);
-  len_indicators = strlen(indicators.text);
-  tw_indicators = TextWidth(ctx, indicators.text, len_indicators);
-
-  switch_layout = indicators.have_multiple_layouts
-                      ? "Press Ctrl-Tab to switch keyboard layout"
-                      : "";
-  len_switch_layout = strlen(switch_layout);
-  tw_switch_layout = TextWidth(ctx, switch_layout, len_switch_layout);
-
-  switch_user = ctx->config.have_switch_user_command
-                    ? "Press Ctrl-Alt-O or Win-O to switch user"
-                    : "";
-  len_switch_user = strlen(switch_user);
-  tw_switch_user = TextWidth(ctx, switch_user, len_switch_user);
 
   if (ctx->config.show_datetime) {
-    time_t rawtime;
-    struct tm timeinfo_buf;
-    struct tm *timeinfo;
+    time_t rawtime = 0;
 
     if (time(&rawtime) != (time_t)-1) {
-      timeinfo = localtime_r(&rawtime, &timeinfo_buf);
+      struct tm timeinfo_buf;
+      struct tm *timeinfo = localtime_r(&rawtime, &timeinfo_buf);
       if (timeinfo != NULL &&
           strftime(datetime, sizeof(datetime), ctx->config.datetime_format,
                    timeinfo) == 0) {
@@ -269,30 +273,27 @@ int AuthDisplayMessage(struct AuthUiContext *ctx, const char *title,
     }
   }
 
-  len_datetime = strlen(datetime);
-  tw_datetime = TextWidth(ctx, datetime, len_datetime);
-  box_w = tw_full_title;
-  if (box_w < tw_datetime) {
-    box_w = tw_datetime;
+  if (ctx->config.show_datetime) {
+    rows[row_count++] = MeasureTextRow(ctx, datetime, false, 2);
   }
-  if (box_w < tw_message) {
-    box_w = tw_message;
+  rows[row_count++] = MeasureTextRow(ctx, full_title, warning, 2);
+  rows[row_count++] = MeasureTextRow(ctx, message, warning, 1);
+  rows[row_count++] =
+      MeasureTextRow(ctx, indicators.text, indicators.warning != 0, 1);
+  if (indicators.have_multiple_layouts) {
+    rows[row_count++] = MeasureTextRow(
+        ctx, "Press Ctrl-Tab to switch keyboard layout", false, 1);
   }
-  if (box_w < tw_indicators) {
-    box_w = tw_indicators;
-  }
-  if (box_w < tw_switch_layout) {
-    box_w = tw_switch_layout;
-  }
-  if (box_w < tw_switch_user) {
-    box_w = tw_switch_user;
+  if (ctx->config.have_switch_user_command) {
+    rows[row_count++] = MeasureTextRow(
+        ctx, "Press Ctrl-Alt-O or Win-O to switch user", false, 0);
   }
 
-  box_h = (4 + indicators.have_multiple_layouts +
-           ctx->config.have_switch_user_command + ctx->config.show_datetime * 2) *
-          th;
-  region_w = box_w + 2 * AuthDialogInset(ctx);
-  region_h = box_h + 2 * AuthDialogInset(ctx);
+  int line_height = TextAscent(ctx) + TextDescent(ctx) + LINE_SPACING;
+  int baseline_offset = TextAscent(ctx) + LINE_SPACING / 2;
+  int box_h = TotalMessageRowHeight(rows, row_count, line_height);
+  int region_w = MaxMessageRowWidth(rows, row_count) + 2 * AuthDialogInset(ctx);
+  int region_h = box_h + 2 * AuthDialogInset(ctx);
 
   if (ctx->config.burnin_mitigation_max_offset_change > 0) {
     ctx->runtime.x_offset = StepBurnInOffset(
@@ -313,37 +314,15 @@ int AuthDisplayMessage(struct AuthUiContext *ctx, const char *title,
 
   for (size_t i = 0; i < ctx->windows.count; ++i) {
     int cx = region_w / 2;
-    int cy = region_h / 2;
-    int y = cy + to - box_h / 2;
+    int y = region_h / 2 + baseline_offset - box_h / 2;
 
     XClearWindow(ctx->resources.display, ctx->windows.windows[i]);
     DrawDialogBorder(ctx, i, region_w, region_h);
 
-    if (ctx->config.show_datetime) {
-      DrawString(ctx, i, cx - tw_datetime / 2, y, false, datetime, len_datetime);
-      y += th * 2;
-    }
-
-    DrawString(ctx, i, cx - tw_full_title / 2, y, warning, full_title,
-               len_full_title);
-    y += th * 2;
-
-    DrawString(ctx, i, cx - tw_message / 2, y, warning, message, len_message);
-    y += th;
-
-    DrawString(ctx, i, cx - tw_indicators / 2, y, indicators.warning,
-               indicators.text, len_indicators);
-    y += th;
-
-    if (indicators.have_multiple_layouts) {
-      DrawString(ctx, i, cx - tw_switch_layout / 2, y, false, switch_layout,
-                 len_switch_layout);
-      y += th;
-    }
-
-    if (ctx->config.have_switch_user_command) {
-      DrawString(ctx, i, cx - tw_switch_user / 2, y, false, switch_user,
-                 len_switch_user);
+    for (size_t j = 0; j < row_count; ++j) {
+      DrawString(ctx, i, cx - rows[j].width / 2, y, rows[j].warning,
+                 rows[j].text, rows[j].len);
+      y += rows[j].advance_lines * line_height;
     }
   }
 

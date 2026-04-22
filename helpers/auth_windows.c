@@ -55,8 +55,9 @@ void AuthWindowsDestroy(struct AuthUiContext *ctx, size_t keep_windows) {
 static void ClearWindowUncoveredAreas(struct AuthUiContext *ctx, size_t i,
                                       Rect new_rect) {
   Rect uncovered[4];
-  size_t count = RectSubtract(ctx->windows.rects[i], new_rect, uncovered);
-  for (size_t j = 0; j < count; ++j) {
+  for (size_t j = 0,
+              count = RectSubtract(ctx->windows.rects[i], new_rect, uncovered);
+       j < count; ++j) {
     XClearArea(ctx->resources.display, ctx->windows.windows[i],
                uncovered[j].x - ctx->windows.rects[i].x,
                uncovered[j].y - ctx->windows.rects[i].y, uncovered[j].w,
@@ -74,7 +75,6 @@ static int CreateOrUpdatePerMonitorWindow(struct AuthUiContext *ctx, size_t i,
   int y =
       monitor->y + (monitor->height - h) * ctx->config.auth_y_position / 100 +
       ctx->runtime.y_offset;
-  Rect new_rect;
 
   if (x < 0) {
     w += x;
@@ -90,7 +90,7 @@ static int CreateOrUpdatePerMonitorWindow(struct AuthUiContext *ctx, size_t i,
   if (y + h > monitor->y + monitor->height) {
     h = monitor->y + monitor->height - y;
   }
-  new_rect = (Rect){.x = x, .y = y, .w = w, .h = h};
+  Rect new_rect = {.x = x, .y = y, .w = w, .h = h};
 
   if (i < ctx->windows.count) {
     ClearWindowUncoveredAreas(ctx, i, new_rect);
@@ -115,7 +115,6 @@ static int CreateOrUpdatePerMonitorWindow(struct AuthUiContext *ctx, size_t i,
                               CWBackPixel, &attrs);
       ctx->windows.windows[i] = ctx->resources.main_window;
     } else {
-      Window stacking_order[2];
       ctx->windows.windows[i] = XCreateWindow(
           ctx->resources.display, ctx->resources.parent_window, x, y, w, h, 0,
           CopyFromParent, InputOutput, CopyFromParent, CWBackPixel, &attrs);
@@ -126,17 +125,18 @@ static int CreateOrUpdatePerMonitorWindow(struct AuthUiContext *ctx, size_t i,
       SetWMProperties(ctx->resources.display, ctx->windows.windows[i],
                       "xsecurelock", "auth_x11_screen", ctx->config.argc,
                       ctx->config.argv);
-      stacking_order[0] = ctx->resources.main_window;
-      stacking_order[1] = ctx->windows.windows[i];
+      Window stacking_order[2] = {ctx->resources.main_window,
+                                  ctx->windows.windows[i]};
       XRestackWindows(ctx->resources.display, stacking_order, 2);
     }
   }
 
   {
-    XGCValues gcattrs;
-    gcattrs.function = GXcopy;
-    gcattrs.foreground = ctx->resources.xcolor_foreground.pixel;
-    gcattrs.background = ctx->resources.xcolor_background.pixel;
+    XGCValues gcattrs = {
+        .function = GXcopy,
+        .foreground = ctx->resources.xcolor_foreground.pixel,
+        .background = ctx->resources.xcolor_background.pixel,
+    };
     if (ctx->resources.core_font != NULL) {
       gcattrs.font = ctx->resources.core_font->fid;
     }
@@ -191,13 +191,13 @@ int AuthWindowsUpdate(struct AuthUiContext *ctx, int region_w, int region_h) {
   }
 
   if (ctx->config.single_auth_window) {
-    Window unused_root;
-    Window unused_child;
-    int unused_root_x;
-    int unused_root_y;
-    int x;
-    int y;
-    unsigned int unused_mask;
+    Window unused_root = None;
+    Window unused_child = None;
+    int unused_root_x = 0;
+    int unused_root_y = 0;
+    int x = 0;
+    int y = 0;
+    unsigned int unused_mask = 0;
 
     XQueryPointer(ctx->resources.display, ctx->resources.parent_window,
                   &unused_root, &unused_child, &unused_root_x, &unused_root_y,

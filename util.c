@@ -88,8 +88,6 @@ void explicit_bzero(void *s, size_t len) {
 #endif
 
 int CloseIfValid(int *fd) {
-  int saved_fd;
-
   if (fd == NULL) {
     errno = EINVAL;
     return -1;
@@ -98,7 +96,7 @@ int CloseIfValid(int *fd) {
     return 0;
   }
 
-  saved_fd = *fd;
+  int saved_fd = *fd;
   *fd = -1;
   return close(saved_fd);
 }
@@ -243,7 +241,7 @@ int PipeCloexec(int fds[2]) {
 }
 
 static int ComputeRemainingTimeoutMs(int timeout_ms, int64_t start_ms) {
-  int64_t now_ms;
+  int64_t now_ms = 0;
   if (GetMonotonicTimeMs(&now_ms) != 0) {
     return timeout_ms;
   }
@@ -285,15 +283,15 @@ int RetryPoll(struct pollfd *fds, nfds_t nfds, int timeout_ms) {
 }
 
 int SleepMs(int timeout_ms) {
-  struct timespec delay;
-
   if (timeout_ms < 0) {
     errno = EINVAL;
     return -1;
   }
 
-  delay.tv_sec = timeout_ms / 1000;
-  delay.tv_nsec = (timeout_ms % 1000) * 1000000L;
+  struct timespec delay = {
+      .tv_sec = timeout_ms / 1000,
+      .tv_nsec = (timeout_ms % 1000) * 1000000L,
+  };
   while (nanosleep(&delay, &delay) != 0) {
     if (errno != EINTR) {
       return -1;
@@ -303,16 +301,13 @@ int SleepMs(int timeout_ms) {
 }
 
 int AppendBytes(char **dst, size_t *remaining, const char *src, size_t len) {
-  char *out;
-  size_t out_remaining;
-
   if (dst == NULL || remaining == NULL || src == NULL) {
     errno = EINVAL;
     return -1;
   }
 
-  out = *dst;
-  out_remaining = *remaining;
+  char *out = *dst;
+  size_t out_remaining = *remaining;
   if (out == NULL) {
     errno = EINVAL;
     return -1;

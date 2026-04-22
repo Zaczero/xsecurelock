@@ -10,7 +10,7 @@ static void PrintLogPrefix(void) {
   time_t t = time(NULL);
   struct tm tm_buf;
   struct tm *tm = gmtime_r(&t, &tm_buf);
-  char s[32];
+  char s[32] = "";
   if (tm == NULL || !strftime(s, sizeof(s), "%Y-%m-%dT%H:%M:%SZ ", tm)) {
     *s = 0;
   }

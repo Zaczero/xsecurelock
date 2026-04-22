@@ -66,13 +66,11 @@ XSL_STATIC_ASSERT(ARRAY_LEN(kKaomoji) == PROMPT_DISPLAY_ANIMATED_MARKER_COUNT,
 static int WriteDisplayString(char *displaybuf, size_t displaybufsize,
                               const char *input, size_t input_length,
                               size_t *displaylen) {
-  size_t copy_length;
-
   if (displaybuf == NULL || displaylen == NULL || displaybufsize == 0) {
     return -1;
   }
 
-  copy_length = input_length;
+  size_t copy_length = input_length;
   if (copy_length >= displaybufsize) {
     copy_length = displaybufsize - 1;
   }
@@ -118,13 +116,11 @@ static int RenderAsterisksPromptDisplay(const struct PromptState *state,
                                         char *displaybuf,
                                         size_t displaybufsize,
                                         size_t *displaylen) {
-  size_t masked_length;
-
   if (displaybuf == NULL || displaylen == NULL || displaybufsize == 0) {
     goto fail;
   }
 
-  masked_length = GetMaskedPasswordLength(state);
+  size_t masked_length = GetMaskedPasswordLength(state);
   if (masked_length + 2 > displaybufsize) {
     goto fail;
   }
@@ -197,8 +193,6 @@ static int RenderTimePromptDisplay(enum PromptDisplayMode mode,
                                    const struct PromptState *state,
                                    char *displaybuf, size_t displaybufsize,
                                    size_t *displaylen) {
-  int written;
-
   if (displaybuf == NULL || displaylen == NULL || displaybufsize == 0) {
     return -1;
   }
@@ -207,6 +201,7 @@ static int RenderTimePromptDisplay(enum PromptDisplayMode mode,
                               displaylen);
   }
 
+  int written = 0;
   if (mode == PROMPT_DISPLAY_MODE_TIME) {
     written = snprintf(displaybuf, displaybufsize, "%" PRId64 ".%06" PRId64,
                        (int64_t)state->last_keystroke.tv_sec,

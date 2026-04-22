@@ -28,10 +28,7 @@ enum AuthActivityResult {
 };
 
 static void WaitForKeypress(int seconds) {
-  struct pollfd pfd;
-  pfd.fd = 0;
-  pfd.events = POLLIN | POLLHUP;
-  pfd.revents = 0;
+  struct pollfd pfd = {.fd = 0, .events = POLLIN | POLLHUP, .revents = 0};
   (void)RetryPoll(&pfd, 1, seconds * 1000);
 }
 
@@ -57,22 +54,19 @@ static enum AuthActivityResult WaitForAuthActivity(struct AuthUiContext *ctx,
                                                    int64_t *deadline_ms,
                                                    bool poll_only,
                                                    char *inputbuf) {
-  struct pollfd fds[2];
+  struct pollfd fds[2] = {
+      {.fd = 0, .events = POLLIN | POLLHUP, .revents = 0},
+      {.fd = -1, .events = POLLIN | POLLHUP, .revents = 0},
+  };
   nfds_t nfds = 1;
-  int ready;
   int64_t now_ms = 0;
 
-  fds[0].fd = 0;
-  fds[0].events = POLLIN | POLLHUP;
-  fds[0].revents = 0;
   if (extra_read_fd >= 0) {
     fds[1].fd = extra_read_fd;
-    fds[1].events = POLLIN | POLLHUP;
-    fds[1].revents = 0;
     nfds = 2;
   }
 
-  ready = RetryPoll(fds, nfds, poll_only ? 0 : BLINK_INTERVAL_MS);
+  int ready = RetryPoll(fds, nfds, poll_only ? 0 : BLINK_INTERVAL_MS);
   if (ready < 0) {
     LogErrno("poll");
     return AUTH_ACTIVITY_FAILED;

@@ -36,10 +36,8 @@ static void ExecShellOrExit(const char *label, const char *command) {
 }
 
 static void ResetSignalToDefault(int signo, const char *label) {
-  struct sigaction sa;
+  struct sigaction sa = {.sa_flags = 0, .sa_handler = SIG_DFL};
   sigemptyset(&sa.sa_mask);
-  sa.sa_flags = 0;
-  sa.sa_handler = SIG_DFL;
   if (sigaction(signo, &sa, NULL) != 0) {
     LogErrno("sigaction(%d) for %s", signo, label);
     _exit(EXIT_FAILURE);
@@ -47,17 +45,17 @@ static void ResetSignalToDefault(int signo, const char *label) {
 }
 
 static int WaitForChild(const char *label, pid_t childpid, int *status) {
-  pid_t gotpid;
-  do {
-    gotpid = waitpid(childpid, status, 0);
-  } while (gotpid < 0 && errno == EINTR);
-
-  if (gotpid == childpid) {
-    return 1;
+  for (;;) {
+    pid_t gotpid = waitpid(childpid, status, 0);
+    if (gotpid == childpid) {
+      return 1;
+    }
+    if (gotpid < 0 && errno == EINTR) {
+      continue;
+    }
+    LogErrno("waitpid for %s", label);
+    return 0;
   }
-
-  LogErrno("waitpid for %s", label);
-  return 0;
 }
 
 static int LogCommandStatus(const char *label, int status) {
@@ -118,7 +116,7 @@ int RunShellCommandValue(const char *label, const char *command, int background)
     ExecShellOrExit(label, command);
   }
 
-  int status;
+  int status = 0;
   if (!WaitForChild(label, childpid, &status)) {
     return 0;
   }

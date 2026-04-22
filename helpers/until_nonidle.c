@@ -196,17 +196,15 @@ int main(int argc, char **argv) {
   }
 
   // Parent process.
-  struct sigaction sa;
-  sigemptyset(&sa.sa_mask);
-  sa.sa_flags = SA_RESETHAND;     // It re-raises to suicide.
-  sa.sa_handler = HandleSIGTERM;  // To kill children.
+  struct sigaction sa = {.sa_flags = SA_RESETHAND, .sa_handler = HandleSIGTERM};
+  sigemptyset(&sa.sa_mask);  // It re-raises to suicide.
   if (sigaction(SIGTERM, &sa, NULL) != 0) {
     LogErrno("sigaction(SIGTERM)");
   }
 
   InitWaitPgrp();
 
-  int64_t start_time_ms;
+  int64_t start_time_ms = 0;
   if (GetMonotonicTimeMs(&start_time_ms) != 0) {
     LogErrno("GetMonotonicTimeMs");
     exit(EXIT_FAILURE);
@@ -221,7 +219,7 @@ int main(int argc, char **argv) {
 
     // Also exit when both dim and wait time expire. This allows using
     // xss-lock's dim-screen.sh without changes.
-    int64_t current_time_ms;
+    int64_t current_time_ms = 0;
     if (GetMonotonicTimeMs(&current_time_ms) != 0) {
       LogErrno("GetMonotonicTimeMs");
       exit(EXIT_FAILURE);
@@ -233,7 +231,7 @@ int main(int argc, char **argv) {
     if (!should_be_running) {
       KillPgrp(childpid, SIGTERM);
     }
-    int status;
+    int status = 0;
     WaitPgrp("idle", &childpid, !should_be_running, !should_be_running,
              &status);
   }

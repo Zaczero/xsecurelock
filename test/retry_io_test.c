@@ -21,28 +21,27 @@ static void HandleSignal(int signo) {
 }
 
 static void InstallSignalHandler(void) {
-  struct sigaction sa;
-  memset(&sa, 0, sizeof(sa));
-  sa.sa_handler = HandleSignal;
+  struct sigaction sa = {.sa_handler = HandleSignal};
   assert(sigaction(SIGALRM, &sa, NULL) == 0);
 }
 
 static void StartTimerMs(int milliseconds) {
-  struct itimerval timer;
-  memset(&timer, 0, sizeof(timer));
-  timer.it_value.tv_sec = milliseconds / 1000;
-  timer.it_value.tv_usec = (milliseconds % 1000) * 1000;
+  struct itimerval timer = {
+      .it_value =
+          {
+              .tv_sec = milliseconds / 1000,
+              .tv_usec = (milliseconds % 1000) * 1000,
+          },
+  };
   assert(setitimer(ITIMER_REAL, &timer, NULL) == 0);
 }
 
 static void StopTimer(void) {
-  struct itimerval timer;
-  memset(&timer, 0, sizeof(timer));
-  assert(setitimer(ITIMER_REAL, &timer, NULL) == 0);
+  assert(setitimer(ITIMER_REAL, &(struct itimerval){0}, NULL) == 0);
 }
 
 static void WaitForChild(pid_t childpid) {
-  int status;
+  int status = 0;
   while (waitpid(childpid, &status, 0) < 0) {
     assert(errno == EINTR);
   }
@@ -149,10 +148,7 @@ static void TestRetryPoll(void) {
   signal_count = 0;
   StartTimerMs(50);
 
-  struct pollfd pfd;
-  pfd.fd = fds[0];
-  pfd.events = POLLIN | POLLHUP;
-  pfd.revents = 0;
+  struct pollfd pfd = {.fd = fds[0], .events = POLLIN | POLLHUP, .revents = 0};
 
   int ready = RetryPoll(&pfd, 1, 1000);
 

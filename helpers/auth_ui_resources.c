@@ -18,9 +18,8 @@
 static int AllocNamedColorOrLog(struct AuthUiResources *resources,
                                 const char *label, const char *color_name,
                                 XColor *color, bool *allocated) {
-  XColor dummy;
   if (XAllocNamedColor(resources->display, resources->colormap, color_name,
-                       color, &dummy)) {
+                       color, &(XColor){0})) {
     *allocated = true;
     return 1;
   }
@@ -32,11 +31,12 @@ static int AllocNamedColorOrLog(struct AuthUiResources *resources,
 static int AllocXftColorOrLog(struct AuthUiResources *resources,
                               const char *label, const XColor *xcolor,
                               XftColor *xft_color, bool *allocated) {
-  XRenderColor xrcolor;
-  xrcolor.alpha = 65535;
-  xrcolor.red = xcolor->red;
-  xrcolor.green = xcolor->green;
-  xrcolor.blue = xcolor->blue;
+  XRenderColor xrcolor = {
+      .red = xcolor->red,
+      .green = xcolor->green,
+      .blue = xcolor->blue,
+      .alpha = 65535,
+  };
   if (!XftColorAllocValue(resources->display,
                           DefaultVisual(resources->display,
                                         DefaultScreen(resources->display)),
@@ -52,7 +52,7 @@ static XftFont *FixedXftFontOpenName(Display *display, int screen,
                                      const char *font_name) {
   XftFont *xft_font = XftFontOpenName(display, screen, font_name);
 #ifdef HAVE_FONTCONFIG
-  FcBool iscol;
+  FcBool iscol = FcFalse;
   if (xft_font != NULL &&
       FcPatternGetBool(xft_font->pattern, FC_COLOR, 0, &iscol) && iscol) {
     Log("Colored font %s is not supported by Xft", font_name);
@@ -69,9 +69,8 @@ static XftFont *FixedXftFontOpenName(Display *display, int screen,
 
 int AuthUiResourcesInit(struct AuthUiResources *resources,
                         const struct AuthUiConfig *config) {
-  int screen;
   int have_font = 0;
-  Window unused_root;
+  Window unused_root = None;
   Window *unused_children = NULL;
   unsigned int unused_nchildren = 0;
 
@@ -81,7 +80,7 @@ int AuthUiResourcesInit(struct AuthUiResources *resources,
     goto fail;
   }
 
-  screen = DefaultScreen(resources->display);
+  int screen = DefaultScreen(resources->display);
   resources->colormap = DefaultColormap(resources->display, screen);
   resources->have_xkb_ext = HaveXkbExtension(resources->display) != 0;
 
