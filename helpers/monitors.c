@@ -57,13 +57,13 @@ static int MaybeInitXRandR(Display* dpy) {
       // XRandR before 1.2 can't connect multiple screens to one, so the
       // default root window size tracking is sufficient for that.
       if (major > 1 || (major == 1 && minor >= 2)) {
-        if (!GetIntSetting("XSECURELOCK_NO_XRANDR", 0)) {
+        if (!GetBoolSetting("XSECURELOCK_NO_XRANDR", 0)) {
           have_xrandr12_ext = 1;
         }
       }
 #ifdef HAVE_XRANDR15_EXT
       if (major > 1 || (major == 1 && minor >= 5)) {
-        if (!GetIntSetting("XSECURELOCK_NO_XRANDR15", 0)) {
+        if (!GetBoolSetting("XSECURELOCK_NO_XRANDR15", 0)) {
           have_xrandr15_ext = 1;
         }
       }

@@ -29,21 +29,22 @@ void AuthUiContextInit(struct AuthUiContext *ctx, int argc, char **argv) {
 }
 
 int AuthUiConfigLoad(struct AuthUiConfig *config) {
-  int paranoid_password_flag =
-      GetIntSetting("XSECURELOCK_" /* REMOVE IN v2 */ "PARANOID_PASSWORD", 1);
+  int paranoid_password_flag = GetBoolSetting(
+      "XSECURELOCK_" /* REMOVE IN v2 */ "PARANOID_PASSWORD", 1);
   const char *password_prompt_flag =
       GetStringSetting("XSECURELOCK_PASSWORD_PROMPT", "");
 
   config->authproto_executable = GetExecutablePathSetting(
       "XSECURELOCK_AUTHPROTO", AUTHPROTO_EXECUTABLE, 0);
   config->burnin_mitigation_max_offset =
-      GetIntSetting("XSECURELOCK_BURNIN_MITIGATION", 16);
+      GetNonnegativeIntSetting("XSECURELOCK_BURNIN_MITIGATION", 16);
   config->burnin_mitigation_max_offset_change =
-      GetIntSetting("XSECURELOCK_BURNIN_MITIGATION_DYNAMIC", 0);
-  config->prompt_timeout = GetIntSetting("XSECURELOCK_AUTH_TIMEOUT", 5 * 60);
-  config->show_username = GetIntSetting("XSECURELOCK_SHOW_USERNAME", 1) != 0;
+      GetNonnegativeIntSetting("XSECURELOCK_BURNIN_MITIGATION_DYNAMIC", 0);
+  config->prompt_timeout =
+      GetNonnegativeIntSetting("XSECURELOCK_AUTH_TIMEOUT", 5 * 60);
+  config->show_username = GetBoolSetting("XSECURELOCK_SHOW_USERNAME", 1);
   config->show_hostname = GetIntSetting("XSECURELOCK_SHOW_HOSTNAME", 1);
-  config->show_datetime = GetIntSetting("XSECURELOCK_SHOW_DATETIME", 0) != 0;
+  config->show_datetime = GetBoolSetting("XSECURELOCK_SHOW_DATETIME", 0);
   config->datetime_format =
       GetStringSetting("XSECURELOCK_DATETIME_FORMAT", "%c");
   config->background_color =
@@ -55,24 +56,24 @@ int AuthUiConfigLoad(struct AuthUiConfig *config) {
   config->font_name = GetStringSetting("XSECURELOCK_FONT", "");
   config->have_switch_user_command =
       *GetStringSetting("XSECURELOCK_SWITCH_USER_COMMAND", "") != '\0';
-  config->auth_sounds = GetIntSetting("XSECURELOCK_AUTH_SOUNDS", 0) != 0;
+  config->auth_sounds = GetBoolSetting("XSECURELOCK_AUTH_SOUNDS", 0);
   config->single_auth_window =
-      GetIntSetting("XSECURELOCK_SINGLE_AUTH_WINDOW", 0) != 0;
+      GetBoolSetting("XSECURELOCK_SINGLE_AUTH_WINDOW", 0);
   config->auth_cursor_blink =
-      GetIntSetting("XSECURELOCK_AUTH_CURSOR_BLINK", 1) != 0;
+      GetBoolSetting("XSECURELOCK_AUTH_CURSOR_BLINK", 1);
   config->auth_padding =
-      GetClampedIntSetting("XSECURELOCK_AUTH_PADDING", 16, 0, INT_MAX);
+      GetNonnegativeIntSetting("XSECURELOCK_AUTH_PADDING", 16);
   config->auth_border_size =
-      GetClampedIntSetting("XSECURELOCK_AUTH_BORDER_SIZE", 0, 0, INT_MAX);
+      GetNonnegativeIntSetting("XSECURELOCK_AUTH_BORDER_SIZE", 0);
   config->auth_x_position =
       GetClampedIntSetting("XSECURELOCK_AUTH_X_POSITION", 50, 0, 100);
   config->auth_y_position =
       GetClampedIntSetting("XSECURELOCK_AUTH_Y_POSITION", 50, 0, 100);
 #ifdef HAVE_XKB_EXT
   config->show_keyboard_layout =
-      GetIntSetting("XSECURELOCK_SHOW_KEYBOARD_LAYOUT", 1) != 0;
+      GetBoolSetting("XSECURELOCK_SHOW_KEYBOARD_LAYOUT", 1);
   config->show_locks_and_latches =
-      GetIntSetting("XSECURELOCK_SHOW_LOCKS_AND_LATCHES", 0) != 0;
+      GetBoolSetting("XSECURELOCK_SHOW_LOCKS_AND_LATCHES", 0);
 #endif
 
   if (!GetPromptDisplayModeFromFlags(paranoid_password_flag,

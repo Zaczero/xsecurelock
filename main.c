@@ -181,21 +181,22 @@ static void LoadDefaults(struct LockConfig *config) {
       GetStringSetting("XSECURELOCK_SWITCH_USER_COMMAND", "")[0] != '\0';
   config->force_grab = GetIntSetting("XSECURELOCK_FORCE_GRAB", 0);
   config->debug_window_info =
-      GetIntSetting("XSECURELOCK_DEBUG_WINDOW_INFO", 0);
+      GetBoolSetting("XSECURELOCK_DEBUG_WINDOW_INFO", 0);
   config->blank_timeout = GetIntSetting("XSECURELOCK_BLANK_TIMEOUT", 600);
   config->blank_dpms_state =
       GetStringSetting("XSECURELOCK_BLANK_DPMS_STATE", "off");
   config->saver_reset_on_auth_close =
-      GetIntSetting("XSECURELOCK_SAVER_RESET_ON_AUTH_CLOSE", 0) != 0;
-  config->saver_delay_ms = GetIntSetting("XSECURELOCK_SAVER_DELAY_MS", 0);
+      GetBoolSetting("XSECURELOCK_SAVER_RESET_ON_AUTH_CLOSE", 0);
+  config->saver_delay_ms =
+      GetNonnegativeIntSetting("XSECURELOCK_SAVER_DELAY_MS", 0);
   config->saver_stop_on_blank =
-      GetIntSetting("XSECURELOCK_SAVER_STOP_ON_BLANK", 1) != 0;
+      GetBoolSetting("XSECURELOCK_SAVER_STOP_ON_BLANK", 1);
   config->background_color =
       GetStringSetting("XSECURELOCK_BACKGROUND_COLOR", "black");
 #ifdef HAVE_XCOMPOSITE_EXT
-  config->no_composite = GetIntSetting("XSECURELOCK_NO_COMPOSITE", 0) != 0;
+  config->no_composite = GetBoolSetting("XSECURELOCK_NO_COMPOSITE", 0);
   config->composite_obscurer =
-      GetIntSetting("XSECURELOCK_COMPOSITE_OBSCURER", 1) != 0;
+      GetBoolSetting("XSECURELOCK_COMPOSITE_OBSCURER", 1);
 #endif
 }
 
@@ -247,7 +248,7 @@ static int CheckLockingEffectiveness(void) {
   int error_status = 0;
   const char *error_string = "Will not lock";
 
-  if (GetIntSetting("XSECURELOCK_DEBUG_ALLOW_LOCKING_IF_INEFFECTIVE", 0)) {
+  if (GetBoolSetting("XSECURELOCK_DEBUG_ALLOW_LOCKING_IF_INEFFECTIVE", 0)) {
     error_status = 1;
     error_string = "Locking anyway";
   }

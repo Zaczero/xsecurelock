@@ -24,7 +24,7 @@ all_settings=$(
 		for file in *.c helpers/*.c; do
 			[ -f "$file" ] || continue
 			<"$file" perl -0ne '
-				print "$1\n" while /\bGet(?:UnsignedLongLong|Long|Int|ClampedInt|Double|String|ExecutablePath)Setting\(\s*"((?:XSECURELOCK_[A-Za-z0-9_%]+))"/g;
+				print "$1\n" while /\bGet(?:UnsignedLongLong|Long|Int|ClampedInt|Bool|NonnegativeInt|PositiveInt|Double|FiniteDouble|ClampedFiniteDouble|String|ExecutablePath)Setting\(\s*"((?:XSECURELOCK_[A-Za-z0-9_%]+))"/g;
 				print "$1\n" while /"(XSECURELOCK_KEY_%s_COMMAND)"/g;
 			'
 		done

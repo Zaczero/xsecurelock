@@ -234,8 +234,9 @@ int main(int argc, char **argv) {
   }
 
   InitState(&state);
-  state.dim_time_ms = GetIntSetting("XSECURELOCK_DIM_TIME_MS", 2000);
-  state.wait_time_ms = GetIntSetting("XSECURELOCK_WAIT_TIME_MS", 5000);
+  state.dim_time_ms = GetNonnegativeIntSetting("XSECURELOCK_DIM_TIME_MS", 2000);
+  state.wait_time_ms =
+      GetNonnegativeIntSetting("XSECURELOCK_WAIT_TIME_MS", 5000);
   state.timers = GetStringSetting("XSECURELOCK_IDLE_TIMERS",
 #ifdef HAVE_XSCREENSAVER_EXT
                                   ""

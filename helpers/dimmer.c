@@ -35,7 +35,7 @@ limitations under the License.
 #include <stdio.h>      // for snprintf
 #include <string.h>     // for memset
 
-#include "../env_settings.h"   // for GetIntSetting, GetDoubleSetting, GetSt...
+#include "../env_settings.h"   // for GetBoolSetting, GetClampedFiniteDouble...
 #include "../logging.h"        // for Log
 #include "../time_util.h"      // for SleepMs, SleepNs
 #include "../wm_properties.h"  // for SetWMProperties
@@ -94,19 +94,20 @@ static int HaveCompositor(Display *display) {
 }
 
 static void LoadDimmerConfig(Display *display, struct DimmerConfig *config) {
-  config->dim_time_ms = GetIntSetting("XSECURELOCK_DIM_TIME_MS", 2000);
-  config->wait_time_ms = GetIntSetting("XSECURELOCK_WAIT_TIME_MS", 5000);
-  config->dim_fps = GetDoubleSetting(
-      "XSECURELOCK_DIM_FPS",
-      GetDoubleSetting("XSECURELOCK_" /* REMOVE IN v2 */ "DIM_MIN_FPS", 60));
-  config->dim_alpha = GetDoubleSetting("XSECURELOCK_DIM_ALPHA", 0.875);
-  config->have_compositor = GetIntSetting(
-      "XSECURELOCK_DIM_OVERRIDE_COMPOSITOR_DETECTION", HaveCompositor(display));
+  double default_dim_fps = GetClampedFiniteDoubleSetting(
+      "XSECURELOCK_" /* REMOVE IN v2 */ "DIM_MIN_FPS", 60.0, 1.0, 1000.0);
 
-  if (config->dim_alpha <= 0 || config->dim_alpha > 1) {
-    Log("XSECURELOCK_DIM_ALPHA must be in ]0..1] - using default");
-    config->dim_alpha = 0.875;
-  }
+  config->dim_time_ms =
+      GetNonnegativeIntSetting("XSECURELOCK_DIM_TIME_MS", 2000);
+  config->wait_time_ms =
+      GetNonnegativeIntSetting("XSECURELOCK_WAIT_TIME_MS", 5000);
+  config->dim_fps = GetClampedFiniteDoubleSetting(
+      "XSECURELOCK_DIM_FPS",
+      default_dim_fps, 1.0, 1000.0);
+  config->dim_alpha =
+      GetClampedFiniteDoubleSetting("XSECURELOCK_DIM_ALPHA", 0.875, 0.001, 1.0);
+  config->have_compositor = GetBoolSetting(
+      "XSECURELOCK_DIM_OVERRIDE_COMPOSITOR_DETECTION", HaveCompositor(display));
 
   Colormap colormap = DefaultColormap(display, DefaultScreen(display));
   const char *color_name = GetStringSetting("XSECURELOCK_DIM_COLOR", "black");
@@ -228,7 +229,8 @@ static void DitherEffectInit(struct DitherEffect *dimmer,
   }
 
   {
-    int max_fill_size = GetIntSetting("XSECURELOCK_DIM_MAX_FILL_SIZE", 2048);
+    int max_fill_size = GetClampedIntSetting("XSECURELOCK_DIM_MAX_FILL_SIZE",
+                                             2048, 1, 1 << 30);
     int max_fill_patterns = max_fill_size >> dimmer->pattern_power;
     if (max_fill_patterns == 0) {
       max_fill_patterns = 1;

@@ -18,8 +18,10 @@ limitations under the License.
 
 #include "build-config.h"
 
+#include <assert.h>   // for assert
 #include <errno.h>   // for errno, ERANGE
 #include <limits.h>  // for PATH_MAX
+#include <math.h>    // for isfinite
 #include <stdio.h>   // for fprintf, NULL, stderr
 #include <stdlib.h>  // for getenv, strtol, strtoull
 #include <string.h>  // for strchr
@@ -31,6 +33,10 @@ unsigned long long GetUnsignedLongLongSetting(const char* name,
                                               unsigned long long def) {
   const char* value = getenv(name);
   if (value == NULL || value[0] == 0) {
+    return def;
+  }
+  if (value[0] == '-') {
+    Log("Ignoring negative value of %s: %s", name, value);
     return def;
   }
   char* endptr = NULL;
@@ -70,7 +76,7 @@ int GetIntSetting(const char* name, int def) {
   long lnumber = GetLongSetting(name, def);
   int number = (int)lnumber;
   if (lnumber != (long)number) {
-    Log("Ignoring out-of-range value of %s: %d", name, number);
+    Log("Ignoring out-of-range value of %s: %ld", name, lnumber);
     return def;
   }
   return number;
@@ -88,6 +94,18 @@ int GetClampedIntSetting(const char* name, int def, int min_value,
   return number;
 }
 
+int GetBoolSetting(const char* name, int def) {
+  return GetIntSetting(name, def) != 0;
+}
+
+int GetNonnegativeIntSetting(const char* name, int def) {
+  return GetClampedIntSetting(name, def, 0, INT_MAX);
+}
+
+int GetPositiveIntSetting(const char* name, int def) {
+  return GetClampedIntSetting(name, def, 1, INT_MAX);
+}
+
 double GetDoubleSetting(const char* name, double def) {
   const char* value = getenv(name);
   if (value == NULL || value[0] == 0) {
@@ -103,6 +121,32 @@ double GetDoubleSetting(const char* name, double def) {
   if ((endptr != NULL && *endptr != 0)) {
     Log("Ignoring non-numeric value of %s: %s", name, value);
     return def;
+  }
+  return number;
+}
+
+double GetFiniteDoubleSetting(const char* name, double def) {
+  double number = GetDoubleSetting(name, def);
+  if (!isfinite(number)) {
+    const char* value = getenv(name);
+    Log("Ignoring non-finite value of %s: %s", name,
+        value != NULL ? value : "(default)");
+    return def;
+  }
+  return number;
+}
+
+double GetClampedFiniteDoubleSetting(const char* name, double def,
+                                     double min_value, double max_value) {
+  double number = 0.0;
+
+  assert(min_value <= max_value);
+  number = GetFiniteDoubleSetting(name, def);
+  if (number < min_value) {
+    return min_value;
+  }
+  if (number > max_value) {
+    return max_value;
   }
   return number;
 }

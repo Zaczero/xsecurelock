@@ -246,7 +246,7 @@ int main(int argc, char **argv) {
 
   InitState(&state, argc, argv);
 
-  if (GetIntSetting("XSECURELOCK_INSIDE_SAVER_MULTIPLEX", 0)) {
+  if (GetBoolSetting("XSECURELOCK_INSIDE_SAVER_MULTIPLEX", 0)) {
     Log("Starting saver_multiplex inside saver_multiplex?!?");
     (void)SleepMs(60000);
     goto done;
