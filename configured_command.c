@@ -19,7 +19,7 @@ limitations under the License.
 #include "configured_command.h"
 
 #include <errno.h>      // for errno, EINTR
-#include <signal.h>     // for sigaction, sigemptyset, SIGPIPE, SIGUSR2
+#include <signal.h>     // for sigaction, sigemptyset, SIGPIPE
 #include <stdio.h>      // for snprintf
 #include <stdlib.h>     // for EXIT_FAILURE, EXIT_SUCCESS
 #include <sys/wait.h>   // for waitpid, WEXITSTATUS, WIFEXITED, WIFSIGNALED
@@ -96,7 +96,6 @@ int RunShellCommandValue(const char *label, const char *command, int background)
 
   if (childpid == 0) {
     ResetSignalToDefault(SIGPIPE, label);
-    ResetSignalToDefault(SIGUSR2, label);
     if (background) {
       if (setsid() == (pid_t)-1) {
         LogErrno("setsid for %s", label);

@@ -20,7 +20,7 @@ limitations under the License.
 
 #include <errno.h>   // for errno, ECHILD, EINTR, ESRCH
 #include <signal.h>  // for kill, sigaddset, sigemptyset, sigprocmask,
-                     // sigsuspend, SIGCHLD, SIGTERM
+                     // sigsuspend, SIGCHLD, SIGTERM, SIGUSR2
 #include <stdlib.h>  // for EXIT_SUCCESS, WEXITSTATUS, WIFEXITED, WIFSIGNALED
 #include <string.h>  // for memcpy
 #include <sys/wait.h>  // for waitpid, WNOHANG
@@ -53,6 +53,7 @@ pid_t ForkWithoutSigHandlers(void) {
   sigset_t oldset, set;
   sigemptyset(&set);
   sigaddset(&set, SIGUSR1);
+  sigaddset(&set, SIGUSR2);
   sigaddset(&set, SIGTERM);
   sigaddset(&set, SIGCHLD);
   sigemptyset(&oldset);
@@ -67,6 +68,9 @@ pid_t ForkWithoutSigHandlers(void) {
     sigemptyset(&sa.sa_mask);
     if (sigaction(SIGUSR1, &sa, NULL)) {
       LogErrno("sigaction(SIGUSR1)");
+    }
+    if (sigaction(SIGUSR2, &sa, NULL)) {
+      LogErrno("sigaction(SIGUSR2)");
     }
     if (sigaction(SIGTERM, &sa, NULL)) {
       LogErrno("sigaction(SIGTERM)");
