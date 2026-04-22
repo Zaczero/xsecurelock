@@ -18,9 +18,13 @@ AM_CPPFLAGS = -I$(top_builddir) $(FEATURE_TEST_CPPFLAGS)
 AM_CFLAGS = $(WARNING_CFLAGS)
 
 noinst_HEADERS = \
+	blanking.h \
 	configured_command.h \
 	buf_util.h \
+	grabs.h \
 	io_util.h \
+	lock_state.h \
+	lock_windows.h \
 	time_util.h \
 	util.h
 
@@ -28,8 +32,12 @@ bin_PROGRAMS = \
 	xsecurelock
 xsecurelock_SOURCES = \
 	auth_child.c auth_child.h \
+	blanking.c blanking.h \
 	configured_command.c configured_command.h \
 	env_settings.c env_settings.h \
+	grabs.c grabs.h \
+	lock_state.h \
+	lock_windows.c lock_windows.h \
 	logging.c logging.h \
 	mlock_page.h \
 	main.c \
