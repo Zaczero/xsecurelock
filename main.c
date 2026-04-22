@@ -67,6 +67,7 @@ limitations under the License.
 
 #include "auth_child.h"     // for KillAuthChildSigHandler, Want...
 #include "env_settings.h"   // for GetIntSetting, GetExecutableP...
+#include "io_util.h"        // for RetryPoll
 #include "logging.h"        // for Log, LogErrno
 #include "mlock_page.h"     // for MLOCK_PAGE
 #include "saver_child.h"    // for WatchSaverChild, KillAllSaver...
@@ -1102,7 +1103,7 @@ int main(int argc, char **argv) {
       // Make this happen instantly.
       XFlush(display);
     }
-    nanosleep(&(const struct timespec){0, 100000000L}, NULL);
+    (void)SleepMs(100);
   }
   if (retries < 0) {
     Log("Failed to grab. Giving up.");
@@ -1163,10 +1164,7 @@ int main(int argc, char **argv) {
   }
 
   // Wait for children to initialize.
-  struct timespec sleep_ts;
-  sleep_ts.tv_sec = saver_delay_ms / 1000;
-  sleep_ts.tv_nsec = (saver_delay_ms % 1000) * 1000000L;
-  nanosleep(&sleep_ts, NULL);
+  (void)SleepMs(saver_delay_ms);
 
   // Map our windows.
   // This is done after grabbing so failure to grab does not blank the screen
@@ -1204,8 +1202,8 @@ int main(int argc, char **argv) {
     x11_pollfd.fd = x11_fd;
     x11_pollfd.events = POLLIN | POLLHUP;
     x11_pollfd.revents = 0;
-    int ready = poll(&x11_pollfd, 1, 1000 / WATCH_CHILDREN_HZ);
-    if (ready < 0 && errno != EINTR) {
+    int ready = RetryPoll(&x11_pollfd, 1, 1000 / WATCH_CHILDREN_HZ);
+    if (ready < 0) {
       LogErrno("poll");
     }
 

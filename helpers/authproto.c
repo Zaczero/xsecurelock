@@ -21,32 +21,20 @@ limitations under the License.
 #include <string.h>  // for strlen
 #include <unistd.h>  // for read, write, ssize_t
 
-#include "../io_util.h"     // for RetryRead, RetryWrite
+#include "../buf_util.h"    // for ClearFreeBuffer
+#include "../io_util.h"     // for ReadFull, WriteFull
 #include "../logging.h"     // for LogErrno, Log
 #include "../mlock_page.h"  // for MLOCK_PAGE
-#include "../util.h"        // for explicit_bzero
 
 #define MAX_PACKET_LENGTH 0xFFFE
 #define MAX_PACKET_LENGTH_DIGITS 5
 
-static size_t WriteChars(int fd, const char *buf, size_t n) {
-  size_t total = 0;
-  while (total < n) {
-    ssize_t got = RetryWrite(fd, buf + total, n - total);
-    if (got < 0) {
-      LogErrno("write");
-      return 0;
-    }
-    if (got == 0) {
-      Log("write: could not write anything, send buffer full");
-      return 0;
-    }
-    if ((size_t)got > n - total) {
-      Log("write: overlong write (should never happen)");
-    }
-    total += got;
+static int WriteExact(int fd, const void *buf, size_t len) {
+  if (WriteFull(fd, buf, len) == (ssize_t)len) {
+    return 1;
   }
-  return total;
+  LogErrno("write");
+  return 0;
 }
 
 void WritePacket(int fd, char type, const char *message) {
@@ -68,61 +56,52 @@ void WritePacket(int fd, char type, const char *message) {
   }
   // Yes, we're wasting syscalls here. This doesn't need to be fast though, and
   // this way we can avoid an extra buffer.
-  if (!WriteChars(fd, prefix, prefixlen)) {
+  if (!WriteExact(fd, prefix, (size_t)prefixlen)) {
     return;
   }
-  if (len != 0 && !WriteChars(fd, message, len)) {
+  if (len != 0 && !WriteExact(fd, message, (size_t)len)) {
     return;
   }
-  if (!WriteChars(fd, "\n", 1)) {
+  if (!WriteExact(fd, "\n", 1)) {
     return;
   }
 }
 
-static size_t ReadChars(int fd, char *buf, size_t n, int eof_permitted) {
-  size_t total = 0;
-  while (total < n) {
-    ssize_t got = RetryRead(fd, buf + total, n - total);
-    if (got < 0) {
-      LogErrno("read");
-      return 0;
-    }
-    if (got == 0) {
-      if (!eof_permitted) {
-        Log("read: unexpected end of file");
-        return 0;
-      }
-      break;
-    }
-    if ((size_t)got > n - total) {
-      Log("read: overlong read (should never happen)");
-    }
-    total += got;
+static int ReadExact(int fd, void *buf, size_t len, int eof_permitted) {
+  ssize_t got = ReadFull(fd, buf, len);
+  if (got == (ssize_t)len) {
+    return 1;
   }
-  return total;
+  if (got < 0) {
+    LogErrno("read");
+    return 0;
+  }
+  if (eof_permitted && got == 0) {
+    return 0;
+  }
+  Log("read: unexpected end of file");
+  return -1;
 }
 
 static void ClearAndFreePacket(char **message, size_t len) {
-  if (*message == NULL) {
-    return;
-  }
-  explicit_bzero(*message, len + 1);
-  free(*message);
-  *message = NULL;
+  ClearFreeBuffer(message, len + 1);
 }
 
 char ReadPacket(int fd, char **message, int eof_permitted) {
   char type;
   *message = NULL;
-  if (!ReadChars(fd, &type, 1, eof_permitted)) {
-    return 0;
+  {
+    int read_status = ReadExact(fd, &type, 1, eof_permitted);
+    if (read_status <= 0) {
+      return 0;
+    }
   }
   if (type == 0) {
     Log("invalid packet type 0");
     return 0;
   }
   char c;
-  if (!ReadChars(fd, &c, 1, 0)) {
+  if (ReadExact(fd, &c, 1, 0) <= 0) {
     return 0;
   }
   if (c != ' ') {
@@ -131,7 +110,7 @@ char ReadPacket(int fd, char **message, int eof_permitted) {
   }
   int len = 0;
   for (int digits = 0; digits <= MAX_PACKET_LENGTH_DIGITS; ++digits) {
-    if (!ReadChars(fd, &c, 1, 0)) {
+    if (ReadExact(fd, &c, 1, 0) <= 0) {
       return 0;
     }
     if (c == '\n') {
@@ -172,12 +151,12 @@ have_len:
     // worse.
     LogErrno("mlock");
   }
-  if (len != 0 && !ReadChars(fd, *message, len, 0)) {
+  if (len != 0 && ReadExact(fd, *message, (size_t)len, 0) <= 0) {
     ClearAndFreePacket(message, (size_t)len);
     return 0;
   }
   (*message)[len] = 0;
-  if (!ReadChars(fd, &c, 1, 0)) {
+  if (ReadExact(fd, &c, 1, 0) <= 0) {
     ClearAndFreePacket(message, (size_t)len);
     return 0;
   }

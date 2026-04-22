@@ -79,6 +79,7 @@ saver_multiplex_SOURCES = \
 	helpers/saver_multiplex.c \
 	logging.c logging.h \
 	saver_child.c saver_child.h \
+	util.c util.h \
 	wait_pgrp.c wait_pgrp.h \
 	wm_properties.c wm_properties.h \
 	xscreensaver_api.c xscreensaver_api.h

@@ -213,7 +213,7 @@ int main(int argc, char **argv) {
   }
   int still_idle = 1;
   while (childpid != 0) {
-    nanosleep(&(const struct timespec){0, 10000000L}, NULL);  // 10ms.
+    (void)SleepMs(10);
 
     uint64_t cur_idle = GetIdleTime(display, root_window, timers);
     still_idle = cur_idle >= prev_idle;

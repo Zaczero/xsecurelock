@@ -27,6 +27,7 @@ limitations under the License.
 #include <unistd.h>      // for sleep
 
 #include "../env_settings.h"      // for GetStringSetting
+#include "../io_util.h"           // for RetryPoll
 #include "../logging.h"           // for Log, LogErrno
 #include "../saver_child.h"       // for MAX_SAVERS
 #include "../wait_pgrp.h"         // for InitWaitPgrp
@@ -136,8 +137,8 @@ int main(int argc, char **argv) {
     x11_pollfd.fd = x11_fd;
     x11_pollfd.events = POLLIN | POLLHUP;
     x11_pollfd.revents = 0;
-    int ready = poll(&x11_pollfd, 1, -1);
-    if (ready < 0 && errno != EINTR) {
+    int ready = RetryPoll(&x11_pollfd, 1, -1);
+    if (ready < 0) {
       LogErrno("poll");
     }
     WatchSavers();

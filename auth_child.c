@@ -22,7 +22,7 @@ limitations under the License.
 #include <unistd.h>  // for close, _exit, dup2, execl, fork
 
 #include "env_settings.h"      // for GetIntSetting
-#include "io_util.h"           // for PipeCloexec, RetryWrite
+#include "io_util.h"           // for CloseIfValid, ClosePair, PipeCloexec...
 #include "logging.h"           // for LogErrno, Log
 #include "wait_pgrp.h"         // for KillPgrp, WaitPgrp
 #include "xscreensaver_api.h"  // for ExportWindowID
@@ -31,7 +31,7 @@ limitations under the License.
 static pid_t auth_child_pid = 0;
 
 //! If auth_child_pid != 0, the FD which connects to stdin of the auth child.
-static int auth_child_fd = 0;
+static int auth_child_fd = -1;
 
 void KillAuthChildSigHandler(int signo) {
   // This is a signal handler, so we're not going to make this too complicated.
@@ -102,7 +102,7 @@ int WatchAuthChild(Window w, const char *executable, int force_auth,
     int status;
     if (WaitPgrp("auth", &auth_child_pid, 0, 0, &status)) {
       // Clean up.
-      close(auth_child_fd);
+      (void)CloseIfValid(&auth_child_fd);
 
       // Handle success; this will exit the screen lock.
       if (status == 0) {
@@ -117,28 +117,27 @@ int WatchAuthChild(Window w, const char *executable, int force_auth,
 
   if (force_auth && auth_child_pid == 0) {
     // Start auth child.
-    int pc[2];
+    int pc[2] = {-1, -1};
     if (PipeCloexec(pc) != 0) {
       LogErrno("PipeCloexec");
     } else {
       pid_t pid = ForkWithoutSigHandlers();
       if (pid == -1) {
         int saved_errno = errno;
-        close(pc[0]);
-        close(pc[1]);
+        (void)ClosePair(pc);
         errno = saved_errno;
         LogErrno("fork");
       } else if (pid == 0) {
         // Child process.
         StartPgrp();
         ExportWindowID(w);
-        close(pc[1]);
+        (void)CloseIfValid(&pc[1]);
         if (pc[0] != 0) {
           if (dup2(pc[0], 0) == -1) {
             LogErrno("dup2");
             _exit(EXIT_FAILURE);
           }
-          close(pc[0]);
+          (void)CloseIfValid(&pc[0]);
         }
         {
           const char *args[2] = {executable, NULL};
@@ -148,7 +147,7 @@ int WatchAuthChild(Window w, const char *executable, int force_auth,
         }
       } else {
         // Parent process after successful fork.
-        close(pc[0]);
+        (void)CloseIfValid(&pc[0]);
         auth_child_fd = pc[1];
         auth_child_pid = pid;
 
@@ -171,11 +170,8 @@ int WatchAuthChild(Window w, const char *executable, int force_auth,
   if (stdinbuf != NULL && stdinbuf[0] != 0) {
     if (auth_child_pid != 0) {
       ssize_t to_write = (ssize_t)strlen(stdinbuf);
-      ssize_t written = RetryWrite(auth_child_fd, stdinbuf, to_write);
-      if (written < 0) {
+      if (WriteFull(auth_child_fd, stdinbuf, (size_t)to_write) != to_write) {
         LogErrno("Failed to send all data to the auth child");
-      } else if (written != to_write) {
-        Log("Failed to send all data to the auth child");
       }
     } else {
       Log("No auth child. Can't send key events");

@@ -37,12 +37,14 @@ limitations under the License.
 #include <fontconfig/fontconfig.h>   // for FcChar8
 #endif
 
+#include "../buf_util.h"          // for AppendCString, ClearFreeString
 #include "../env_info.h"          // for GetHostName, GetUserName
 #include "../env_settings.h"      // for GetIntSetting, GetStringSetting
-#include "../io_util.h"           // for PipeCloexec, RetryPoll, RetryRead
+#include "../io_util.h"           // for CloseIfValid, ClosePair, PipeCloexec...
 #include "../logging.h"           // for Log, LogErrno
 #include "../mlock_page.h"        // for MLOCK_PAGE
 #include "../rect.h"              // for Rect, RectSubtract
+#include "../time_util.h"         // for SleepMs
 #include "../util.h"              // for XSL_STATIC_ASSERT, explicit_bzero
 #include "../wait_pgrp.h"         // for WaitPgrp
 #include "../wm_properties.h"     // for SetWMProperties
@@ -261,7 +263,6 @@ static const int sounds[][2] = {
 static void PlaySound(enum Sound snd) {
   XKeyboardState state;
   XKeyboardControl control;
-  struct timespec sleeptime;
 
   if (!auth_sounds) {
     return;
@@ -280,9 +281,7 @@ static void PlaySound(enum Sound snd) {
 
   XFlush(display);
 
-  sleeptime.tv_sec = SOUND_SLEEP_MS / 1000;
-  sleeptime.tv_nsec = 1000000L * (SOUND_SLEEP_MS % 1000);
-  nanosleep(&sleeptime, NULL);
+  (void)SleepMs(SOUND_SLEEP_MS);
 
   control.bell_pitch = sounds[snd][1];
   XChangeKeyboardControl(display, KBBellPitch, &control);
@@ -296,7 +295,7 @@ static void PlaySound(enum Sound snd) {
 
   XFlush(display);
 
-  nanosleep(&sleeptime, NULL);
+  (void)SleepMs(SOUND_SLEEP_MS);
 }
 
 
@@ -612,43 +611,47 @@ static void DrawDialogBorder(size_t window_index, int region_w, int region_h) {
                  region_h - auth_border_size - 1);
 }
 
-static void StrAppend(char **output, size_t *output_size, const char *input,
-                      size_t input_size) {
-  if (*output_size <= input_size) {
-    // Cut the input off. Sorry.
+static void TruncatingAppendBytes(char **output, size_t *output_size,
+                                  const char *input, size_t input_size) {
+  if (output == NULL || output_size == NULL || *output == NULL ||
+      *output_size == 0) {
+    return;
+  }
+  if (input_size >= *output_size) {
     input_size = *output_size - 1;
   }
-  memcpy(*output, input, input_size);
-  *output += input_size;
-  *output_size -= input_size;
+  (void)AppendBytes(output, output_size, input, input_size);
 }
 
 static void BuildTitle(char *output, size_t output_size, const char *input) {
+  if (output_size == 0) {
+    return;
+  }
+  output[0] = '\0';
+
   if (show_username) {
     size_t username_len = strlen(username);
-    StrAppend(&output, &output_size, username, username_len);
+    TruncatingAppendBytes(&output, &output_size, username, username_len);
   }
 
   if (show_username && show_hostname) {
-    StrAppend(&output, &output_size, "@", 1);
+    TruncatingAppendBytes(&output, &output_size, "@", 1);
   }
 
   if (show_hostname) {
     size_t hostname_len =
         show_hostname > 1 ? strlen(hostname) : strcspn(hostname, ".");
-    StrAppend(&output, &output_size, hostname, hostname_len);
+    TruncatingAppendBytes(&output, &output_size, hostname, hostname_len);
   }
 
   if (*input == 0) {
-    *output = 0;
     return;
   }
 
   if (show_username || show_hostname) {
-    StrAppend(&output, &output_size, " - ", 3);
+    TruncatingAppendBytes(&output, &output_size, " - ", 3);
   }
-  strncpy(output, input, output_size - 1);
-  output[output_size - 1] = 0;
+  TruncatingAppendBytes(&output, &output_size, input, strlen(input));
 }
 
 /*! \brief Display a string in the window.
@@ -944,15 +947,6 @@ static enum StaticMessageResult WaitStaticMessage(const char *title,
   }
 }
 
-static void ClearFreeString(char **message) {
-  if (*message == NULL) {
-    return;
-  }
-  explicit_bzero(*message, strlen(*message));
-  free(*message);
-  *message = NULL;
-}
-
 static void TerminateAuthproto(pid_t childpid) {
   if (kill(childpid, SIGTERM) != 0 && errno != ESRCH) {
     LogErrno("kill");
@@ -1162,15 +1156,15 @@ redraw:
  * \return The authentication status (0 for OK, 1 otherwise).
  */
 static int Authenticate(void) {
-  int requestfd[2], responsefd[2];
+  int requestfd[2] = {-1, -1};
+  int responsefd[2] = {-1, -1};
   if (PipeCloexec(requestfd) != 0) {
     LogErrno("PipeCloexec");
     return 1;
   }
   if (PipeCloexec(responsefd) != 0) {
     int saved_errno = errno;
-    close(requestfd[0]);
-    close(requestfd[1]);
+    (void)ClosePair(requestfd);
     errno = saved_errno;
     LogErrno("PipeCloexec");
     return 1;
@@ -1180,10 +1174,8 @@ static int Authenticate(void) {
   pid_t childpid = ForkWithoutSigHandlers();
   if (childpid == -1) {
     int saved_errno = errno;
-    close(requestfd[0]);
-    close(requestfd[1]);
-    close(responsefd[0]);
-    close(responsefd[1]);
+    (void)ClosePair(requestfd);
+    (void)ClosePair(responsefd);
     errno = saved_errno;
     LogErrno("fork");
     return 1;
@@ -1192,8 +1184,8 @@ static int Authenticate(void) {
   if (childpid == 0) {
     // Child process. Just run authproto_pam.
     // But first, move requestfd[1] to 1 and responsefd[0] to 0.
-    close(requestfd[0]);
-    close(responsefd[1]);
+    (void)CloseIfValid(&requestfd[0]);
+    (void)CloseIfValid(&responsefd[1]);
 
     if (requestfd[1] == 0) {
       // Tricky case. We don't _expect_ this to happen - after all,
@@ -1205,12 +1197,12 @@ static int Authenticate(void) {
         LogErrno("dup");
         _exit(EXIT_FAILURE);
       }
-      close(requestfd[1]);
+      (void)CloseIfValid(&requestfd[1]);
       if (dup2(responsefd[0], 0) == -1) {
         LogErrno("dup2");
         _exit(EXIT_FAILURE);
       }
-      close(responsefd[0]);
+      (void)CloseIfValid(&responsefd[0]);
       if (requestfd1 != 1) {
         if (dup2(requestfd1, 1) == -1) {
           LogErrno("dup2");
@@ -1224,14 +1216,14 @@ static int Authenticate(void) {
           LogErrno("dup2");
           _exit(EXIT_FAILURE);
         }
-        close(responsefd[0]);
+        (void)CloseIfValid(&responsefd[0]);
       }
       if (requestfd[1] != 1) {
         if (dup2(requestfd[1], 1) == -1) {
           LogErrno("dup2");
           _exit(EXIT_FAILURE);
         }
-        close(requestfd[1]);
+        (void)CloseIfValid(&requestfd[1]);
       }
     }
     {
@@ -1243,8 +1235,8 @@ static int Authenticate(void) {
   }
 
   // Otherwise, we're in the parent process.
-  close(requestfd[1]);
-  close(responsefd[0]);
+  (void)CloseIfValid(&requestfd[1]);
+  (void)CloseIfValid(&responsefd[0]);
 #define SHOW_PROCESSING_OR_FAIL()        \
   do {                                   \
     if (!DisplayMessage("Processing...", "", 0)) { \
@@ -1289,8 +1281,7 @@ static int Authenticate(void) {
         switch (RunPromptSession(message, &response, 1)) {
           case PROMPT_SESSION_RESULT_SUBMITTED:
             WritePacket(responsefd[1], PTYPE_RESPONSE_LIKE_USERNAME, response);
-            explicit_bzero(response, strlen(response));
-            free(response);
+            ClearFreeString(&response);
             SHOW_PROCESSING_OR_FAIL();
             break;
           case PROMPT_SESSION_RESULT_CANCELLED:
@@ -1307,8 +1298,7 @@ static int Authenticate(void) {
         switch (RunPromptSession(message, &response, 0)) {
           case PROMPT_SESSION_RESULT_SUBMITTED:
             WritePacket(responsefd[1], PTYPE_RESPONSE_LIKE_PASSWORD, response);
-            explicit_bzero(response, strlen(response));
-            free(response);
+            ClearFreeString(&response);
             SHOW_PROCESSING_OR_FAIL();
             break;
           case PROMPT_SESSION_RESULT_CANCELLED:
@@ -1331,8 +1321,8 @@ static int Authenticate(void) {
   }
 #undef SHOW_PROCESSING_OR_FAIL
 done:
-  close(requestfd[0]);
-  close(responsefd[1]);
+  (void)ClosePair(requestfd);
+  (void)ClosePair(responsefd);
   int status;
   if (!WaitProc("authproto", &childpid, 1, 0, &status)) {
     Log("WaitPgrp returned false but we were blocking");
