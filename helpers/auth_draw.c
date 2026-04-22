@@ -1,0 +1,352 @@
+#include "config.h"
+
+#include "auth_draw.h"
+
+#include <X11/X.h>
+#include <X11/Xlib.h>
+#include <string.h>
+#include <time.h>
+
+#ifdef HAVE_XFT_EXT
+#include <X11/Xft/Xft.h>
+#include <X11/extensions/Xrender.h>
+#include <fontconfig/fontconfig.h>
+#endif
+
+#include "../buf_util.h"
+#include "../time_util.h"
+#include "auth_windows.h"
+#include "xkb.h"
+
+#define LINE_SPACING 4
+#define NOTE_DS3 156
+#define NOTE_A3 220
+#define NOTE_DS4 311
+#define NOTE_E4 330
+#define NOTE_B4 494
+#define NOTE_E5 659
+#define SOUND_SLEEP_MS 125
+#define SOUND_TONE_MS 100
+
+static const int kSounds[][2] = {
+    /* AUTH_SOUND_PROMPT=  */ {NOTE_B4, NOTE_E5},
+    /* AUTH_SOUND_INFO=    */ {NOTE_E5, NOTE_E5},
+    /* AUTH_SOUND_ERROR=   */ {NOTE_A3, NOTE_DS3},
+    /* AUTH_SOUND_SUCCESS= */ {NOTE_DS4, NOTE_E4},
+};
+
+static int TextAscent(const struct AuthUiContext *ctx) {
+#ifdef HAVE_XFT_EXT
+  if (ctx->resources.xft_font != NULL) {
+    return ctx->resources.xft_font->ascent;
+  }
+#endif
+  return ctx->resources.core_font->max_bounds.ascent;
+}
+
+static int TextDescent(const struct AuthUiContext *ctx) {
+#ifdef HAVE_XFT_EXT
+  if (ctx->resources.xft_font != NULL) {
+    return ctx->resources.xft_font->descent;
+  }
+#endif
+  return ctx->resources.core_font->max_bounds.descent;
+}
+
+#ifdef HAVE_XFT_EXT
+static int XGlyphInfoExpandAmount(XGlyphInfo *extents) {
+  int expand_left = extents->x;
+  int expand_right = -extents->x + extents->width - extents->xOff;
+  int expand_max = expand_left > expand_right ? expand_left : expand_right;
+  return expand_max > 0 ? expand_max : 0;
+}
+#endif
+
+static int TextWidth(const struct AuthUiContext *ctx, const char *string,
+                     int len) {
+#ifdef HAVE_XFT_EXT
+  if (ctx->resources.xft_font != NULL) {
+    XGlyphInfo extents;
+    XftTextExtentsUtf8(ctx->resources.display, ctx->resources.xft_font,
+                       (const FcChar8 *)string, len, &extents);
+    return extents.xOff + 2 * XGlyphInfoExpandAmount(&extents);
+  }
+#endif
+  return XTextWidth(ctx->resources.core_font, string, len);
+}
+
+static void DrawString(const struct AuthUiContext *ctx, size_t window_index,
+                       int x, int y, bool warning, const char *string,
+                       int len) {
+#ifdef HAVE_XFT_EXT
+  if (ctx->resources.xft_font != NULL) {
+    XGlyphInfo extents;
+    XftTextExtentsUtf8(ctx->resources.display, ctx->resources.xft_font,
+                       (const FcChar8 *)string, len, &extents);
+    XftDrawStringUtf8(
+        ctx->windows.xft_draws[window_index],
+        warning ? &ctx->resources.xft_color_warning
+                : &ctx->resources.xft_color_foreground,
+        ctx->resources.xft_font, x + XGlyphInfoExpandAmount(&extents), y,
+        (const FcChar8 *)string, len);
+    return;
+  }
+#endif
+  XDrawString(ctx->resources.display, ctx->windows.windows[window_index],
+              warning ? ctx->windows.warning_gcs[window_index]
+                      : ctx->windows.gcs[window_index],
+              x, y, string, len);
+}
+
+static int AuthDialogInset(const struct AuthUiContext *ctx) {
+  return ctx->config.auth_padding + ctx->config.auth_border_size;
+}
+
+static void DrawDialogBorder(const struct AuthUiContext *ctx,
+                             size_t window_index, int region_w, int region_h) {
+  int border_offset;
+
+  if (ctx->config.auth_border_size <= 0) {
+    return;
+  }
+
+  XSetLineAttributes(ctx->resources.display, ctx->windows.gcs[window_index],
+                     ctx->config.auth_border_size, LineSolid, CapButt,
+                     JoinMiter);
+  border_offset = ctx->config.auth_border_size / 2;
+  XDrawRectangle(ctx->resources.display, ctx->windows.windows[window_index],
+                 ctx->windows.gcs[window_index], border_offset, border_offset,
+                 region_w - ctx->config.auth_border_size - 1,
+                 region_h - ctx->config.auth_border_size - 1);
+}
+
+static void TruncatingAppendBytes(char **output, size_t *output_size,
+                                  const char *input, size_t input_size) {
+  if (output == NULL || output_size == NULL || *output == NULL ||
+      *output_size == 0) {
+    return;
+  }
+  if (input_size >= *output_size) {
+    input_size = *output_size - 1;
+  }
+  (void)AppendBytes(output, output_size, input, input_size);
+}
+
+static void BuildTitle(const struct AuthUiContext *ctx, char *output,
+                       size_t output_size, const char *input) {
+  if (output_size == 0) {
+    return;
+  }
+  output[0] = '\0';
+
+  if (ctx->config.show_username) {
+    TruncatingAppendBytes(&output, &output_size, ctx->config.username,
+                          strlen(ctx->config.username));
+  }
+
+  if (ctx->config.show_username && ctx->config.show_hostname) {
+    TruncatingAppendBytes(&output, &output_size, "@", 1);
+  }
+
+  if (ctx->config.show_hostname) {
+    size_t hostname_len =
+        ctx->config.show_hostname > 1
+            ? strlen(ctx->config.hostname)
+            : strcspn(ctx->config.hostname, ".");
+    TruncatingAppendBytes(&output, &output_size, ctx->config.hostname,
+                          hostname_len);
+  }
+
+  if (*input == '\0') {
+    return;
+  }
+
+  if (ctx->config.show_username || ctx->config.show_hostname) {
+    TruncatingAppendBytes(&output, &output_size, " - ", 3);
+  }
+  TruncatingAppendBytes(&output, &output_size, input, strlen(input));
+}
+
+void AuthPlaySound(struct AuthUiContext *ctx, enum AuthSound sound) {
+  XKeyboardState state;
+  XKeyboardControl control;
+
+  if (!ctx->config.auth_sounds) {
+    return;
+  }
+
+  XGetKeyboardControl(ctx->resources.display, &state);
+
+  control.bell_percent = 50;
+  control.bell_duration = SOUND_TONE_MS;
+  control.bell_pitch = kSounds[sound][0];
+  XChangeKeyboardControl(
+      ctx->resources.display,
+      KBBellPercent | KBBellDuration | KBBellPitch, &control);
+  XBell(ctx->resources.display, 0);
+  XFlush(ctx->resources.display);
+  (void)SleepMs(SOUND_SLEEP_MS);
+
+  control.bell_pitch = kSounds[sound][1];
+  XChangeKeyboardControl(ctx->resources.display, KBBellPitch, &control);
+  XBell(ctx->resources.display, 0);
+
+  control.bell_percent = state.bell_percent;
+  control.bell_duration = state.bell_duration;
+  control.bell_pitch = state.bell_pitch;
+  XChangeKeyboardControl(
+      ctx->resources.display,
+      KBBellPercent | KBBellDuration | KBBellPitch, &control);
+  XFlush(ctx->resources.display);
+  (void)SleepMs(SOUND_SLEEP_MS);
+}
+
+int AuthDisplayMessage(struct AuthUiContext *ctx, const char *title,
+                       const char *message, bool warning) {
+  char full_title[256];
+  char datetime[80] = "";
+  struct XkbIndicators indicators = {0};
+  const char *switch_layout;
+  const char *switch_user;
+  int th;
+  int to;
+  int len_full_title;
+  int tw_full_title;
+  int len_message;
+  int tw_message;
+  int len_indicators;
+  int tw_indicators;
+  int len_switch_layout;
+  int tw_switch_layout;
+  int len_switch_user;
+  int tw_switch_user;
+  int len_datetime;
+  int tw_datetime;
+  int box_w;
+  int box_h;
+  int region_w;
+  int region_h;
+
+  BuildTitle(ctx, full_title, sizeof(full_title), title);
+
+  th = TextAscent(ctx) + TextDescent(ctx) + LINE_SPACING;
+  to = TextAscent(ctx) + LINE_SPACING / 2;
+  len_full_title = strlen(full_title);
+  tw_full_title = TextWidth(ctx, full_title, len_full_title);
+  len_message = strlen(message);
+  tw_message = TextWidth(ctx, message, len_message);
+
+  (void)GetXkbIndicators(ctx->resources.display, ctx->resources.have_xkb_ext,
+                         ctx->config.show_keyboard_layout,
+                         ctx->config.show_locks_and_latches, &indicators);
+  len_indicators = strlen(indicators.text);
+  tw_indicators = TextWidth(ctx, indicators.text, len_indicators);
+
+  switch_layout = indicators.have_multiple_layouts
+                      ? "Press Ctrl-Tab to switch keyboard layout"
+                      : "";
+  len_switch_layout = strlen(switch_layout);
+  tw_switch_layout = TextWidth(ctx, switch_layout, len_switch_layout);
+
+  switch_user = ctx->config.have_switch_user_command
+                    ? "Press Ctrl-Alt-O or Win-O to switch user"
+                    : "";
+  len_switch_user = strlen(switch_user);
+  tw_switch_user = TextWidth(ctx, switch_user, len_switch_user);
+
+  if (ctx->config.show_datetime) {
+    time_t rawtime;
+    struct tm timeinfo_buf;
+    struct tm *timeinfo;
+
+    if (time(&rawtime) != (time_t)-1) {
+      timeinfo = localtime_r(&rawtime, &timeinfo_buf);
+      if (timeinfo != NULL &&
+          strftime(datetime, sizeof(datetime), ctx->config.datetime_format,
+                   timeinfo) == 0) {
+        datetime[0] = '\0';
+      }
+    }
+  }
+
+  len_datetime = strlen(datetime);
+  tw_datetime = TextWidth(ctx, datetime, len_datetime);
+  box_w = tw_full_title;
+  if (box_w < tw_datetime) {
+    box_w = tw_datetime;
+  }
+  if (box_w < tw_message) {
+    box_w = tw_message;
+  }
+  if (box_w < tw_indicators) {
+    box_w = tw_indicators;
+  }
+  if (box_w < tw_switch_layout) {
+    box_w = tw_switch_layout;
+  }
+  if (box_w < tw_switch_user) {
+    box_w = tw_switch_user;
+  }
+
+  box_h = (4 + indicators.have_multiple_layouts +
+           ctx->config.have_switch_user_command + ctx->config.show_datetime * 2) *
+          th;
+  region_w = box_w + 2 * AuthDialogInset(ctx);
+  region_h = box_h + 2 * AuthDialogInset(ctx);
+
+  if (ctx->config.burnin_mitigation_max_offset_change > 0) {
+    ctx->runtime.x_offset = StepBurnInOffset(
+        &ctx->runtime.prompt_rng, ctx->runtime.x_offset,
+        ctx->config.burnin_mitigation_max_offset,
+        ctx->config.burnin_mitigation_max_offset_change);
+    ctx->runtime.y_offset = StepBurnInOffset(
+        &ctx->runtime.prompt_rng, ctx->runtime.y_offset,
+        ctx->config.burnin_mitigation_max_offset,
+        ctx->config.burnin_mitigation_max_offset_change);
+  }
+
+  if (!AuthWindowsUpdate(ctx, region_w, region_h)) {
+    ctx->windows.dirty = true;
+    return 0;
+  }
+  ctx->windows.dirty = false;
+
+  for (size_t i = 0; i < ctx->windows.count; ++i) {
+    int cx = region_w / 2;
+    int cy = region_h / 2;
+    int y = cy + to - box_h / 2;
+
+    XClearWindow(ctx->resources.display, ctx->windows.windows[i]);
+    DrawDialogBorder(ctx, i, region_w, region_h);
+
+    if (ctx->config.show_datetime) {
+      DrawString(ctx, i, cx - tw_datetime / 2, y, false, datetime, len_datetime);
+      y += th * 2;
+    }
+
+    DrawString(ctx, i, cx - tw_full_title / 2, y, warning, full_title,
+               len_full_title);
+    y += th * 2;
+
+    DrawString(ctx, i, cx - tw_message / 2, y, warning, message, len_message);
+    y += th;
+
+    DrawString(ctx, i, cx - tw_indicators / 2, y, indicators.warning,
+               indicators.text, len_indicators);
+    y += th;
+
+    if (indicators.have_multiple_layouts) {
+      DrawString(ctx, i, cx - tw_switch_layout / 2, y, false, switch_layout,
+                 len_switch_layout);
+      y += th;
+    }
+
+    if (ctx->config.have_switch_user_command) {
+      DrawString(ctx, i, cx - tw_switch_user / 2, y, false, switch_user,
+                 len_switch_user);
+    }
+  }
+
+  XFlush(ctx->resources.display);
+  return 1;
+}

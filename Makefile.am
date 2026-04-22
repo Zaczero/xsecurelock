@@ -111,6 +111,12 @@ auth_x11_SOURCES = \
 	env_info.c env_info.h \
 	env_settings.c env_settings.h \
 	helpers/authproto.c helpers/authproto.h \
+	helpers/auth_draw.c helpers/auth_draw.h \
+	helpers/auth_prompt.c helpers/auth_prompt.h \
+	helpers/auth_ui.h \
+	helpers/auth_ui_config.c helpers/auth_ui_config.h \
+	helpers/auth_ui_resources.c helpers/auth_ui_resources.h \
+	helpers/auth_windows.c helpers/auth_windows.h \
 	helpers/auth_x11.c \
 	helpers/indicator_text.c helpers/indicator_text.h \
 	helpers/prompt_glyph.c helpers/prompt_glyph.h \
