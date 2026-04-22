@@ -14,6 +14,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifndef XSECURELOCK_UTIL_H
+#define XSECURELOCK_UTIL_H
+
 #include <stddef.h>      // for size_t
 #include <stdint.h>      // for int64_t
 #include <poll.h>        // for pollfd, nfds_t
@@ -28,3 +31,5 @@ int PipeCloexec(int fds[2]);
 ssize_t RetryRead(int fd, void *buf, size_t len);
 ssize_t RetryWrite(int fd, const void *buf, size_t len);
 int RetryPoll(struct pollfd *fds, nfds_t nfds, int timeout_ms);
+
+#endif  // XSECURELOCK_UTIL_H
