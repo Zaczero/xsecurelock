@@ -69,6 +69,40 @@ static int ShowProcessingMessage(struct AuthUiContext *ctx) {
   return AuthDisplayMessage(ctx, "Processing...", "", false);
 }
 
+static int HandleStaticAuthMessage(struct AuthUiContext *ctx, pid_t childpid,
+                                   int *already_killed, const char *title,
+                                   const char *message, bool warning,
+                                   int request_fd) {
+  switch (AuthWaitStaticMessage(ctx, title, message, warning, request_fd)) {
+    case STATIC_MESSAGE_RESULT_ADVANCE:
+      return 1;
+    case STATIC_MESSAGE_RESULT_CANCELLED:
+      TerminateAuthproto(childpid);
+      *already_killed = 1;
+      return 0;
+    case STATIC_MESSAGE_RESULT_FAILED:
+      return 0;
+  }
+  return 0;
+}
+
+static int HandlePromptAuthMessage(struct AuthUiContext *ctx,
+                                   const char *message, bool echo,
+                                   int response_fd, char response_type) {
+  switch (AuthRunPromptSession(ctx, message, echo, response_fd, response_type)) {
+    case PROMPT_SESSION_RESULT_SUBMITTED:
+      return ShowProcessingMessage(ctx);
+    case PROMPT_SESSION_RESULT_CANCELLED:
+      if (!WritePacketBytes(response_fd, PTYPE_RESPONSE_CANCELLED, "", 0)) {
+        return 0;
+      }
+      return ShowProcessingMessage(ctx);
+    case PROMPT_SESSION_RESULT_FAILED:
+      return 0;
+  }
+  return 0;
+}
+
 static int DuplicateAwayFromStdio(int *fd) {
   if (fd == NULL) {
     errno = EINVAL;
@@ -157,75 +191,26 @@ static int Authenticate(struct AuthUiContext *ctx) {
 
     switch (type) {
       case PTYPE_INFO_MESSAGE:
-        switch (AuthWaitStaticMessage(ctx, "PAM says", message, false,
-                                      requestfd[0])) {
-          case STATIC_MESSAGE_RESULT_ADVANCE:
-            break;
-          case STATIC_MESSAGE_RESULT_CANCELLED:
-            TerminateAuthproto(childpid);
-            already_killed = 1;
-            keep_running = 0;
-            break;
-          case STATIC_MESSAGE_RESULT_FAILED:
-            keep_running = 0;
-            break;
-        }
+        keep_running = HandleStaticAuthMessage(ctx, childpid, &already_killed,
+                                               "PAM says", message, false,
+                                               requestfd[0]);
         break;
       case PTYPE_ERROR_MESSAGE:
-        switch (AuthWaitStaticMessage(ctx, "Error", message, true,
-                                      requestfd[0])) {
-          case STATIC_MESSAGE_RESULT_ADVANCE:
-            break;
-          case STATIC_MESSAGE_RESULT_CANCELLED:
-            TerminateAuthproto(childpid);
-            already_killed = 1;
-            keep_running = 0;
-            break;
-          case STATIC_MESSAGE_RESULT_FAILED:
-            keep_running = 0;
-            break;
-        }
+        keep_running = HandleStaticAuthMessage(ctx, childpid, &already_killed,
+                                               "Error", message, true,
+                                               requestfd[0]);
         break;
       case PTYPE_PROMPT_LIKE_USERNAME:
-        switch (AuthRunPromptSession(ctx, message, true, responsefd[1],
-                                     PTYPE_RESPONSE_LIKE_USERNAME)) {
-          case PROMPT_SESSION_RESULT_SUBMITTED:
-            keep_running = ShowProcessingMessage(ctx);
-            break;
-          case PROMPT_SESSION_RESULT_CANCELLED:
-            if (!WritePacketBytes(responsefd[1], PTYPE_RESPONSE_CANCELLED, "",
-                                  0)) {
-              keep_running = 0;
-              break;
-            }
-            keep_running = ShowProcessingMessage(ctx);
-            break;
-          case PROMPT_SESSION_RESULT_FAILED:
-            keep_running = 0;
-            break;
-        }
+        keep_running = HandlePromptAuthMessage(
+            ctx, message, true, responsefd[1], PTYPE_RESPONSE_LIKE_USERNAME);
         break;
       case PTYPE_PROMPT_LIKE_PASSWORD:
-        switch (AuthRunPromptSession(ctx, message, false, responsefd[1],
-                                     PTYPE_RESPONSE_LIKE_PASSWORD)) {
-          case PROMPT_SESSION_RESULT_SUBMITTED:
-            keep_running = ShowProcessingMessage(ctx);
-            break;
-          case PROMPT_SESSION_RESULT_CANCELLED:
-            if (!WritePacketBytes(responsefd[1], PTYPE_RESPONSE_CANCELLED, "",
-                                  0)) {
-              keep_running = 0;
-              break;
-            }
-            keep_running = ShowProcessingMessage(ctx);
-            break;
-          case PROMPT_SESSION_RESULT_FAILED:
-            keep_running = 0;
-            break;
-        }
+        keep_running = HandlePromptAuthMessage(
+            ctx, message, false, responsefd[1], PTYPE_RESPONSE_LIKE_PASSWORD);
         break;
       default:
-        Log("Unknown message type %02x", (int)type);
+        Log("Unknown message type %02x",
+            (unsigned int)(unsigned char)type);
         keep_running = 0;
         break;
     }
