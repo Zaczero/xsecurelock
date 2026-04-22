@@ -99,6 +99,10 @@ static void ExpectMaskedAndHiddenRendering(void) {
                              &displaylen) == 0);
   assert(strcmp(displaybuf, "") == 0);
   assert(displaylen == 0);
+
+  assert(RenderPromptDisplay(PROMPT_DISPLAY_MODE_ASTERISKS, &state, 0, 0, '|',
+                             displaybuf, sizeof(displaybuf), NULL) != 0);
+  assert(displaybuf[0] == '\0');
 }
 
 static void ExpectEmojiAndTruncationRendering(void) {

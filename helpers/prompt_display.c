@@ -116,15 +116,21 @@ static int RenderAsterisksPromptDisplay(const struct PromptState *state,
                                         char *displaybuf,
                                         size_t displaybufsize,
                                         size_t *displaylen) {
-  *displaylen = GetMaskedPasswordLength(state);
-  if (displaybuf == NULL || displaylen == NULL || displaybufsize == 0 ||
-      *displaylen + 2 > displaybufsize) {
+  size_t masked_length;
+
+  if (displaybuf == NULL || displaylen == NULL || displaybufsize == 0) {
     goto fail;
   }
 
-  memset(displaybuf, '*', *displaylen);
-  displaybuf[*displaylen] = blink_state ? ' ' : cursor_char;
-  displaybuf[*displaylen + 1] = '\0';
+  masked_length = GetMaskedPasswordLength(state);
+  if (masked_length + 2 > displaybufsize) {
+    goto fail;
+  }
+
+  memset(displaybuf, '*', masked_length);
+  displaybuf[masked_length] = blink_state ? ' ' : cursor_char;
+  displaybuf[masked_length + 1] = '\0';
+  *displaylen = masked_length;
   ++*displaylen;
   return 0;
 
