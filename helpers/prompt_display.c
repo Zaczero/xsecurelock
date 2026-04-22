@@ -8,6 +8,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../util.h"
+
 static const char *const kDiscoCombiner = " ♪ ";
 static const char *const kDiscoDancers[] = {
     "┏(･o･)┛",
@@ -24,6 +26,9 @@ static const char *const kPromptDisplayModeNames[] = {
     /* PROMPT_DISPLAY_MODE_TIME= */ "time",
     /* PROMPT_DISPLAY_MODE_TIME_HEX= */ "time_hex",
 };
+XSL_STATIC_ASSERT(ARRAY_LEN(kPromptDisplayModeNames) ==
+                      PROMPT_DISPLAY_MODE_COUNT,
+                  "Prompt display mode names must match the enum");
 static const char *const kEmoji[] = {
     "_____", "😂", "❤", "♻", "😍", "♥", "😭", "😊", "😒", "💕", "😘",
     "😩",     "☺", "👌", "😔", "😁", "😏", "😉", "👍", "⬅", "😅", "🙏",

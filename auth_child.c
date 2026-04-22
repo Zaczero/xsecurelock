@@ -22,8 +22,8 @@ limitations under the License.
 #include <unistd.h>  // for close, _exit, dup2, execl, fork
 
 #include "env_settings.h"      // for GetIntSetting
+#include "io_util.h"           // for PipeCloexec, RetryWrite
 #include "logging.h"           // for LogErrno, Log
-#include "util.h"              // for PipeCloexec, RetryWrite
 #include "wait_pgrp.h"         // for KillPgrp, WaitPgrp
 #include "xscreensaver_api.h"  // for ExportWindowID
 

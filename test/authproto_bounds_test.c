@@ -9,6 +9,7 @@
 #include <unistd.h>
 
 #include "../helpers/authproto.h"
+#include "../time_util.h"
 #include "../util.h"
 
 static volatile sig_atomic_t signal_count = 0;
@@ -45,18 +46,6 @@ static void StopTimer(void) {
   if (setitimer(ITIMER_REAL, &timer, NULL) != 0) {
     perror("setitimer");
     exit(1);
-  }
-}
-
-static void SleepMs(int milliseconds) {
-  struct timespec delay;
-  delay.tv_sec = milliseconds / 1000;
-  delay.tv_nsec = (milliseconds % 1000) * 1000000L;
-  while (nanosleep(&delay, &delay) != 0) {
-    if (errno != EINTR) {
-      perror("nanosleep");
-      exit(1);
-    }
   }
 }
 
@@ -126,7 +115,10 @@ static void ExpectInterruptedReadSuccess(void) {
   }
   if (childpid == 0) {
     close(fds[0]);
-    SleepMs(200);
+    if (SleepMs(200) != 0) {
+      perror("SleepMs");
+      _exit(1);
+    }
     WriteAllOrDie(fds[1], "P 7\nhunter2\n", strlen("P 7\nhunter2\n"));
     close(fds[1]);
     _exit(0);

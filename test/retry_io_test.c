@@ -8,10 +8,10 @@
 #include <sys/select.h>
 #include <sys/time.h>
 #include <sys/wait.h>
-#include <time.h>
 #include <unistd.h>
 
-#include "../util.h"
+#include "../io_util.h"
+#include "../time_util.h"
 
 static volatile sig_atomic_t signal_count = 0;
 
@@ -39,15 +39,6 @@ static void StopTimer(void) {
   struct itimerval timer;
   memset(&timer, 0, sizeof(timer));
   assert(setitimer(ITIMER_REAL, &timer, NULL) == 0);
-}
-
-static void SleepMs(int milliseconds) {
-  struct timespec delay;
-  delay.tv_sec = milliseconds / 1000;
-  delay.tv_nsec = (milliseconds % 1000) * 1000000L;
-  while (nanosleep(&delay, &delay) != 0) {
-    assert(errno == EINTR);
-  }
 }
 
 static void WaitForChild(pid_t childpid) {
@@ -87,7 +78,7 @@ static void TestRetryRead(void) {
   assert(childpid >= 0);
   if (childpid == 0) {
     close(fds[0]);
-    SleepMs(200);
+    assert(SleepMs(200) == 0);
     assert(write(fds[1], "A", 1) == 1);
     close(fds[1]);
     _exit(0);
@@ -118,7 +109,7 @@ static void TestRetryWrite(void) {
   assert(childpid >= 0);
   if (childpid == 0) {
     close(fds[1]);
-    SleepMs(200);
+    assert(SleepMs(200) == 0);
     char drain[4096];
     assert(read(fds[0], drain, sizeof(drain)) > 0);
     close(fds[0]);
@@ -148,7 +139,7 @@ static void TestRetryPoll(void) {
   assert(childpid >= 0);
   if (childpid == 0) {
     close(fds[0]);
-    SleepMs(200);
+    assert(SleepMs(200) == 0);
     assert(write(fds[1], "C", 1) == 1);
     close(fds[1]);
     _exit(0);
@@ -178,6 +169,83 @@ static void TestRetryPoll(void) {
   WaitForChild(childpid);
 }
 
+static void TestReadFull(void) {
+  int fds[2];
+  assert(pipe(fds) == 0);
+
+  pid_t childpid = fork();
+  assert(childpid >= 0);
+  if (childpid == 0) {
+    close(fds[0]);
+    assert(SleepMs(200) == 0);
+    assert(write(fds[1], "FG", 2) == 2);
+    close(fds[1]);
+    _exit(0);
+  }
+
+  close(fds[1]);
+  signal_count = 0;
+  StartTimerMs(50);
+
+  char buf[2] = {0};
+  ssize_t got = ReadFull(fds[0], buf, sizeof(buf));
+
+  StopTimer();
+  close(fds[0]);
+  WaitForChild(childpid);
+
+  assert(got == 2);
+  assert(buf[0] == 'F');
+  assert(buf[1] == 'G');
+  assert(signal_count > 0);
+}
+
+static void TestReadFullEof(void) {
+  int fds[2];
+  assert(pipe(fds) == 0);
+
+  assert(write(fds[1], "H", 1) == 1);
+  close(fds[1]);
+
+  char buf[2] = {0};
+  ssize_t got = ReadFull(fds[0], buf, sizeof(buf));
+  close(fds[0]);
+
+  assert(got == 1);
+  assert(buf[0] == 'H');
+}
+
+static void TestWriteFull(void) {
+  int fds[2];
+  assert(pipe(fds) == 0);
+  FillPipe(fds[1]);
+
+  pid_t childpid = fork();
+  assert(childpid >= 0);
+  if (childpid == 0) {
+    close(fds[1]);
+    assert(SleepMs(200) == 0);
+    char drain[4096];
+    ssize_t got = read(fds[0], drain, sizeof(drain));
+    assert(got >= 2);
+    close(fds[0]);
+    _exit(0);
+  }
+
+  signal_count = 0;
+  StartTimerMs(50);
+
+  ssize_t written = WriteFull(fds[1], "IJ", 2);
+
+  StopTimer();
+  close(fds[1]);
+  close(fds[0]);
+  WaitForChild(childpid);
+
+  assert(written == 2);
+  assert(signal_count > 0);
+}
+
 static void TestRetryPollHighFd(void) {
   int fds[2];
   assert(pipe(fds) == 0);
@@ -198,7 +266,7 @@ static void TestRetryPollHighFd(void) {
   assert(childpid >= 0);
   if (childpid == 0) {
     close(high_fd);
-    SleepMs(200);
+    assert(SleepMs(200) == 0);
     assert(write(fds[1], "D", 1) == 1);
     close(fds[1]);
     _exit(0);
@@ -248,15 +316,64 @@ static void TestPipeCloexec(void) {
   close(fds[1]);
 }
 
+static void TestCloseIfValid(void) {
+  int fds[2];
+  assert(pipe(fds) == 0);
+
+  int closed_fd = fds[0];
+  assert(CloseIfValid(&fds[0]) == 0);
+  assert(fds[0] == -1);
+  assert(fcntl(closed_fd, F_GETFD) < 0);
+  assert(errno == EBADF);
+
+  assert(CloseIfValid(&fds[0]) == 0);
+  close(fds[1]);
+}
+
+static void TestClosePair(void) {
+  int fds[2];
+  assert(pipe(fds) == 0);
+
+  int fd0 = fds[0];
+  int fd1 = fds[1];
+  assert(ClosePair(fds) == 0);
+  assert(fds[0] == -1);
+  assert(fds[1] == -1);
+  assert(fcntl(fd0, F_GETFD) < 0);
+  assert(errno == EBADF);
+  assert(fcntl(fd1, F_GETFD) < 0);
+  assert(errno == EBADF);
+}
+
 static void TestGetMonotonicTimeMs(void) {
   int64_t start_ms = 0;
   int64_t end_ms = 0;
 
   assert(GetMonotonicTimeMs(&start_ms) == 0);
-  SleepMs(20);
+  assert(SleepMs(20) == 0);
   assert(GetMonotonicTimeMs(&end_ms) == 0);
   assert(end_ms >= start_ms);
   assert(end_ms - start_ms >= 1);
+}
+
+static void TestSleepMs(void) {
+  int64_t start_ms = 0;
+  int64_t end_ms = 0;
+
+  errno = 0;
+  assert(SleepMs(-1) < 0);
+  assert(errno == EINVAL);
+
+  signal_count = 0;
+  StartTimerMs(20);
+  assert(GetMonotonicTimeMs(&start_ms) == 0);
+  assert(SleepMs(80) == 0);
+  assert(GetMonotonicTimeMs(&end_ms) == 0);
+  StopTimer();
+
+  assert(end_ms >= start_ms);
+  assert(end_ms - start_ms >= 20);
+  assert(signal_count > 0);
 }
 
 int main(void) {
@@ -264,8 +381,14 @@ int main(void) {
   TestRetryRead();
   TestRetryWrite();
   TestRetryPoll();
+  TestReadFull();
+  TestReadFullEof();
+  TestWriteFull();
   TestRetryPollHighFd();
   TestPipeCloexec();
+  TestCloseIfValid();
+  TestClosePair();
   TestGetMonotonicTimeMs();
+  TestSleepMs();
   return 0;
 }

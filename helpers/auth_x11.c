@@ -39,10 +39,11 @@ limitations under the License.
 
 #include "../env_info.h"          // for GetHostName, GetUserName
 #include "../env_settings.h"      // for GetIntSetting, GetStringSetting
+#include "../io_util.h"           // for PipeCloexec, RetryPoll, RetryRead
 #include "../logging.h"           // for Log, LogErrno
 #include "../mlock_page.h"        // for MLOCK_PAGE
 #include "../rect.h"              // for Rect, RectSubtract
-#include "../util.h"              // for explicit_bzero
+#include "../util.h"              // for XSL_STATIC_ASSERT, explicit_bzero
 #include "../wait_pgrp.h"         // for WaitPgrp
 #include "../wm_properties.h"     // for SetWMProperties
 #include "../xscreensaver_api.h"  // for ReadWindowID
@@ -52,13 +53,6 @@ limitations under the License.
 #include "prompt_random.h"        // for PromptRng, NextDisplayMarker
 #include "prompt_state.h"         // for PromptState
 #include "xkb.h"                  // for GetXkbIndicators, SwitchToNext...
-
-#if __STDC_VERSION__ >= 201112L
-#define STATIC_ASSERT(state, message) _Static_assert(state, message)
-#else
-#define STATIC_ASSERT(state, message) \
-  extern int statically_asserted(int assertion[(state) ? 1 : -1]);
-#endif
 
 //! Number of args.
 static int argc;
@@ -80,9 +74,9 @@ static int prompt_timeout;
 
 //! Minimum distance the cursor shall move on keypress.
 #define PARANOID_PASSWORD_MIN_CHANGE 4
-STATIC_ASSERT(PARANOID_PASSWORD_MIN_CHANGE <=
-                  (PARANOID_PASSWORD_LENGTH - 2) / 2,
-              "Display marker movement must always leave a valid next choice");
+XSL_STATIC_ASSERT(PARANOID_PASSWORD_MIN_CHANGE <=
+                      (PARANOID_PASSWORD_LENGTH - 2) / 2,
+                  "Display marker movement must always leave a valid next choice");
 
 //! Extra line spacing.
 #define LINE_SPACING 4

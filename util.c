@@ -35,11 +35,16 @@
  */
 
 #include "config.h"
+#include "buf_util.h"
+#include "io_util.h"
+#include "time_util.h"
 #include "util.h"
 
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <poll.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
 #include <time.h>
@@ -82,6 +87,46 @@ void explicit_bzero(void *s, size_t len) {
 }
 #endif
 
+int CloseIfValid(int *fd) {
+  int saved_fd;
+
+  if (fd == NULL) {
+    errno = EINVAL;
+    return -1;
+  }
+  if (*fd < 0) {
+    return 0;
+  }
+
+  saved_fd = *fd;
+  *fd = -1;
+  return close(saved_fd);
+}
+
+int ClosePair(int fds[2]) {
+  int ret = 0;
+  int saved_errno = 0;
+
+  if (fds == NULL) {
+    errno = EINVAL;
+    return -1;
+  }
+
+  if (CloseIfValid(&fds[0]) != 0) {
+    ret = -1;
+    saved_errno = errno;
+  }
+  if (CloseIfValid(&fds[1]) != 0 && ret == 0) {
+    ret = -1;
+    saved_errno = errno;
+  }
+
+  if (ret != 0) {
+    errno = saved_errno;
+  }
+  return ret;
+}
+
 ssize_t RetryRead(int fd, void *buf, size_t len) {
   ssize_t ret;
   do {
@@ -96,6 +141,49 @@ ssize_t RetryWrite(int fd, const void *buf, size_t len) {
     ret = write(fd, buf, len);
   } while (ret < 0 && errno == EINTR);
   return ret;
+}
+
+ssize_t ReadFull(int fd, void *buf, size_t len) {
+  size_t total = 0;
+
+  if (len > (size_t)SSIZE_MAX) {
+    errno = EINVAL;
+    return -1;
+  }
+
+  while (total < len) {
+    ssize_t got = RetryRead(fd, (char *)buf + total, len - total);
+    if (got < 0) {
+      return -1;
+    }
+    if (got == 0) {
+      return (ssize_t)total;
+    }
+    total += (size_t)got;
+  }
+  return (ssize_t)total;
+}
+
+ssize_t WriteFull(int fd, const void *buf, size_t len) {
+  size_t total = 0;
+
+  if (len > (size_t)SSIZE_MAX) {
+    errno = EINVAL;
+    return -1;
+  }
+
+  while (total < len) {
+    ssize_t got = RetryWrite(fd, (const char *)buf + total, len - total);
+    if (got < 0) {
+      return -1;
+    }
+    if (got == 0) {
+      errno = EIO;
+      return -1;
+    }
+    total += (size_t)got;
+  }
+  return (ssize_t)total;
 }
 
 int GetMonotonicTimeMs(int64_t *time_ms) {
@@ -147,8 +235,7 @@ int PipeCloexec(int fds[2]) {
   }
   if (SetCloexec(fds[0]) != 0 || SetCloexec(fds[1]) != 0) {
     int saved_errno = errno;
-    close(fds[0]);
-    close(fds[1]);
+    (void)ClosePair(fds);
     errno = saved_errno;
     return -1;
   }
@@ -195,4 +282,79 @@ int RetryPoll(struct pollfd *fds, nfds_t nfds, int timeout_ms) {
       return ret;
     }
   }
+}
+
+int SleepMs(int timeout_ms) {
+  struct timespec delay;
+
+  if (timeout_ms < 0) {
+    errno = EINVAL;
+    return -1;
+  }
+
+  delay.tv_sec = timeout_ms / 1000;
+  delay.tv_nsec = (timeout_ms % 1000) * 1000000L;
+  while (nanosleep(&delay, &delay) != 0) {
+    if (errno != EINTR) {
+      return -1;
+    }
+  }
+  return 0;
+}
+
+int AppendBytes(char **dst, size_t *remaining, const char *src, size_t len) {
+  char *out;
+  size_t out_remaining;
+
+  if (dst == NULL || remaining == NULL || src == NULL) {
+    errno = EINVAL;
+    return -1;
+  }
+
+  out = *dst;
+  out_remaining = *remaining;
+  if (out == NULL) {
+    errno = EINVAL;
+    return -1;
+  }
+  if (out_remaining == 0 || len > out_remaining - 1) {
+    errno = ENOSPC;
+    return -1;
+  }
+
+  if (len != 0) {
+    memcpy(out, src, len);
+  }
+  out[len] = '\0';
+  *dst = out + len;
+  *remaining = out_remaining - len;
+  return 0;
+}
+
+int AppendCString(char **dst, size_t *remaining, const char *src) {
+  if (src == NULL) {
+    errno = EINVAL;
+    return -1;
+  }
+  return AppendBytes(dst, remaining, src, strlen(src));
+}
+
+void ClearFreeString(char **p) {
+  if (p == NULL || *p == NULL) {
+    return;
+  }
+
+  explicit_bzero(*p, strlen(*p));
+  free(*p);
+  *p = NULL;
+}
+
+void ClearFreeBuffer(char **p, size_t len) {
+  if (p == NULL || *p == NULL) {
+    return;
+  }
+
+  explicit_bzero(*p, len);
+  free(*p);
+  *p = NULL;
 }

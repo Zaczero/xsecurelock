@@ -17,19 +17,30 @@
 #ifndef XSECURELOCK_UTIL_H
 #define XSECURELOCK_UTIL_H
 
-#include <stddef.h>      // for size_t
-#include <stdint.h>      // for int64_t
-#include <poll.h>        // for pollfd, nfds_t
-#include <sys/types.h>   // for ssize_t
+#include <stddef.h>  // for size_t
+
+#if defined(__GNUC__) || defined(__clang__)
+#define XSL_PRINTF(string_index, first_to_check) \
+  __attribute__((format(printf, string_index, first_to_check)))
+#else
+#define XSL_PRINTF(string_index, first_to_check)
+#endif
+
+#define XSL_CONCAT_IMPL(a, b) a##b
+#define XSL_CONCAT(a, b) XSL_CONCAT_IMPL(a, b)
+
+#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
+#define XSL_STATIC_ASSERT(expr, message) _Static_assert((expr), message)
+#else
+#define XSL_STATIC_ASSERT(expr, message)                              \
+  typedef char XSL_CONCAT(xsl_static_assert_, __LINE__)[(expr) ? 1 : \
+                                                             -1]
+#endif
+
+#define ARRAY_LEN(array) (sizeof(array) / sizeof((array)[0]))
 
 // Use the libc implementation when available; otherwise util.c provides a
 // local fallback with the same signature.
 void explicit_bzero(void *s, size_t len);
-
-int GetMonotonicTimeMs(int64_t *time_ms);
-int PipeCloexec(int fds[2]);
-ssize_t RetryRead(int fd, void *buf, size_t len);
-ssize_t RetryWrite(int fd, const void *buf, size_t len);
-int RetryPoll(struct pollfd *fds, nfds_t nfds, int timeout_ms);
 
 #endif  // XSECURELOCK_UTIL_H

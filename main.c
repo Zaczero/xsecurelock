@@ -70,6 +70,7 @@ limitations under the License.
 #include "logging.h"        // for Log, LogErrno
 #include "mlock_page.h"     // for MLOCK_PAGE
 #include "saver_child.h"    // for WatchSaverChild, KillAllSaver...
+#include "time_util.h"      // for GetMonotonicTimeMs
 #include "unmap_all.h"      // for ClearUnmapAllWindowsState
 #include "util.h"           // for explicit_bzero
 #include "version.h"        // for git_version

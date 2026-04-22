@@ -17,13 +17,15 @@ limitations under the License.
 #ifndef LOGGING_H
 #define LOGGING_H
 
+#include "util.h"
+
 /*! \brief Prints the given string to the error log (stderr).
  *
  * For a format expanding to "Foo", this will log "xsecurelock: Foo.".
  *
  * \param format A printf format string, followed by its arguments.
  */
-void Log(const char *format, ...) __attribute__((format(printf, 1, 2)));
+void Log(const char *format, ...) XSL_PRINTF(1, 2);
 
 /*! \brief Prints the given string to the error log (stderr).
  *
@@ -32,6 +34,6 @@ void Log(const char *format, ...) __attribute__((format(printf, 1, 2)));
  *
  * \param format A printf format string, followed by its arguments.
  */
-void LogErrno(const char *format, ...) __attribute__((format(printf, 1, 2)));
+void LogErrno(const char *format, ...) XSL_PRINTF(1, 2);
 
 #endif

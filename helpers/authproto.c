@@ -21,6 +21,7 @@ limitations under the License.
 #include <string.h>  // for strlen
 #include <unistd.h>  // for read, write, ssize_t
 
+#include "../io_util.h"     // for RetryRead, RetryWrite
 #include "../logging.h"     // for LogErrno, Log
 #include "../mlock_page.h"  // for MLOCK_PAGE
 #include "../util.h"        // for explicit_bzero

@@ -48,7 +48,7 @@ limitations under the License.
 
 #include "../env_settings.h"  // for GetIntSetting, GetStringSetting
 #include "../logging.h"       // for Log, LogErrno
-#include "../util.h"          // for GetMonotonicTimeMs
+#include "../time_util.h"     // for GetMonotonicTimeMs
 #include "../wait_pgrp.h"     // for KillPgrp, WaitPgrp
 
 #ifdef HAVE_XSCREENSAVER_EXT
