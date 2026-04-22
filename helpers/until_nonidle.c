@@ -47,7 +47,7 @@ limitations under the License.
 #include <X11/extensions/syncconst.h>  // for XSyncValue
 #endif
 
-#include "../env_settings.h"  // for GetIntSetting, GetStringSetting
+#include "../env_settings.h"  // for GetNonnegativeIntSetting, GetStringSetting
 #include "../logging.h"       // for Log, LogErrno
 #include "../time_util.h"     // for GetMonotonicTimeMs, SleepMs
 #include "../wait_pgrp.h"     // for KillPgrp, WaitPgrp
@@ -124,7 +124,11 @@ static uint64_t GetIdleTimeForSingleTimer(const struct UntilNonidleState *state,
   if (*timer == '\0') {
 #ifdef HAVE_XSCREENSAVER_EXT
     if (state->have_xscreensaver_ext) {
-      XScreenSaverQueryInfo(state->display, state->root_window, state->saver_info);
+      if (!XScreenSaverQueryInfo(state->display, state->root_window,
+                                 state->saver_info)) {
+        Log("XScreenSaverQueryInfo failed");
+        return (uint64_t)-1;
+      }
       return state->saver_info->idle;
     }
 #endif
@@ -134,8 +138,11 @@ static uint64_t GetIdleTimeForSingleTimer(const struct UntilNonidleState *state,
       for (int i = 0; i < state->num_xsync_counters; ++i) {
         if (!strcmp(timer, state->xsync_counters[i].name)) {
           XSyncValue value;
-          XSyncQueryCounter(state->display, state->xsync_counters[i].counter,
-                            &value);
+          if (!XSyncQueryCounter(state->display,
+                                 state->xsync_counters[i].counter, &value)) {
+            Log("XSyncQueryCounter failed for timer \"%s\"", timer);
+            return (uint64_t)-1;
+          }
           return (((uint64_t)XSyncValueHigh32(value)) << 32) |
                  (uint64_t)XSyncValueLow32(value);
         }
