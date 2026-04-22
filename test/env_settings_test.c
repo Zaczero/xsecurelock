@@ -1,5 +1,6 @@
 #include <limits.h>
 #include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 #include "../env_settings.h"
@@ -54,6 +55,18 @@ static void ExpectUnsignedSettingRejectsNegativeInput(void) {
   }
 }
 
+static void ExpectUnsignedSettingRejectsOverflow(void) {
+  char overflow[64];
+
+  if (snprintf(overflow, sizeof(overflow), "%llu0", ULLONG_MAX) <= 0) {
+    abort();
+  }
+  setenv("XSECURELOCK_TEST_UNSIGNED", overflow, 1);
+  if (GetUnsignedLongLongSetting("XSECURELOCK_TEST_UNSIGNED", 99) != 99) {
+    abort();
+  }
+}
+
 static void ExpectBoolSettingsNormalize(void) {
   unsetenv("XSECURELOCK_TEST_BOOL");
   if (GetBoolSetting("XSECURELOCK_TEST_BOOL", 7) != 1) {
@@ -101,6 +114,18 @@ static void ExpectPositiveSettingsClamp(void) {
 
   setenv("XSECURELOCK_TEST_POSITIVE_INT", "37", 1);
   if (GetPositiveIntSetting("XSECURELOCK_TEST_POSITIVE_INT", 12) != 37) {
+    abort();
+  }
+}
+
+static void ExpectIntSettingRejectsOverflow(void) {
+  char overflow[64];
+
+  if (snprintf(overflow, sizeof(overflow), "%ld0", LONG_MAX) <= 0) {
+    abort();
+  }
+  setenv("XSECURELOCK_TEST_INT", overflow, 1);
+  if (GetIntSetting("XSECURELOCK_TEST_INT", 12) != 12) {
     abort();
   }
 }
@@ -160,9 +185,11 @@ int main(void) {
   ExpectInRangeValuePassesThrough();
   ExpectInvalidValueFallsBackThenClampsDefault();
   ExpectUnsignedSettingRejectsNegativeInput();
+  ExpectUnsignedSettingRejectsOverflow();
   ExpectBoolSettingsNormalize();
   ExpectNonnegativeSettingsClamp();
   ExpectPositiveSettingsClamp();
+  ExpectIntSettingRejectsOverflow();
   ExpectFiniteDoubleSettingRejectsNanAndInfinity();
   ExpectClampedFiniteDoubleSettingClampsAndFallsBack();
   unsetenv("XSECURELOCK_TEST_INT");

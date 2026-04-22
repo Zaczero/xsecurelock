@@ -43,7 +43,8 @@ int AuthUiConfigLoad(struct AuthUiConfig *config) {
   config->prompt_timeout =
       GetNonnegativeIntSetting("XSECURELOCK_AUTH_TIMEOUT", 5 * 60);
   config->show_username = GetBoolSetting("XSECURELOCK_SHOW_USERNAME", 1);
-  config->show_hostname = GetIntSetting("XSECURELOCK_SHOW_HOSTNAME", 1);
+  config->show_hostname =
+      GetClampedIntSetting("XSECURELOCK_SHOW_HOSTNAME", 1, 0, 2);
   config->show_datetime = GetBoolSetting("XSECURELOCK_SHOW_DATETIME", 0);
   config->datetime_format =
       GetStringSetting("XSECURELOCK_DATETIME_FORMAT", "%c");

@@ -76,7 +76,9 @@ int GetIntSetting(const char* name, int def) {
   long lnumber = GetLongSetting(name, def);
   int number = (int)lnumber;
   if (lnumber != (long)number) {
-    Log("Ignoring out-of-range value of %s: %ld", name, lnumber);
+    const char* value = getenv(name);
+    Log("Ignoring out-of-range value of %s: %s", name,
+        value != NULL ? value : "(default)");
     return def;
   }
   return number;
