@@ -11,6 +11,10 @@
 #include "mlock_page.h"
 
 int GetHostName(char* hostname_buf, size_t hostname_buflen) {
+  if (hostname_buf == NULL || hostname_buflen == 0) {
+    errno = EINVAL;
+    return 0;
+  }
   if (gethostname(hostname_buf, hostname_buflen)) {
     LogErrno("gethostname");
     return 0;
@@ -20,27 +24,44 @@ int GetHostName(char* hostname_buf, size_t hostname_buflen) {
 }
 
 int GetUserName(char* username_buf, size_t username_buflen) {
+  enum {
+    PASSWD_BUF_MIN = 1024,
+    PASSWD_BUF_MAX = 1 << 20,
+  };
   struct passwd* pwd = NULL;
   struct passwd pwd_storage;
   char* pwd_buf = NULL;
   int ok = 0;
-  size_t pwd_bufsize = 1 << 20;
+  int status = 0;
+  size_t pwd_bufsize = PASSWD_BUF_MIN;
   long sysconf_bufsize = sysconf(_SC_GETPW_R_SIZE_MAX);
   if (sysconf_bufsize > 0) {
-    pwd_bufsize = (size_t)sysconf_bufsize;
+    if ((size_t)sysconf_bufsize < PASSWD_BUF_MIN) {
+      pwd_bufsize = PASSWD_BUF_MIN;
+    } else if ((size_t)sysconf_bufsize > PASSWD_BUF_MAX) {
+      pwd_bufsize = PASSWD_BUF_MAX;
+    } else {
+      pwd_bufsize = (size_t)sysconf_bufsize;
+    }
   }
-  pwd_buf = malloc(pwd_bufsize);
-  if (!pwd_buf) {
-    LogErrno("malloc(pwd_bufsize)");
-    return 0;
+  for (;;) {
+    pwd_buf = malloc(pwd_bufsize);
+    if (!pwd_buf) {
+      LogErrno("malloc(pwd_bufsize)");
+      return 0;
+    }
+    if (MLOCK_PAGE(pwd_buf, pwd_bufsize) < 0) {
+      // We continue anyway, as very likely getpwuid_r won't retrieve a
+      // password hash on modern systems.
+      LogErrno("mlock");
+    }
+    status = getpwuid_r(getuid(), &pwd_storage, pwd_buf, pwd_bufsize, &pwd);
+    if (status != ERANGE || pwd_bufsize >= PASSWD_BUF_MAX) {
+      break;
+    }
+    ClearFreeBuffer(&pwd_buf, pwd_bufsize);
+    pwd_bufsize = PASSWD_BUF_MAX;
   }
-  if (MLOCK_PAGE(pwd_buf, pwd_bufsize) < 0) {
-    // We continue anyway, as very likely getpwuid_r won't retrieve a password
-    // hash on modern systems.
-    LogErrno("mlock");
-  }
-  int status =
-      getpwuid_r(getuid(), &pwd_storage, pwd_buf, pwd_bufsize, &pwd);
   if (status != 0) {
     errno = status;
     LogErrno("getpwuid_r");
