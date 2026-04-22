@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <string.h>
 
 #include <X11/X.h>
 
@@ -32,10 +33,23 @@ static void ExpectOverflowFallsBackToNone(void) {
   }
 }
 
+static void ExpectSaverIndexUsesSignedFormatting(void) {
+  const char *value = NULL;
+
+  unsetenv("XSCREENSAVER_SAVER_INDEX");
+  ExportSaverIndex(-1);
+  value = getenv("XSCREENSAVER_SAVER_INDEX");
+  if (value == NULL || strcmp(value, "-1") != 0) {
+    abort();
+  }
+}
+
 int main(void) {
   ExpectUnsetFallsBackToNone();
   ExpectRoundTripWindowID();
   ExpectOverflowFallsBackToNone();
+  ExpectSaverIndexUsesSignedFormatting();
   unsetenv("XSCREENSAVER_WINDOW");
+  unsetenv("XSCREENSAVER_SAVER_INDEX");
   return 0;
 }

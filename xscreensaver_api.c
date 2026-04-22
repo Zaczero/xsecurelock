@@ -31,18 +31,22 @@ void ExportWindowID(Window w) {
     Log("Window ID doesn't fit into buffer");
     return;
   }
-  setenv("XSCREENSAVER_WINDOW", window_id_str, 1);
+  if (setenv("XSCREENSAVER_WINDOW", window_id_str, 1) != 0) {
+    LogErrno("setenv XSCREENSAVER_WINDOW");
+  }
 }
 
 void ExportSaverIndex(int index) {
   char saver_index_str[32];
-  int saver_index_len = snprintf(saver_index_str, sizeof(saver_index_str), "%llu",
-                                 (unsigned long long)index);
+  int saver_index_len =
+      snprintf(saver_index_str, sizeof(saver_index_str), "%d", index);
   if (saver_index_len <= 0 || (size_t)saver_index_len >= sizeof(saver_index_str)) {
     Log("Saver index doesn't fit into buffer");
     return;
   }
-  setenv("XSCREENSAVER_SAVER_INDEX", saver_index_str, 1);
+  if (setenv("XSCREENSAVER_SAVER_INDEX", saver_index_str, 1) != 0) {
+    LogErrno("setenv XSCREENSAVER_SAVER_INDEX");
+  }
 }
 
 Window ReadWindowID(void) {
