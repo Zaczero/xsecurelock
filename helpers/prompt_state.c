@@ -28,11 +28,13 @@ int PromptStateAppendByte(struct PromptState *state, char input_byte) {
 }
 
 void PromptStateDeleteLastGlyph(struct PromptState *state) {
+  size_t old_length;
   size_t previous_length = 0;
   size_t offset = 0;
 
   assert(state != NULL);
 
+  old_length = state->password_length;
   mblen(NULL, 0);
   while (offset < state->password_length) {
     previous_length = offset;
@@ -43,11 +45,18 @@ void PromptStateDeleteLastGlyph(struct PromptState *state) {
     }
     offset += (size_t)glyph_length;
   }
+  if (previous_length < old_length) {
+    explicit_bzero(state->password + previous_length,
+                   old_length - previous_length);
+  }
   state->password_length = previous_length;
 }
 
 void PromptStateClear(struct PromptState *state) {
   assert(state != NULL);
+  if (state->password_length != 0) {
+    explicit_bzero(state->password, state->password_length);
+  }
   state->password_length = 0;
 }
 

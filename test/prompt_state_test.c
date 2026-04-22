@@ -29,6 +29,9 @@ static void ExpectAppendAndClear(void) {
 
   PromptStateClear(&state);
   assert(state.password_length == 0);
+  assert(state.password[0] == '\0');
+  assert(state.password[1] == '\0');
+  assert(state.password[2] == '\0');
 }
 
 static void ExpectDeleteLastGlyph(void) {
@@ -41,9 +44,12 @@ static void ExpectDeleteLastGlyph(void) {
   PromptStateDeleteLastGlyph(&state);
   assert(state.password_length == 1);
   assert(state.password[0] == 'a');
+  assert(state.password[1] == '\0');
+  assert(state.password[2] == '\0');
 
   PromptStateDeleteLastGlyph(&state);
   assert(state.password_length == 0);
+  assert(state.password[0] == '\0');
 }
 
 static void ExpectDeleteMalformedByteStillProgresses(void) {
@@ -55,6 +61,7 @@ static void ExpectDeleteMalformedByteStillProgresses(void) {
 
   PromptStateDeleteLastGlyph(&state);
   assert(state.password_length == 0);
+  assert(state.password[0] == '\0');
 }
 
 static void ExpectBufferFullRejectsAppend(void) {
