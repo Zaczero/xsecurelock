@@ -16,6 +16,7 @@ limitations under the License.
 
 #include "auth_child.h"
 
+#include <errno.h>   // for errno
 #include <stdlib.h>  // for NULL, EXIT_FAILURE
 #include <string.h>  // for strlen
 #include <unistd.h>  // for close, _exit, dup2, execl, fork
@@ -122,6 +123,10 @@ int WatchAuthChild(Window w, const char *executable, int force_auth,
     } else {
       pid_t pid = ForkWithoutSigHandlers();
       if (pid == -1) {
+        int saved_errno = errno;
+        close(pc[0]);
+        close(pc[1]);
+        errno = saved_errno;
         LogErrno("fork");
       } else if (pid == 0) {
         // Child process.

@@ -1185,6 +1185,12 @@ static int Authenticate(void) {
   // Use authproto_pam.
   pid_t childpid = ForkWithoutSigHandlers();
   if (childpid == -1) {
+    int saved_errno = errno;
+    close(requestfd[0]);
+    close(requestfd[1]);
+    close(responsefd[0]);
+    close(responsefd[1]);
+    errno = saved_errno;
     LogErrno("fork");
     return 1;
   }
