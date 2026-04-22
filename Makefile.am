@@ -270,7 +270,10 @@ xscreensaver_api_test_SOURCES = \
 	test/xscreensaver_api_test.c \
 	xscreensaver_api.c xscreensaver_api.h
 
-check-local:
+check-docs:
+	@cd "$(abs_srcdir)" && $(SHELL) ./ensure-documented-settings.sh
+
+check-local: check-docs
 	@$(SHELL) "$(abs_srcdir)/test/check-local.sh" "$(abs_srcdir)"
 
 FORCE:

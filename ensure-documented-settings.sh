@@ -16,13 +16,25 @@
 
 # Simple script to ensure all settings variables are documented.
 
-# List all settings (usually from Get*Settings call).
+# List all public settings from real configuration call sites and helper
+# scripts. This intentionally ignores header guards, tests, and other internal
+# XSECURELOCK_* tokens that are not user-facing settings.
 all_settings=$(
-	for file in *.[ch] */*.[ch] */auth_* */saver_*; do
-		<"$file" perl -ne '
-			print "$_\n" for /\bXSECURELOCK_[A-Za-z0-9_%]+\b/g;
-		'
-	done | sort -u
+	{
+		for file in *.c helpers/*.c; do
+			[ -f "$file" ] || continue
+			<"$file" perl -0ne '
+				print "$1\n" while /\bGet(?:UnsignedLongLong|Long|Int|ClampedInt|Double|String|ExecutablePath)Setting\(\s*"((?:XSECURELOCK_[A-Za-z0-9_%]+))"/g;
+				print "$1\n" while /"(XSECURELOCK_KEY_%s_COMMAND)"/g;
+			'
+		done
+		for file in helpers/*.in helpers/saver_blank; do
+			[ -f "$file" ] || continue
+			<"$file" perl -ne '
+				print "$1\n" while /\b(XSECURELOCK_[A-Za-z0-9_%]+)\b/g;
+			'
+		done
+	} | sort -u
 )
 
 # List of internal settings. These shall not be documented.
