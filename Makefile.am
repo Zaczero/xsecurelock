@@ -179,7 +179,7 @@ CLEANFILES += xsecurelock.1.md xsecurelock.1
 endif
 
 # Some tools that we sure don't wan to install
-noinst_PROGRAMS = authproto_bounds_test buf_util_test cat_authproto configured_command_test dimmer_bayer_test nvidia_break_compositor get_compositor remap_all rect_test prompt_display_test prompt_state_test xkb_test explicit_bzero_test explicit_bzero_fallback_test retry_io_test retry_io_fallback_test indicator_text_test mlock_page_test mlock_page_overflow_test prompt_random_test env_settings_test xscreensaver_api_test
+noinst_PROGRAMS = authproto_bounds_test buf_util_test cat_authproto configured_command_test dimmer_bayer_test nvidia_break_compositor get_compositor remap_all rect_test prompt_display_test prompt_state_test xkb_test explicit_bzero_test explicit_bzero_fallback_test retry_io_test retry_io_fallback_test indicator_text_test mlock_page_test mlock_page_overflow_test prompt_random_test env_settings_test wait_pgrp_test xscreensaver_api_test
 authproto_bounds_test_SOURCES = \
 	logging.c logging.h \
 	helpers/authproto.c helpers/authproto.h \
@@ -264,6 +264,10 @@ env_settings_test_SOURCES = \
 	env_settings.c env_settings.h \
 	logging.c logging.h \
 	test/env_settings_test.c
+wait_pgrp_test_SOURCES = \
+	logging.c logging.h \
+	test/wait_pgrp_test.c \
+	wait_pgrp.c wait_pgrp.h
 xscreensaver_api_test_SOURCES = \
 	env_settings.c env_settings.h \
 	logging.c logging.h \

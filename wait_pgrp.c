@@ -197,6 +197,7 @@ int WaitProc(const char *name, pid_t *pid, int do_block, int already_killed,
         default:
           // Assume the child still lives. Shouldn't ever happen.
           LogErrno("%s child could not be waited upon", name);
+          result = 0;
           break;
       }
     } else if (gotpid == *pid) {
