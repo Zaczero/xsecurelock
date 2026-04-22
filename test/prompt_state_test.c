@@ -72,14 +72,14 @@ static void ExpectDeleteTruncatedUtf8TailStillProgresses(void) {
   state.password_length = 3;
 
   PromptStateDeleteLastGlyph(&state);
-  assert(state.password_length == 2);
-  assert(memcmp(state.password, "a\xE2", 2) == 0);
-  assert(state.password[2] == '\0');
-
-  PromptStateDeleteLastGlyph(&state);
   assert(state.password_length == 1);
   assert(state.password[0] == 'a');
   assert(state.password[1] == '\0');
+  assert(state.password[2] == '\0');
+
+  PromptStateDeleteLastGlyph(&state);
+  assert(state.password_length == 0);
+  assert(state.password[0] == '\0');
 }
 
 static void ExpectDeleteStrayContinuationByteStillProgresses(void) {
@@ -91,9 +91,23 @@ static void ExpectDeleteStrayContinuationByteStillProgresses(void) {
   state.password_length = 2;
 
   PromptStateDeleteLastGlyph(&state);
-  assert(state.password_length == 1);
-  assert(state.password[0] == 'a');
+  assert(state.password_length == 0);
+  assert(state.password[0] == '\0');
   assert(state.password[1] == '\0');
+}
+
+static void ExpectDeleteContinuationOnlyBufferStillProgresses(void) {
+  struct PromptState state;
+
+  PromptStateInit(&state);
+  memcpy(state.password, "\x80\x80\x80", 3);
+  state.password_length = 3;
+
+  PromptStateDeleteLastGlyph(&state);
+  assert(state.password_length == 0);
+  assert(state.password[0] == '\0');
+  assert(state.password[1] == '\0');
+  assert(state.password[2] == '\0');
 }
 
 static void ExpectBufferFullRejectsAppend(void) {
@@ -157,6 +171,7 @@ int main(void) {
   ExpectDeleteMalformedByteStillProgresses();
   ExpectDeleteTruncatedUtf8TailStillProgresses();
   ExpectDeleteStrayContinuationByteStillProgresses();
+  ExpectDeleteContinuationOnlyBufferStillProgresses();
   ExpectBufferFullRejectsAppend();
   ExpectDisplayMarkerUpdatesStayValid();
   ExpectNonMarkerModesKeepMarkerAtZero();
