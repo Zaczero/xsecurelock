@@ -1571,11 +1571,14 @@ int main(int argc, char **argv) {
           }
           // Those cause spam below, so let's log them separately to get some
           // details.
-          const char *message_type =
+          char *message_type =
               XGetAtomName(display, priv.ev.xclient.message_type);
           Log("Received unexpected ClientMessage event %s on window %lu",
               message_type == NULL ? "(null)" : message_type,
               priv.ev.xclient.window);
+          if (message_type != NULL) {
+            XFree(message_type);
+          }
           break;
         }
         default:
