@@ -19,6 +19,7 @@ limitations under the License.
 
 #include <X11/X.h>     // for Window
 #include <X11/Xlib.h>  // for Display
+#include <stddef.h>    // for size_t
 
 typedef struct {
   Display *display;
@@ -41,7 +42,7 @@ typedef struct {
  */
 int InitUnmapAllWindowsState(UnmapAllWindowsState *state, Display *display,
                              Window root_window, const Window *ignored_windows,
-                             unsigned int n_ignored_windows,
+                             size_t n_ignored_windows,
                              const char *my_res_class, const char *my_res_name,
                              int include_frame);
 

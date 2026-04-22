@@ -55,7 +55,7 @@ struct LockBlankingState {
 
 struct LockWindows {
   Window tracked_windows[LOCK_TRACKED_WINDOW_CAPACITY];
-  unsigned int tracked_window_count;
+  size_t tracked_window_count;
   Window root_window;
   Window parent_window;
   Window background_window;

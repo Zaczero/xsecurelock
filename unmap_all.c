@@ -8,7 +8,7 @@
 
 int InitUnmapAllWindowsState(UnmapAllWindowsState* state, Display* display,
                              Window root_window, const Window* ignored_windows,
-                             unsigned int n_ignored_windows,
+                             size_t n_ignored_windows,
                              const char* my_res_class, const char* my_res_name,
                              int include_frame) {
   int should_proceed = 1;
@@ -43,7 +43,7 @@ int InitUnmapAllWindowsState(UnmapAllWindowsState* state, Display* display,
       state->windows[i] = XmuClientWindow(display, state->windows[i]);
     }
     // If any window we'd be unmapping is in the ignore list, skip it.
-    for (unsigned int j = 0; j < n_ignored_windows; ++j) {
+    for (size_t j = 0; j < n_ignored_windows; ++j) {
       if (state->windows[i] == ignored_windows[j]) {
         state->windows[i] = None;
       }

@@ -42,36 +42,23 @@ static unsigned int ObscurerDimension(int size) {
   return (size > 2) ? (unsigned int)(size - 2) : 1U;
 }
 
-static Window CreateCoverWindow(struct LockContext *ctx, Window parent, int x,
-                                int y, unsigned int width, unsigned int height,
-                                unsigned long valuemask,
-                                XSetWindowAttributes *attrs,
-                                const char *role) {
-  Window window = None;
-
-  if (!ValidWindowSize((int)width, (int)height)) {
-    Log("%s window has invalid size %ux%u", role, width, height);
-    return None;
-  }
-
-  window = XCreateWindow(ctx->runtime.display, parent, x, y, width, height, 0,
-                         CopyFromParent, InputOutput, CopyFromParent,
-                         valuemask, attrs);
-  if (window == None) {
-    Log("XCreateWindow failed for %s", role);
-  }
-  return window;
-}
-
 static int CreateTrackedCoverWindow(struct LockContext *ctx, Window *window,
                                     Window parent, int x, int y,
                                     unsigned int width, unsigned int height,
                                     unsigned long valuemask,
                                     XSetWindowAttributes *attrs,
                                     const char *role) {
-  *window = CreateCoverWindow(ctx, parent, x, y, width, height, valuemask,
-                              attrs, role);
+  if (!ValidWindowSize((int)width, (int)height)) {
+    Log("%s window has invalid size %ux%u", role, width, height);
+    *window = None;
+    return 0;
+  }
+
+  *window = XCreateWindow(ctx->runtime.display, parent, x, y, width, height, 0,
+                          CopyFromParent, InputOutput, CopyFromParent,
+                          valuemask, attrs);
   if (*window == None) {
+    Log("XCreateWindow failed for %s", role);
     return 0;
   }
   SetWMProperties(ctx->runtime.display, *window, "xsecurelock", role,
