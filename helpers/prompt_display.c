@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../buf_util.h"
 #include "../util.h"
 #include "prompt_glyph.h"
 
@@ -63,11 +64,22 @@ XSL_STATIC_ASSERT(ARRAY_LEN(kEmoticons) ==
 XSL_STATIC_ASSERT(ARRAY_LEN(kKaomoji) == PROMPT_DISPLAY_ANIMATED_MARKER_COUNT,
                   "Kaomoji prompt choices must match the animated marker count");
 
+static int ClearDisplayFailure(char *displaybuf, size_t displaybufsize,
+                               size_t *displaylen) {
+  if (displaybuf != NULL && displaybufsize != 0) {
+    displaybuf[0] = '\0';
+  }
+  if (displaylen != NULL) {
+    *displaylen = 0;
+  }
+  return -1;
+}
+
 static int WriteDisplayString(char *displaybuf, size_t displaybufsize,
                               const char *input, size_t input_length,
                               size_t *displaylen) {
   if (displaybuf == NULL || displaylen == NULL || displaybufsize == 0) {
-    return -1;
+    return ClearDisplayFailure(displaybuf, displaybufsize, displaylen);
   }
 
   size_t copy_length = input_length;
@@ -88,7 +100,7 @@ static int RenderCursorPromptDisplay(const struct PromptState *state,
                                      char *displaybuf, size_t displaybufsize,
                                      size_t *displaylen) {
   if (displaybuf == NULL || displaylen == NULL || displaybufsize == 0) {
-    return -1;
+    goto fail;
   }
 
   *displaylen = PromptDisplayMarkerCount(PROMPT_DISPLAY_MODE_CURSOR);
@@ -102,9 +114,7 @@ static int RenderCursorPromptDisplay(const struct PromptState *state,
   return 0;
 
 fail:
-  displaybuf[0] = '\0';
-  *displaylen = 0;
-  return -1;
+  return ClearDisplayFailure(displaybuf, displaybufsize, displaylen);
 }
 
 static size_t GetMaskedPasswordLength(const struct PromptState *state) {
@@ -133,13 +143,7 @@ static int RenderAsterisksPromptDisplay(const struct PromptState *state,
   return 0;
 
 fail:
-  if (displaybuf != NULL && displaybufsize != 0) {
-    displaybuf[0] = '\0';
-  }
-  if (displaylen != NULL) {
-    *displaylen = 0;
-  }
-  return -1;
+  return ClearDisplayFailure(displaybuf, displaybufsize, displaylen);
 }
 
 static int RenderEchoPromptDisplay(const struct PromptState *state,
@@ -148,7 +152,7 @@ static int RenderEchoPromptDisplay(const struct PromptState *state,
                                    size_t *displaylen) {
   if (displaybuf == NULL || displaylen == NULL || displaybufsize < 2 ||
       state->password_length + 2 > displaybufsize) {
-    goto fail;
+    return ClearDisplayFailure(displaybuf, displaybufsize, displaylen);
   }
 
   if (state->password_length != 0) {
@@ -158,15 +162,6 @@ static int RenderEchoPromptDisplay(const struct PromptState *state,
   displaybuf[state->password_length + 1] = '\0';
   *displaylen = state->password_length + 1;
   return 0;
-
-fail:
-  if (displaybuf != NULL && displaybufsize != 0) {
-    displaybuf[0] = '\0';
-  }
-  if (displaylen != NULL) {
-    *displaylen = 0;
-  }
-  return -1;
 }
 
 static int RenderArrayPromptDisplay(const char *const *choices,
@@ -176,13 +171,7 @@ static int RenderArrayPromptDisplay(const char *const *choices,
                                     size_t *displaylen) {
   if (choices == NULL || state == NULL ||
       state->display_marker >= choices_count) {
-    if (displaybuf != NULL && displaybufsize != 0) {
-      displaybuf[0] = '\0';
-    }
-    if (displaylen != NULL) {
-      *displaylen = 0;
-    }
-    return -1;
+    return ClearDisplayFailure(displaybuf, displaybufsize, displaylen);
   }
   return WriteDisplayString(displaybuf, displaybufsize,
                             choices[state->display_marker],
@@ -194,7 +183,7 @@ static int RenderTimePromptDisplay(enum PromptDisplayMode mode,
                                    char *displaybuf, size_t displaybufsize,
                                    size_t *displaylen) {
   if (displaybuf == NULL || displaylen == NULL || displaybufsize == 0) {
-    return -1;
+    return ClearDisplayFailure(displaybuf, displaybufsize, displaylen);
   }
   if (state->password_length == 0) {
     return WriteDisplayString(displaybuf, displaybufsize, "----", 4,
@@ -215,9 +204,7 @@ static int RenderTimePromptDisplay(enum PromptDisplayMode mode,
   }
 
   if (written < 0) {
-    displaybuf[0] = '\0';
-    *displaylen = 0;
-    return -1;
+    return ClearDisplayFailure(displaybuf, displaybufsize, displaylen);
   }
   displaybuf[displaybufsize - 1] = '\0';
   *displaylen = strlen(displaybuf);
@@ -272,49 +259,27 @@ size_t PromptDisplayMinChange(enum PromptDisplayMode mode) {
                                              : PROMPT_DISPLAY_ANIMATED_MIN_CHANGE;
 }
 
-static int AppendPromptFragment(char *displaybuf, size_t displaybufsize,
-                                size_t *used, const char *fragment) {
-  size_t fragment_length = strlen(fragment);
-
-  if (*used >= displaybufsize ||
-      fragment_length > displaybufsize - *used - 1) {
-    return -1;
-  }
-
-  memcpy(displaybuf + *used, fragment, fragment_length);
-  *used += fragment_length;
-  return 0;
-}
-
 int FormatDiscoPrompt(size_t displaymarker, char *displaybuf,
                       size_t displaybufsize, size_t *displaylen) {
-  size_t used = 0;
+  char *out = displaybuf;
+  size_t remaining = displaybufsize;
 
   if (displaybuf == NULL || displaylen == NULL || displaybufsize == 0) {
-    return -1;
+    return ClearDisplayFailure(displaybuf, displaybufsize, displaylen);
   }
 
   for (size_t i = 0, bit = 1; i < DISCO_PASSWORD_DANCERS; ++i, bit <<= 1) {
-    if (i != 0 &&
-        AppendPromptFragment(displaybuf, displaybufsize, &used,
-                             kDiscoCombiner) != 0) {
-      goto fail;
+    if (i != 0 && AppendCString(&out, &remaining, kDiscoCombiner) != 0) {
+      return ClearDisplayFailure(displaybuf, displaybufsize, displaylen);
     }
-    if (AppendPromptFragment(
-            displaybuf, displaybufsize, &used,
-            kDiscoDancers[(displaymarker & bit) ? 1 : 0]) != 0) {
-      goto fail;
+    if (AppendCString(&out, &remaining,
+                      kDiscoDancers[(displaymarker & bit) ? 1 : 0]) != 0) {
+      return ClearDisplayFailure(displaybuf, displaybufsize, displaylen);
     }
   }
 
-  displaybuf[used] = '\0';
-  *displaylen = used;
+  *displaylen = (size_t)(out - displaybuf);
   return 0;
-
-fail:
-  displaybuf[0] = '\0';
-  *displaylen = 0;
-  return -1;
 }
 
 int RenderPromptDisplay(enum PromptDisplayMode mode,
@@ -322,13 +287,7 @@ int RenderPromptDisplay(enum PromptDisplayMode mode,
                         int blink_state, char cursor_char, char *displaybuf,
                         size_t displaybufsize, size_t *displaylen) {
   if (state == NULL) {
-    if (displaybuf != NULL && displaybufsize != 0) {
-      displaybuf[0] = '\0';
-    }
-    if (displaylen != NULL) {
-      *displaylen = 0;
-    }
-    return -1;
+    return ClearDisplayFailure(displaybuf, displaybufsize, displaylen);
   }
 
   if (echo) {

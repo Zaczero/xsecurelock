@@ -191,6 +191,28 @@ static void ExpectTimeRendering(void) {
   assert(displaylen == strlen("0x75bcd15"));
 }
 
+static void ExpectFailureResetBehavior(void) {
+  char displaybuf[PROMPT_DISPLAY_BUFFER_SIZE] = "sentinel";
+  size_t displaylen = 99;
+  struct PromptState state = MakePromptState("hunter2", 0, 123, 456789);
+
+  assert(RenderPromptDisplay(PROMPT_DISPLAY_MODE_CURSOR, NULL, 0, 0, '|',
+                             displaybuf, sizeof(displaybuf),
+                             &displaylen) != 0);
+  assert(displaybuf[0] == '\0');
+  assert(displaylen == 0);
+
+  strcpy(displaybuf, "sentinel");
+  assert(RenderPromptDisplay(PROMPT_DISPLAY_MODE_HIDDEN, &state, 0, 0, '|',
+                             displaybuf, sizeof(displaybuf), NULL) != 0);
+  assert(displaybuf[0] == '\0');
+
+  strcpy(displaybuf, "sentinel");
+  assert(RenderPromptDisplay(PROMPT_DISPLAY_MODE_TIME, &state, 0, 0, '|',
+                             displaybuf, sizeof(displaybuf), NULL) != 0);
+  assert(displaybuf[0] == '\0');
+}
+
 int main(void) {
   ExpectDiscoPrompt(
       0,
@@ -210,5 +232,6 @@ int main(void) {
   ExpectMaskedAndHiddenRendering();
   ExpectEmojiAndTruncationRendering();
   ExpectTimeRendering();
+  ExpectFailureResetBehavior();
   return 0;
 }

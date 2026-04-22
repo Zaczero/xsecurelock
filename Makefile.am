@@ -221,7 +221,8 @@ prompt_display_test_SOURCES = \
 	helpers/prompt_glyph.c helpers/prompt_glyph.h \
 	helpers/prompt_display.c helpers/prompt_display.h \
 	helpers/prompt_state.h \
-	test/prompt_display_test.c
+	test/prompt_display_test.c \
+	util.c util.h
 prompt_state_test_SOURCES = \
 	helpers/prompt_glyph.c helpers/prompt_glyph.h \
 	helpers/prompt_display.c helpers/prompt_display.h \
