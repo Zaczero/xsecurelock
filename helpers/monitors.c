@@ -19,6 +19,7 @@ limitations under the License.
 #include "monitors.h"
 
 #include <X11/Xlib.h>  // for XWindowAttributes, Display, XGetW...
+#include <stdint.h>    // for int64_t
 #include <stdlib.h>    // for qsort
 #include <string.h>    // for memcmp, memset
 
@@ -83,10 +84,12 @@ static int CompareMonitors(const void* a, const void* b) {
 
 static int IntervalsOverlap(int astart, int asize, int bstart, int bsize) {
   // Compute exclusive bounds.
-  int aend = astart + asize;
-  int bend = bstart + bsize;
+  int64_t astart64 = astart;
+  int64_t bstart64 = bstart;
+  int64_t aend = astart64 + asize;
+  int64_t bend = bstart64 + bsize;
   // If one interval starts at or after the other, there's no overlap.
-  if (astart >= bend || bstart >= aend) {
+  if (astart64 >= bend || bstart64 >= aend) {
     return 0;
   }
   // Otherwise, there must be an overlap.
@@ -228,10 +231,14 @@ static int GetMonitorsXRandR(Display* dpy, Window window,
 static void GetMonitorsGuess(const XWindowAttributes* xwa,
                              Monitor* out_monitors, size_t* out_num_monitors,
                              size_t max_monitors) {
+  int64_t weighted_size = 0;
+  size_t guessed_monitors = 0;
+
   // XRandR-less dummy fallback.
-  size_t guessed_monitors = CLAMP((size_t)(xwa->width * 9 + xwa->height * 8) /
-                                      (size_t)(xwa->height * 16),  //
-                                  1, max_monitors);
+  weighted_size = (int64_t)xwa->width * 9 + (int64_t)xwa->height * 8;
+  guessed_monitors =
+      CLAMP((size_t)(weighted_size / ((int64_t)xwa->height * 16)), 1,
+            max_monitors);
   for (size_t i = 0; i < guessed_monitors; ++i) {
     int x = xwa->width * i / guessed_monitors;
     int y = 0;
@@ -252,7 +259,13 @@ size_t GetMonitors(Display* dpy, Window window, Monitor* out_monitors,
 
   // As outputs will be relative to the window, we have to query its attributes.
   XWindowAttributes xwa;
-  XGetWindowAttributes(dpy, window, &xwa);
+  if (!XGetWindowAttributes(dpy, window, &xwa)) {
+    Log("XGetWindowAttributes failed; using display-size fallback");
+    AddMonitor(out_monitors, &num_monitors, max_monitors, 0, 0,
+               DisplayWidth(dpy, DefaultScreen(dpy)),
+               DisplayHeight(dpy, DefaultScreen(dpy)));
+    return num_monitors;
+  }
 
   do {
 #ifdef HAVE_XRANDR_EXT
