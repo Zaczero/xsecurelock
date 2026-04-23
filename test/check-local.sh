@@ -20,10 +20,11 @@ trap 'status=$?; rm -rf "$checksrcdir" "$builddir" "$prefix"; exit $status' 0 1 
 rm -rf "$checksrcdir"
 "$maketool" distdir distdir="$checksrcdir"
 
-git_version=$(
+GIT_VERSION=$(
   cd "$srcdir"
   git describe --always --dirty 2>/dev/null || true
 )
+export GIT_VERSION
 
 echo "Configuring sanitizer smoke build in $builddir"
 cd "$builddir"
@@ -35,8 +36,8 @@ LDFLAGS='-fsanitize=address,undefined' \
   --without-pam \
   --with-default-auth-module=auth_x11 \
   --with-default-authproto-module=authproto_htpasswd
-"$maketool" GIT_VERSION="$git_version"
-"$maketool" GIT_VERSION="$git_version" install
+"$maketool"
+"$maketool" install
 
 export ASAN_OPTIONS='detect_leaks=1:halt_on_error=1:abort_on_error=1'
 export UBSAN_OPTIONS='print_stacktrace=1:halt_on_error=1'
@@ -64,6 +65,7 @@ echo "Running native smoke tests"
 "$builddir"/wait_pgrp_test
 "$builddir"/xscreensaver_api_test
 "$builddir"/unmap_all_test
+/bin/sh "$srcdir"/test/version_c_escape_test.sh "$srcdir"
 "$srcdir"/test/saver_xscreensaver_smoke.sh "$builddir"/helpers/saver_xscreensaver
 printf 'P 7\nhunter2\n' > "$builddir"/cat_authproto.fixture
 "$builddir"/cat_authproto < "$builddir"/cat_authproto.fixture > "$builddir"/cat_authproto.out

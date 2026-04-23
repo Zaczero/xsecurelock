@@ -171,10 +171,9 @@ if HAVE_PANDOC
 man1_MANS = xsecurelock.1
 xsecurelock.1.md: $(srcdir)/doc/xsecurelock.1.md $(srcdir)/README.md
 	{ \
-		grep -B 9999 'ENV VARIABLES HERE' "$(srcdir)/doc/xsecurelock.1.md"; \
-		grep -A 9999 'ENV VARIABLES START' "$(srcdir)/README.md" |\
-			grep -B 9999 'ENV VARIABLES END'; \
-		grep -A 9999 'ENV VARIABLES HERE' "$(srcdir)/doc/xsecurelock.1.md"; \
+		sed -n '1,/ENV VARIABLES HERE/p' "$(srcdir)/doc/xsecurelock.1.md"; \
+		sed -n '/ENV VARIABLES START/,/ENV VARIABLES END/p' "$(srcdir)/README.md"; \
+		sed -n '/ENV VARIABLES HERE/,$$p' "$(srcdir)/doc/xsecurelock.1.md"; \
 	} > xsecurelock.1.md
 xsecurelock.1: xsecurelock.1.md
 	$(path_to_pandoc) -s -f markdown -t man -o $@ $<
@@ -297,25 +296,15 @@ check-docs:
 check-local: check-docs
 	@$(SHELL) "$(abs_srcdir)/test/check-local.sh" "$(abs_srcdir)"
 
+export GIT_VERSION
+
 FORCE:
 version.c: FORCE
-	if [ -n "$(GIT_VERSION)" ]; then \
-		echo "const char *const git_version = \"$(GIT_VERSION)\";" \
-			> version.c; \
-	elif git describe --always --dirty >/dev/null 2>&1; then \
-		echo "const char *const git_version = \"` \
-			git describe --always --dirty \
-		`\";" > version.c; \
-	else \
-		: version.c must exist in non-git builds.; \
-		cat version.c; \
-	fi
+	@cd "$(abs_srcdir)" && $(SHELL) ./generate-version-c.sh "$(abs_builddir)/version.c"
 .PRECIOUS: version.c  # Old one is better than none.
 
 env_helpstr.inc: README.md # Autogenerate for --help.
-	grep -A 9999 'ENV VARIABLES START' "$<" |\
-		grep -B 9999 'ENV VARIABLES END' |\
-		grep '^[ *]' |\
+	sed -n '/ENV VARIABLES START/,/ENV VARIABLES END/{/^[ *]/p;}' "$<" |\
 		sed -e 's,\\\|",\\&,g; s,$$,\\n",; s,^,",;' > "$@"
 main.$(OBJEXT): env_helpstr.inc
 
@@ -327,6 +316,7 @@ EXTRA_DIST = \
 	build-config.h.in \
 	doc/xsecurelock.1.md \
 	ensure-documented-settings.sh \
+	generate-version-c.sh \
 	helpers/saver_blank \
 	incompatible_compositor.xbm.sh \
 	run-iwyu.sh \

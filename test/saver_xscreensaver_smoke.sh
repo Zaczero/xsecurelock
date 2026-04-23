@@ -47,8 +47,8 @@ run_helper_once() {
 tmpdir=$(mktemp -d -t xsecurelock-saver-xscreensaver.XXXXXX)
 trap 'rm -rf "$tmpdir"' EXIT
 
-grep -Fq 'sh -c "$saver"' "$helper" || fail "helper does not use sh -c"
-if grep -Fq 'eval $saver' "$helper"; then
+grep -Fq "sh -c \"\$saver\"" "$helper" || fail "helper does not use sh -c"
+if grep -Fq "eval \$saver" "$helper"; then
   fail "helper still uses eval"
 fi
 

@@ -14,9 +14,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-: ${XSECURELOCK_XSCREENSAVER_PATH:=@path_to_xscreensaver@}
+: "${XSECURELOCK_XSCREENSAVER_PATH:=@path_to_xscreensaver@}"
 
 TAB='	'
+xscreensaver_resources=
+
+if [ -f ~/.xscreensaver ]; then
+  xscreensaver_resources=$(xrdb -n ~/.xscreensaver 2>/dev/null || true)
+fi
+
+get_xscreensaver_resource() {
+  resource=$1
+  printf '%s\n' "$xscreensaver_resources" |
+    sed -n "s/^$resource:[[:space:]]*//p" |
+    head -n 1
+}
 
 # Note: the following logic is somewhat derived from parse_screenhack in
 # XScreenSaver.
@@ -26,7 +38,7 @@ convert_xscreensaver_programs() {
     skipwhite() {
       while :; do
         case "$line" in
-          $TAB*) line=${line#$TAB} ;;
+          $TAB*) line=${line#"$TAB"} ;;
           \ *)   line=${line# } ;;
           *)     break ;;
         esac
@@ -39,7 +51,10 @@ convert_xscreensaver_programs() {
       *)  enabled=true ;;
     esac
     # Strip visual name (VISUAL:, where VISUAL can't contain " or whitespace).
-    case "${line%%[\" $TAB]*}" in
+    prefix=${line%% *}
+    prefix=${prefix%%"$TAB"*}
+    prefix=${prefix%%\"*}
+    case "$prefix" in
       *:*) line=${line#*:}; skipwhite ;;
     esac
     # Strip textual description ("description").
@@ -47,7 +62,7 @@ convert_xscreensaver_programs() {
       '"'*) line=${line#\"*\"}; skipwhite ;;
     esac
     # What's remaining is the program name with its options.
-    echo "$i $enabled $line"
+    printf '%d %s %s\n' "$i" "$enabled" "$line"
     i=$((i+1))
   done
 }
@@ -55,7 +70,7 @@ convert_xscreensaver_programs() {
 convert_program_list() {
   i=0
   while IFS= read -r line; do
-    echo "$i true $line -root"
+    printf '%d true %s -root\n' "$i" "$line"
     i=$((i+1))
   done
 }
@@ -63,11 +78,8 @@ convert_program_list() {
 list_savers() {
   want_all=$1
   if [ -f ~/.xscreensaver ]; then
-    printf "%b" "$(
-      xrdb -n ~/.xscreensaver 2>/dev/null |\
-      grep ^programs: |\
-      cut -d : -f 2-
-    )" | convert_xscreensaver_programs
+    printf '%b' "$(get_xscreensaver_resource programs)" |
+      convert_xscreensaver_programs
   else
     ls "$XSECURELOCK_XSCREENSAVER_PATH" | convert_program_list
   fi | while read -r number enabled saver flags; do
@@ -95,21 +107,13 @@ case "$1" in
 esac
 
 if [ -z "$mode" ]; then
-  mode=$(
-    xrdb -n ~/.xscreensaver 2>/dev/null |\
-      grep ^mode: |\
-      cut -f 2
-  )
+  mode=$(get_xscreensaver_resource mode)
 fi
 
 selected=
 case "$mode" in
   one)
-    selected=$(
-      xrdb -n ~/.xscreensaver 2>/dev/null |\
-        grep ^selected: |\
-        cut -f 2
-    )
+    selected=$(get_xscreensaver_resource selected)
     ;;
   random)  # NOT random-same.
     # Try bash's $RANDOM, but if it's not there, just use the PID.
@@ -173,7 +177,7 @@ while :; do
     # Saver failed entirely. Just give up.
     echo >&2 "xsecurelock: Screen saver failed with status $status: $saver."
     sleep 2  # Anti-spam delay.
-    if [ x"$mode" != x"random" ]; then
+    if [ "$mode" != "random" ]; then
       # As a fallback, when the saver failed, try random.
       exec "$0" --internal-override-mode=random
     fi
