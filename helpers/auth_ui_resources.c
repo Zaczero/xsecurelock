@@ -37,10 +37,10 @@ static int AllocXftColorOrLog(struct AuthUiResources *resources,
       .blue = xcolor->blue,
       .alpha = 65535,
   };
-  if (!XftColorAllocValue(resources->display,
-                          DefaultVisual(resources->display,
-                                        DefaultScreen(resources->display)),
-                          resources->colormap, &xrcolor, xft_color)) {
+  if (!XftColorAllocValue(
+          resources->display,
+          DefaultVisual(resources->display, DefaultScreen(resources->display)),
+          resources->colormap, &xrcolor, xft_color)) {
     Log("XftColorAllocValue failed for %s color", label);
     return 0;
   }
@@ -124,12 +124,13 @@ int AuthUiResourcesInit(struct AuthUiResources *resources,
   }
 
   if (config->font_name[0] != '\0') {
-    resources->core_font = XLoadQueryFont(resources->display, config->font_name);
+    resources->core_font =
+        XLoadQueryFont(resources->display, config->font_name);
     have_font = resources->core_font != NULL;
 #ifdef HAVE_XFT_EXT
     if (!have_font) {
-      resources->xft_font = FixedXftFontOpenName(resources->display, screen,
-                                                 config->font_name);
+      resources->xft_font =
+          FixedXftFontOpenName(resources->display, screen, config->font_name);
       have_font = resources->xft_font != NULL;
     }
 #endif
@@ -189,17 +190,17 @@ void AuthUiResourcesCleanup(struct AuthUiResources *resources) {
 #ifdef HAVE_XFT_EXT
   if (resources->xft_font != NULL) {
     if (resources->xft_color_warning_allocated) {
-      XftColorFree(resources->display,
-                   DefaultVisual(resources->display,
-                                 DefaultScreen(resources->display)),
-                   resources->colormap, &resources->xft_color_warning);
+      XftColorFree(
+          resources->display,
+          DefaultVisual(resources->display, DefaultScreen(resources->display)),
+          resources->colormap, &resources->xft_color_warning);
       resources->xft_color_warning_allocated = false;
     }
     if (resources->xft_color_foreground_allocated) {
-      XftColorFree(resources->display,
-                   DefaultVisual(resources->display,
-                                 DefaultScreen(resources->display)),
-                   resources->colormap, &resources->xft_color_foreground);
+      XftColorFree(
+          resources->display,
+          DefaultVisual(resources->display, DefaultScreen(resources->display)),
+          resources->colormap, &resources->xft_color_foreground);
       resources->xft_color_foreground_allocated = false;
     }
     XftFontClose(resources->display, resources->xft_font);

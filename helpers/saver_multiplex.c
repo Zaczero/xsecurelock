@@ -6,15 +6,15 @@
 #include "config.h"
 #include "build-config.h"
 
-#include <X11/X.h>       // for Window, CopyFromParent
-#include <X11/Xlib.h>    // for XEvent, XFlush, XNextEvent, XOpenDi...
-#include <errno.h>       // for errno, EAGAIN, EINTR, EWOULDBLOCK
-#include <poll.h>        // for pollfd, POLLIN, POLLHUP
-#include <signal.h>      // for sigaction, SIGTERM, SIGUSR1
-#include <stdbool.h>     // for bool
-#include <stdlib.h>      // for EXIT_FAILURE, setenv
-#include <string.h>      // for memcmp, memcpy, memset
-#include <unistd.h>      // for read, write, ssize_t
+#include <X11/X.h>     // for Window, CopyFromParent
+#include <X11/Xlib.h>  // for XEvent, XFlush, XNextEvent, XOpenDi...
+#include <errno.h>     // for errno, EAGAIN, EINTR, EWOULDBLOCK
+#include <poll.h>      // for pollfd, POLLIN, POLLHUP
+#include <signal.h>    // for sigaction, SIGTERM, SIGUSR1
+#include <stdbool.h>   // for bool
+#include <stdlib.h>    // for EXIT_FAILURE, setenv
+#include <string.h>    // for memcmp, memcpy, memset
+#include <unistd.h>    // for read, write, ssize_t
 
 #include "../env_settings.h"      // for GetIntSetting, GetExecutablePathSet...
 #include "../io_util.h"           // for ClosePair, PipeCloexec, RetryPoll
@@ -60,7 +60,8 @@ static void HandleSIGTERM(int signo) {
   SignalPipeNotifyFromHandler();
 }
 
-static void InitState(struct SaverMultiplexState *state, int argc, char **argv) {
+static void InitState(struct SaverMultiplexState *state, int argc,
+                      char **argv) {
   memset(state, 0, sizeof(*state));
   state->argc = argc;
   state->argv = argv;
@@ -130,10 +131,10 @@ static void StopSavers(struct SaverMultiplexState *state) {
 static void SpawnSavers(struct SaverMultiplexState *state) {
   for (size_t i = 0; i < state->num_monitors; ++i) {
     state->windows[i] =
-        XCreateWindow(state->display, state->parent_window, state->monitors[i].x,
-                      state->monitors[i].y, state->monitors[i].width,
-                      state->monitors[i].height, 0, CopyFromParent, InputOutput,
-                      CopyFromParent, 0, NULL);
+        XCreateWindow(state->display, state->parent_window,
+                      state->monitors[i].x, state->monitors[i].y,
+                      state->monitors[i].width, state->monitors[i].height, 0,
+                      CopyFromParent, InputOutput, CopyFromParent, 0, NULL);
     SetWMProperties(state->display, state->windows[i], "xsecurelock",
                     "saver_multiplex_screen", state->argc, state->argv);
     XMapRaised(state->display, state->windows[i]);
@@ -255,8 +256,8 @@ int main(int argc, char **argv) {
          .events = POLLIN | POLLHUP,
          .revents = 0},
     };
-    int ready = RetryPoll(fds, ARRAY_LEN(fds),
-                          state.have_pending_x_events ? 0 : -1);
+    int ready =
+        RetryPoll(fds, ARRAY_LEN(fds), state.have_pending_x_events ? 0 : -1);
     if (ready < 0) {
       LogErrno("poll");
     }

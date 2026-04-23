@@ -16,7 +16,8 @@
  */
 void ExportWindowID(Window w);
 
-/*! \brief Export the given saver index to the environment for a saver/auth child.
+/*! \brief Export the given saver index to the environment for a saver/auth
+ * child.
  *
  * This simply sets $XSCREENSAVER_SAVER_INDEX.
  *

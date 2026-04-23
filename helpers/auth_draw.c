@@ -86,12 +86,12 @@ static void DrawString(const struct AuthUiContext *ctx, size_t window_index,
     XGlyphInfo extents;
     XftTextExtentsUtf8(ctx->resources.display, ctx->resources.xft_font,
                        (const FcChar8 *)string, len, &extents);
-    XftDrawStringUtf8(
-        ctx->windows.xft_draws[window_index],
-        warning ? &ctx->resources.xft_color_warning
-                : &ctx->resources.xft_color_foreground,
-        ctx->resources.xft_font, x + XGlyphInfoExpandAmount(&extents), y,
-        (const FcChar8 *)string, len);
+    XftDrawStringUtf8(ctx->windows.xft_draws[window_index],
+                      warning ? &ctx->resources.xft_color_warning
+                              : &ctx->resources.xft_color_foreground,
+                      ctx->resources.xft_font,
+                      x + XGlyphInfoExpandAmount(&extents), y,
+                      (const FcChar8 *)string, len);
     return;
   }
 #endif
@@ -155,10 +155,9 @@ static void BuildTitle(const struct AuthUiContext *ctx, char *output,
   }
 
   if (ctx->config.show_hostname) {
-    size_t hostname_len =
-        ctx->config.show_hostname > 1
-            ? strlen(ctx->config.hostname)
-            : strcspn(ctx->config.hostname, ".");
+    size_t hostname_len = ctx->config.show_hostname > 1
+                              ? strlen(ctx->config.hostname)
+                              : strcspn(ctx->config.hostname, ".");
     TruncatingAppendBytes(&output, &output_size, ctx->config.hostname,
                           hostname_len);
   }
@@ -196,7 +195,8 @@ static struct AuthTextRow MeasureTextRow(const struct AuthUiContext *ctx,
   };
 }
 
-static int MaxMessageRowWidth(const struct AuthTextRow *rows, size_t row_count) {
+static int MaxMessageRowWidth(const struct AuthTextRow *rows,
+                              size_t row_count) {
   int max_width = 0;
 
   for (size_t i = 0; i < row_count; ++i) {
@@ -207,8 +207,8 @@ static int MaxMessageRowWidth(const struct AuthTextRow *rows, size_t row_count) 
   return max_width;
 }
 
-static int TotalMessageRowHeight(const struct AuthTextRow *rows, size_t row_count,
-                                 int line_height) {
+static int TotalMessageRowHeight(const struct AuthTextRow *rows,
+                                 size_t row_count, int line_height) {
   int total_height = 0;
 
   for (size_t i = 0; i < row_count; ++i) {
@@ -229,9 +229,9 @@ void AuthPlaySound(struct AuthUiContext *ctx, enum AuthSound sound) {
   control.bell_percent = 50;
   control.bell_duration = SOUND_TONE_MS;
   control.bell_pitch = kSounds[sound][0];
-  XChangeKeyboardControl(
-      ctx->resources.display,
-      KBBellPercent | KBBellDuration | KBBellPitch, &control);
+  XChangeKeyboardControl(ctx->resources.display,
+                         KBBellPercent | KBBellDuration | KBBellPitch,
+                         &control);
   XBell(ctx->resources.display, 0);
   XFlush(ctx->resources.display);
   (void)SleepMs(SOUND_SLEEP_MS);
@@ -243,9 +243,9 @@ void AuthPlaySound(struct AuthUiContext *ctx, enum AuthSound sound) {
   control.bell_percent = state.bell_percent;
   control.bell_duration = state.bell_duration;
   control.bell_pitch = state.bell_pitch;
-  XChangeKeyboardControl(
-      ctx->resources.display,
-      KBBellPercent | KBBellDuration | KBBellPitch, &control);
+  XChangeKeyboardControl(ctx->resources.display,
+                         KBBellPercent | KBBellDuration | KBBellPitch,
+                         &control);
   XFlush(ctx->resources.display);
   (void)SleepMs(SOUND_SLEEP_MS);
 }
@@ -301,14 +301,14 @@ int AuthDisplayMessage(struct AuthUiContext *ctx, const char *title,
   int region_h = box_h + 2 * AuthDialogInset(ctx);
 
   if (ctx->config.burnin_mitigation_max_offset_change > 0) {
-    ctx->runtime.x_offset = StepBurnInOffset(
-        &ctx->runtime.prompt_rng, ctx->runtime.x_offset,
-        ctx->config.burnin_mitigation_max_offset,
-        ctx->config.burnin_mitigation_max_offset_change);
-    ctx->runtime.y_offset = StepBurnInOffset(
-        &ctx->runtime.prompt_rng, ctx->runtime.y_offset,
-        ctx->config.burnin_mitigation_max_offset,
-        ctx->config.burnin_mitigation_max_offset_change);
+    ctx->runtime.x_offset =
+        StepBurnInOffset(&ctx->runtime.prompt_rng, ctx->runtime.x_offset,
+                         ctx->config.burnin_mitigation_max_offset,
+                         ctx->config.burnin_mitigation_max_offset_change);
+    ctx->runtime.y_offset =
+        StepBurnInOffset(&ctx->runtime.prompt_rng, ctx->runtime.y_offset,
+                         ctx->config.burnin_mitigation_max_offset,
+                         ctx->config.burnin_mitigation_max_offset_change);
   }
 
   if (!AuthWindowsUpdate(ctx, region_w, region_h)) {

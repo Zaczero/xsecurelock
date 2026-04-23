@@ -14,7 +14,7 @@
  * \param hostname_buflen The size of the buffer.
  * \return Whether fetching the host name succeeded.
  */
-int GetHostName(char* hostname_buf, size_t hostname_buflen);
+int GetHostName(char *hostname_buf, size_t hostname_buflen);
 
 /*! \brief Loads the current user name.
  *
@@ -22,6 +22,6 @@ int GetHostName(char* hostname_buf, size_t hostname_buflen);
  * \param username_buflen The size of the buffer.
  * \return Whether fetching the user name succeeded.
  */
-int GetUserName(char* username_buf, size_t username_buflen);
+int GetUserName(char *username_buf, size_t username_buflen);
 
 #endif

@@ -12,7 +12,7 @@
 #include "logging.h"
 #include "mlock_page.h"
 
-int GetHostName(char* hostname_buf, size_t hostname_buflen) {
+int GetHostName(char *hostname_buf, size_t hostname_buflen) {
   if (hostname_buf == NULL || hostname_buflen == 0) {
     errno = EINVAL;
     return 0;
@@ -25,14 +25,14 @@ int GetHostName(char* hostname_buf, size_t hostname_buflen) {
   return 1;
 }
 
-int GetUserName(char* username_buf, size_t username_buflen) {
+int GetUserName(char *username_buf, size_t username_buflen) {
   enum {
     PASSWD_BUF_MIN = 1024,
     PASSWD_BUF_MAX = 1 << 20,
   };
-  struct passwd* pwd = NULL;
+  struct passwd *pwd = NULL;
   struct passwd pwd_storage;
-  char* pwd_buf = NULL;
+  char *pwd_buf = NULL;
   int ok = 0;
   int status = 0;
   size_t pwd_bufsize = PASSWD_BUF_MIN;

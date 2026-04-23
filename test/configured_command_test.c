@@ -102,8 +102,8 @@ static void ExpectBackgroundShellCommandDetaches(const char *tmpbase) {
     abort();
   }
   unlink(path);
-  if (snprintf(command, sizeof(command),
-               "sleep 1; printf 'background' > '%s'", path) <= 0) {
+  if (snprintf(command, sizeof(command), "sleep 1; printf 'background' > '%s'",
+               path) <= 0) {
     abort();
   }
 

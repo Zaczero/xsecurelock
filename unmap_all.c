@@ -8,11 +8,10 @@
 #include <X11/Xutil.h>        // for XClassHint, XGetClassHint
 #include <string.h>           // for NULL, strcmp
 
-int InitUnmapAllWindowsState(UnmapAllWindowsState* state, Display* display,
-                             Window root_window, const Window* ignored_windows,
-                             size_t n_ignored_windows,
-                             const char* my_res_class, const char* my_res_name,
-                             int include_frame) {
+int InitUnmapAllWindowsState(UnmapAllWindowsState *state, Display *display,
+                             Window root_window, const Window *ignored_windows,
+                             size_t n_ignored_windows, const char *my_res_class,
+                             const char *my_res_name, int include_frame) {
   int should_proceed = 1;
   state->display = display;
   state->root_window = root_window;
@@ -80,9 +79,9 @@ int InitUnmapAllWindowsState(UnmapAllWindowsState* state, Display* display,
   return should_proceed;
 }
 
-int UnmapAllWindows(UnmapAllWindowsState* state,
-                    int (*just_unmapped_can_we_stop)(Window w, void* arg),
-                    void* arg) {
+int UnmapAllWindows(UnmapAllWindowsState *state,
+                    int (*just_unmapped_can_we_stop)(Window w, void *arg),
+                    void *arg) {
   if (state->first_unmapped_window == 0) {  // Already all unmapped.
     return 0;
   }
@@ -103,7 +102,7 @@ int UnmapAllWindows(UnmapAllWindowsState* state,
   }
 }
 
-void RemapAllWindows(UnmapAllWindowsState* state) {
+void RemapAllWindows(UnmapAllWindowsState *state) {
   for (unsigned int i = state->first_unmapped_window; i < state->n_windows;
        ++i) {
     if (state->windows[i] != None) {
@@ -113,7 +112,7 @@ void RemapAllWindows(UnmapAllWindowsState* state) {
   state->first_unmapped_window = state->n_windows;
 }
 
-void ClearUnmapAllWindowsState(UnmapAllWindowsState* state) {
+void ClearUnmapAllWindowsState(UnmapAllWindowsState *state) {
   state->display = NULL;
   state->root_window = None;
   XFree(state->windows);

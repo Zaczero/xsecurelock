@@ -63,12 +63,10 @@ int AuthUiConfigLoad(struct AuthUiConfig *config) {
       GetBoolSetting("XSECURELOCK_SINGLE_AUTH_WINDOW", 0);
   config->auth_cursor_blink =
       GetBoolSetting("XSECURELOCK_AUTH_CURSOR_BLINK", 1);
-  config->auth_padding =
-      GetClampedIntSetting("XSECURELOCK_AUTH_PADDING", 16, 0,
-                           AUTH_UI_MAX_INSET_SETTING);
-  config->auth_border_size =
-      GetClampedIntSetting("XSECURELOCK_AUTH_BORDER_SIZE", 0, 0,
-                           AUTH_UI_MAX_INSET_SETTING);
+  config->auth_padding = GetClampedIntSetting("XSECURELOCK_AUTH_PADDING", 16, 0,
+                                              AUTH_UI_MAX_INSET_SETTING);
+  config->auth_border_size = GetClampedIntSetting(
+      "XSECURELOCK_AUTH_BORDER_SIZE", 0, 0, AUTH_UI_MAX_INSET_SETTING);
   config->auth_x_position =
       GetClampedIntSetting("XSECURELOCK_AUTH_X_POSITION", 50, 0, 100);
   config->auth_y_position =

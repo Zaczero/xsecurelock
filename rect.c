@@ -18,9 +18,8 @@ size_t RectSubtract(Rect old_rect, Rect new_rect, Rect out[4]) {
       .y = old_rect.y > new_rect.y ? old_rect.y : new_rect.y,
       .w = (RectRight(old_rect) < RectRight(new_rect) ? RectRight(old_rect)
                                                       : RectRight(new_rect)),
-      .h = (RectBottom(old_rect) < RectBottom(new_rect)
-                ? RectBottom(old_rect)
-                : RectBottom(new_rect)),
+      .h = (RectBottom(old_rect) < RectBottom(new_rect) ? RectBottom(old_rect)
+                                                        : RectBottom(new_rect)),
   };
   intersection.w -= intersection.x;
   intersection.h -= intersection.y;

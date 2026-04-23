@@ -17,7 +17,7 @@
 
 #include "config.h"
 
-#include <errno.h>      // for errno, ESRCH
+#include <errno.h>     // for errno, ESRCH
 #include <X11/X.h>     // for Window
 #include <X11/Xlib.h>  // for Display, XOpenDisplay, Default...
 #include <signal.h>    // for sigaction, raise, sigemptyset
@@ -68,9 +68,7 @@ struct UntilNonidleState {
 
 static volatile sig_atomic_t g_terminate_signal = 0;
 
-static void HandleSIGTERM(int signo) {
-  g_terminate_signal = signo;
-}
+static void HandleSIGTERM(int signo) { g_terminate_signal = signo; }
 
 static void InitState(struct UntilNonidleState *state) {
   memset(state, 0, sizeof(*state));

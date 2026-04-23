@@ -122,7 +122,8 @@ Window XmuClientWindow(Display *display, Window window) {
   return info->client_window != None ? info->client_window : window;
 }
 
-Status XGetClassHint(Display *display, Window w, XClassHint *class_hints_return) {
+Status XGetClassHint(Display *display, Window w,
+                     XClassHint *class_hints_return) {
   (void)display;
   struct FakeWindowInfo *info = FindWindow(w);
   assert(info != NULL);

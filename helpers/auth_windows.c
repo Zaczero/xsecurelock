@@ -70,11 +70,12 @@ static int CreateOrUpdatePerMonitorWindow(struct AuthUiContext *ctx, size_t i,
                                           int region_h) {
   int w = region_w;
   int h = region_h;
-  int x = monitor->x + (monitor->width - w) * ctx->config.auth_x_position / 100 +
+  int x = monitor->x +
+          (monitor->width - w) * ctx->config.auth_x_position / 100 +
           ctx->runtime.x_offset;
-  int y =
-      monitor->y + (monitor->height - h) * ctx->config.auth_y_position / 100 +
-      ctx->runtime.y_offset;
+  int y = monitor->y +
+          (monitor->height - h) * ctx->config.auth_y_position / 100 +
+          ctx->runtime.y_offset;
 
   if (x < 0) {
     w += x;
@@ -113,10 +114,10 @@ static int CreateOrUpdatePerMonitorWindow(struct AuthUiContext *ctx, size_t i,
     XSetWindowAttributes attrs = {0};
     attrs.background_pixel = ctx->resources.xcolor_background.pixel;
     if (i == AUTH_UI_MAIN_WINDOW) {
-      XMoveResizeWindow(ctx->resources.display, ctx->resources.main_window, x, y,
-                        w, h);
-      XChangeWindowAttributes(ctx->resources.display, ctx->resources.main_window,
-                              CWBackPixel, &attrs);
+      XMoveResizeWindow(ctx->resources.display, ctx->resources.main_window, x,
+                        y, w, h);
+      XChangeWindowAttributes(ctx->resources.display,
+                              ctx->resources.main_window, CWBackPixel, &attrs);
       ctx->windows.windows[i] = ctx->resources.main_window;
     } else {
       ctx->windows.windows[i] = XCreateWindow(
@@ -170,11 +171,11 @@ static int CreateOrUpdatePerMonitorWindow(struct AuthUiContext *ctx, size_t i,
 #ifdef HAVE_XFT_EXT
   ctx->windows.xft_draws[i] = NULL;
   if (ctx->resources.xft_font != NULL) {
-    ctx->windows.xft_draws[i] = XftDrawCreate(
-        ctx->resources.display, ctx->windows.windows[i],
-        DefaultVisual(ctx->resources.display,
-                      DefaultScreen(ctx->resources.display)),
-        ctx->resources.colormap);
+    ctx->windows.xft_draws[i] =
+        XftDrawCreate(ctx->resources.display, ctx->windows.windows[i],
+                      DefaultVisual(ctx->resources.display,
+                                    DefaultScreen(ctx->resources.display)),
+                      ctx->resources.colormap);
     if (ctx->windows.xft_draws[i] == NULL) {
       Log("XftDrawCreate failed");
       CleanupPerMonitorWindow(ctx, i);
@@ -191,10 +192,9 @@ static int CreateOrUpdatePerMonitorWindow(struct AuthUiContext *ctx, size_t i,
 
 int AuthWindowsUpdate(struct AuthUiContext *ctx, int region_w, int region_h) {
   if (ctx->windows.dirty) {
-    ctx->windows.monitor_count = GetMonitors(ctx->resources.display,
-                                             ctx->resources.parent_window,
-                                             ctx->windows.monitors,
-                                             AUTH_UI_MAX_WINDOWS);
+    ctx->windows.monitor_count =
+        GetMonitors(ctx->resources.display, ctx->resources.parent_window,
+                    ctx->windows.monitors, AUTH_UI_MAX_WINDOWS);
   }
 
   if (ctx->config.single_auth_window) {

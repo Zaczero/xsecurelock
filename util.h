@@ -19,9 +19,8 @@
 #if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
 #define XSL_STATIC_ASSERT(expr, message) _Static_assert((expr), message)
 #else
-#define XSL_STATIC_ASSERT(expr, message)                              \
-  typedef char XSL_CONCAT(xsl_static_assert_, __LINE__)[(expr) ? 1 : \
-                                                             -1]
+#define XSL_STATIC_ASSERT(expr, message) \
+  typedef char XSL_CONCAT(xsl_static_assert_, __LINE__)[(expr) ? 1 : -1]
 #endif
 
 #define ARRAY_LEN(array) (sizeof(array) / sizeof((array)[0]))

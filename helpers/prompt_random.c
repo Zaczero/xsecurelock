@@ -78,8 +78,7 @@ int StepBurnInOffset(struct PromptRng *rng, int current, int max_offset,
     return ClampInt(current, -max_offset, max_offset);
   }
 
-  int delta = RandomRangeInclusive(rng, -max_offset_change,
-                                   max_offset_change);
+  int delta = RandomRangeInclusive(rng, -max_offset_change, max_offset_change);
   return ClampInt(current + delta, -max_offset, max_offset);
 }
 

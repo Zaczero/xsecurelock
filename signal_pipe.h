@@ -20,7 +20,8 @@ struct SignalPipe {
  */
 int SignalPipeInit(struct SignalPipe *pipe);
 
-/*! \brief Selects which file descriptor SignalPipeNotifyFromHandler() writes to.
+/*! \brief Selects which file descriptor SignalPipeNotifyFromHandler() writes
+ * to.
  *
  * The caller is responsible for passing the current write end, or -1 to disable
  * notifications.

@@ -145,9 +145,7 @@ static void Usage(const char *me) {
       "This software is licensed under the Apache 2.0 License. Details are\n"
       "available at the following location:\n"
       "  " DOCS_PATH "/COPYING\n",
-      me,
-      "%s",
-      "%s");
+      me, "%s", "%s");
 }
 
 static void LoadDefaults(struct LockConfig *config) {
@@ -291,7 +289,8 @@ static int WakeUp(struct LockContext *ctx, const char *stdinbuf) {
 static void NotifyOfLock(struct LockContext *ctx) {
   (void)CloseIfValid(&ctx->runtime.xss_sleep_lock_fd);
 
-  if (ctx->config.notify_command == NULL || *ctx->config.notify_command == NULL) {
+  if (ctx->config.notify_command == NULL ||
+      *ctx->config.notify_command == NULL) {
     return;
   }
 
@@ -382,8 +381,7 @@ static bool LookupKeypress(struct LockContext *ctx) {
         &ctx->runtime.sensitive.keysym, &lookup_status);
     if (ctx->runtime.sensitive.len <= 0) {
       return false;
-    } else if (lookup_status != XLookupChars &&
-               lookup_status != XLookupBoth) {
+    } else if (lookup_status != XLookupChars && lookup_status != XLookupBoth) {
       return false;
     }
   } else {
@@ -396,7 +394,8 @@ static bool LookupKeypress(struct LockContext *ctx) {
     }
   }
 
-  if ((size_t)ctx->runtime.sensitive.len >= sizeof(ctx->runtime.sensitive.buf)) {
+  if ((size_t)ctx->runtime.sensitive.len >=
+      sizeof(ctx->runtime.sensitive.buf)) {
     Log("Received invalid length from XLookupString: %d",
         ctx->runtime.sensitive.len);
     return false;
@@ -471,8 +470,7 @@ static int HandleKeyPressEvent(struct LockContext *ctx) {
     }
   }
 
-  int authenticated =
-      do_wake_up ? WakeUp(ctx, ctx->runtime.sensitive.buf) : 0;
+  int authenticated = do_wake_up ? WakeUp(ctx, ctx->runtime.sensitive.buf) : 0;
   explicit_bzero(&ctx->runtime.sensitive, sizeof(ctx->runtime.sensitive));
   return authenticated;
 }
@@ -515,9 +513,9 @@ static int HandleScreenSaverEvent(struct LockContext *ctx) {
           ctx->runtime.scrnsaver_event_base + ScreenSaverNotify) {
     XScreenSaverNotifyEvent *xss_ev =
         (XScreenSaverNotifyEvent *)&ctx->runtime.sensitive.ev;
-    ctx->runtime.xss_requested_saver_state =
-        xss_ev->state == ScreenSaverOn ? WATCH_CHILDREN_SAVER_DISABLED
-                                       : WATCH_CHILDREN_NORMAL;
+    ctx->runtime.xss_requested_saver_state = xss_ev->state == ScreenSaverOn
+                                                 ? WATCH_CHILDREN_SAVER_DISABLED
+                                                 : WATCH_CHILDREN_NORMAL;
     return 1;
   }
 #endif
@@ -597,14 +595,13 @@ static int AcquireInitialGrabs(struct LockContext *ctx) {
   int retries = 10;
 
   for (; retries >= 0; --retries) {
-    int force_grab =
-        retries < last_normal_attempt ? ctx->config.force_grab : 0;
-    if (LockAcquireGrabs(ctx, retries > last_normal_attempt,
-                         force_grab)) {
+    int force_grab = retries < last_normal_attempt ? ctx->config.force_grab : 0;
+    if (LockAcquireGrabs(ctx, retries > last_normal_attempt, force_grab)) {
       return 1;
     }
     if (ctx->windows.previous_focused_window == None) {
-      XGetInputFocus(ctx->runtime.display, &ctx->windows.previous_focused_window,
+      XGetInputFocus(ctx->runtime.display,
+                     &ctx->windows.previous_focused_window,
                      &ctx->windows.previous_revert_focus_to);
       XSetInputFocus(ctx->runtime.display, PointerRoot, RevertToPointerRoot,
                      CurrentTime);
@@ -647,8 +644,7 @@ static int InitializeLockContextRuntime(struct LockContext *ctx) {
       } else if (info->state == ScreenSaverOn &&
                  info->kind == ScreenSaverBlanked &&
                  ctx->config.saver_stop_on_blank) {
-        ctx->runtime.xss_requested_saver_state =
-            WATCH_CHILDREN_SAVER_DISABLED;
+        ctx->runtime.xss_requested_saver_state = WATCH_CHILDREN_SAVER_DISABLED;
       }
       XFree(info);
     }
@@ -659,7 +655,8 @@ static int InitializeLockContextRuntime(struct LockContext *ctx) {
   return 1;
 }
 
-static int RunLockMainLoop(struct LockContext *ctx, int *have_pending_x_events) {
+static int RunLockMainLoop(struct LockContext *ctx,
+                           int *have_pending_x_events) {
   XFlush(ctx->runtime.display);
   if (WatchChildren(ctx, ctx->runtime.xss_requested_saver_state, NULL)) {
     return 1;

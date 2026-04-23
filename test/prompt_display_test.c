@@ -6,8 +6,7 @@
 #include "../helpers/prompt_display.h"
 
 static struct PromptState MakePromptState(const char *password,
-                                          size_t display_marker,
-                                          time_t seconds,
+                                          size_t display_marker, time_t seconds,
                                           suseconds_t microseconds) {
   struct PromptState state;
 
@@ -94,19 +93,16 @@ static void ExpectCursorAndEchoRendering(void) {
   struct PromptState state = MakePromptState("abc", 5, 0, 0);
 
   assert(RenderPromptDisplay(PROMPT_DISPLAY_MODE_CURSOR, &state, 0, 0, '|',
-                             displaybuf, sizeof(displaybuf),
-                             &displaylen) == 0);
+                             displaybuf, sizeof(displaybuf), &displaylen) == 0);
   assert(displaylen == (size_t)(1u << DISCO_PASSWORD_DANCERS));
   assert(displaybuf[5] == '|');
 
   assert(RenderPromptDisplay(PROMPT_DISPLAY_MODE_CURSOR, &state, 0, 1, '|',
-                             displaybuf, sizeof(displaybuf),
-                             &displaylen) == 0);
+                             displaybuf, sizeof(displaybuf), &displaylen) == 0);
   assert(displaybuf[5] == '-');
 
   assert(RenderPromptDisplay(PROMPT_DISPLAY_MODE_CURSOR, &state, 1, 0, '|',
-                             displaybuf, sizeof(displaybuf),
-                             &displaylen) == 0);
+                             displaybuf, sizeof(displaybuf), &displaylen) == 0);
   assert(strcmp(displaybuf, "abc|") == 0);
   assert(displaylen == 4);
 }
@@ -117,14 +113,12 @@ static void ExpectMaskedAndHiddenRendering(void) {
   struct PromptState state = MakePromptState("hunter2", 0, 0, 0);
 
   assert(RenderPromptDisplay(PROMPT_DISPLAY_MODE_ASTERISKS, &state, 0, 0, '|',
-                             displaybuf, sizeof(displaybuf),
-                             &displaylen) == 0);
+                             displaybuf, sizeof(displaybuf), &displaylen) == 0);
   assert(strcmp(displaybuf, "*******|") == 0);
   assert(displaylen == 8);
 
   assert(RenderPromptDisplay(PROMPT_DISPLAY_MODE_HIDDEN, &state, 0, 0, '|',
-                             displaybuf, sizeof(displaybuf),
-                             &displaylen) == 0);
+                             displaybuf, sizeof(displaybuf), &displaylen) == 0);
   assert(strcmp(displaybuf, "") == 0);
   assert(displaylen == 0);
 
@@ -142,9 +136,8 @@ static void ExpectEmojiAndTruncationRendering(void) {
   struct PromptState kaomoji_state = MakePromptState(NULL, 31, 0, 0);
   struct PromptState invalid_state = MakePromptState(NULL, 32, 0, 0);
 
-  assert(RenderPromptDisplay(PROMPT_DISPLAY_MODE_EMOJI, &emoji_state, 0, 0,
-                             '|', displaybuf, sizeof(displaybuf),
-                             &displaylen) == 0);
+  assert(RenderPromptDisplay(PROMPT_DISPLAY_MODE_EMOJI, &emoji_state, 0, 0, '|',
+                             displaybuf, sizeof(displaybuf), &displaylen) == 0);
   assert(strcmp(displaybuf, "_____") == 0);
   assert(displaylen == 5);
 
@@ -173,20 +166,17 @@ static void ExpectTimeRendering(void) {
   struct PromptState state = MakePromptState("x", 0, 123, 456789);
 
   assert(RenderPromptDisplay(PROMPT_DISPLAY_MODE_TIME, &empty_state, 0, 0, '|',
-                             displaybuf, sizeof(displaybuf),
-                             &displaylen) == 0);
+                             displaybuf, sizeof(displaybuf), &displaylen) == 0);
   assert(strcmp(displaybuf, "----") == 0);
   assert(displaylen == 4);
 
   assert(RenderPromptDisplay(PROMPT_DISPLAY_MODE_TIME, &state, 0, 0, '|',
-                             displaybuf, sizeof(displaybuf),
-                             &displaylen) == 0);
+                             displaybuf, sizeof(displaybuf), &displaylen) == 0);
   assert(strcmp(displaybuf, "123.456789") == 0);
   assert(displaylen == strlen("123.456789"));
 
   assert(RenderPromptDisplay(PROMPT_DISPLAY_MODE_TIME_HEX, &state, 0, 0, '|',
-                             displaybuf, sizeof(displaybuf),
-                             &displaylen) == 0);
+                             displaybuf, sizeof(displaybuf), &displaylen) == 0);
   assert(strcmp(displaybuf, "0x75bcd15") == 0);
   assert(displaylen == strlen("0x75bcd15"));
 }
@@ -197,8 +187,7 @@ static void ExpectFailureResetBehavior(void) {
   struct PromptState state = MakePromptState("hunter2", 0, 123, 456789);
 
   assert(RenderPromptDisplay(PROMPT_DISPLAY_MODE_CURSOR, NULL, 0, 0, '|',
-                             displaybuf, sizeof(displaybuf),
-                             &displaylen) != 0);
+                             displaybuf, sizeof(displaybuf), &displaylen) != 0);
   assert(displaybuf[0] == '\0');
   assert(displaylen == 0);
 
@@ -214,15 +203,9 @@ static void ExpectFailureResetBehavior(void) {
 }
 
 int main(void) {
-  ExpectDiscoPrompt(
-      0,
-      "┏(･o･)┛ ♪ ┏(･o･)┛ ♪ ┏(･o･)┛ ♪ ┏(･o･)┛ ♪ ┏(･o･)┛");
-  ExpectDiscoPrompt(
-      31,
-      "┗(･o･)┓ ♪ ┗(･o･)┓ ♪ ┗(･o･)┓ ♪ ┗(･o･)┓ ♪ ┗(･o･)┓");
-  ExpectDiscoPrompt(
-      21,
-      "┗(･o･)┓ ♪ ┏(･o･)┛ ♪ ┗(･o･)┓ ♪ ┏(･o･)┛ ♪ ┗(･o･)┓");
+  ExpectDiscoPrompt(0, "┏(･o･)┛ ♪ ┏(･o･)┛ ♪ ┏(･o･)┛ ♪ ┏(･o･)┛ ♪ ┏(･o･)┛");
+  ExpectDiscoPrompt(31, "┗(･o･)┓ ♪ ┗(･o･)┓ ♪ ┗(･o･)┓ ♪ ┗(･o･)┓ ♪ ┗(･o･)┓");
+  ExpectDiscoPrompt(21, "┗(･o･)┓ ♪ ┏(･o･)┛ ♪ ┗(･o･)┓ ♪ ┏(･o･)┛ ♪ ┗(･o･)┓");
   ExpectDiscoPromptFailure(0, 8);
   ExpectDiscoPromptFailure(0, 1);
 

@@ -24,7 +24,7 @@
 #include "../logging.h"       // for Log
 
 #ifdef HAVE_XRANDR_EXT
-static Display* initialized_for = NULL;
+static Display *initialized_for = NULL;
 static int have_xrandr12_ext;
 #ifdef HAVE_XRANDR15_EXT
 static int have_xrandr15_ext;
@@ -32,7 +32,7 @@ static int have_xrandr15_ext;
 static int event_base;
 static int error_base;
 
-static int MaybeInitXRandR(Display* dpy) {
+static int MaybeInitXRandR(Display *dpy) {
   if (dpy == initialized_for) {
     return have_xrandr12_ext;
   }
@@ -67,7 +67,7 @@ static int MaybeInitXRandR(Display* dpy) {
 
 #define CLAMP(x, mi, ma) ((x) < (mi) ? (mi) : (x) > (ma) ? (ma) : (x))
 
-static int CompareMonitors(const void* a, const void* b) {
+static int CompareMonitors(const void *a, const void *b) {
   return memcmp(a, b, sizeof(Monitor));
 }
 
@@ -85,7 +85,7 @@ static int IntervalsOverlap(int astart, int asize, int bstart, int bsize) {
   return 1;
 }
 
-static void AddMonitor(Monitor* out_monitors, size_t* num_monitors,
+static void AddMonitor(Monitor *out_monitors, size_t *num_monitors,
                        size_t max_monitors, int x, int y, int w, int h) {
 #ifdef DEBUG_EVENTS
   Log("AddMonitor %d %d %d %d", x, y, w, h);
@@ -125,15 +125,15 @@ static void AddMonitor(Monitor* out_monitors, size_t* num_monitors,
 }
 
 #ifdef HAVE_XRANDR_EXT
-static int GetMonitorsXRandR12(Display* dpy, Window window, int wx, int wy,
-                               int ww, int wh, Monitor* out_monitors,
-                               size_t* out_num_monitors, size_t max_monitors) {
-  XRRScreenResources* screenres = XRRGetScreenResources(dpy, window);
+static int GetMonitorsXRandR12(Display *dpy, Window window, int wx, int wy,
+                               int ww, int wh, Monitor *out_monitors,
+                               size_t *out_num_monitors, size_t max_monitors) {
+  XRRScreenResources *screenres = XRRGetScreenResources(dpy, window);
   if (screenres == NULL) {
     return 0;
   }
   for (int i = 0; i < screenres->noutput; ++i) {
-    XRROutputInfo* output =
+    XRROutputInfo *output =
         XRRGetOutputInfo(dpy, screenres, screenres->outputs[i]);
     if (output == NULL) {
       continue;
@@ -144,9 +144,10 @@ static int GetMonitorsXRandR12(Display* dpy, Window window, int wx, int wy,
       // of that one should always be onscreen anyway (even though they
       // may not be, as cloned displays can have different panning
       // settings).
-      RRCrtc crtc =
-          (output->crtc ? output->crtc : output->ncrtc ? output->crtcs[0] : 0);
-      XRRCrtcInfo* info = (crtc ? XRRGetCrtcInfo(dpy, screenres, crtc) : 0);
+      RRCrtc crtc = (output->crtc    ? output->crtc
+                     : output->ncrtc ? output->crtcs[0]
+                                     : 0);
+      XRRCrtcInfo *info = (crtc ? XRRGetCrtcInfo(dpy, screenres, crtc) : 0);
       if (info != NULL) {
         int x = CLAMP(info->x, wx, wx + ww) - wx;
         int y = CLAMP(info->y, wy, wy + wh) - wy;
@@ -163,19 +164,19 @@ static int GetMonitorsXRandR12(Display* dpy, Window window, int wx, int wy,
 }
 
 #ifdef HAVE_XRANDR15_EXT
-static int GetMonitorsXRandR15(Display* dpy, Window window, int wx, int wy,
-                               int ww, int wh, Monitor* out_monitors,
-                               size_t* out_num_monitors, size_t max_monitors) {
+static int GetMonitorsXRandR15(Display *dpy, Window window, int wx, int wy,
+                               int ww, int wh, Monitor *out_monitors,
+                               size_t *out_num_monitors, size_t max_monitors) {
   if (!have_xrandr15_ext) {
     return 0;
   }
   int num_rrmonitors;
-  XRRMonitorInfo* rrmonitors = XRRGetMonitors(dpy, window, 1, &num_rrmonitors);
+  XRRMonitorInfo *rrmonitors = XRRGetMonitors(dpy, window, 1, &num_rrmonitors);
   if (rrmonitors == NULL) {
     return 0;
   }
   for (int i = 0; i < num_rrmonitors; ++i) {
-    XRRMonitorInfo* info = &rrmonitors[i];
+    XRRMonitorInfo *info = &rrmonitors[i];
     int x = CLAMP(info->x, wx, wx + ww) - wx;
     int y = CLAMP(info->y, wy, wy + wh) - wy;
     int w = CLAMP(info->x + info->width, wx + x, wx + ww) - (wx + x);
@@ -187,9 +188,9 @@ static int GetMonitorsXRandR15(Display* dpy, Window window, int wx, int wy,
 }
 #endif
 
-static int GetMonitorsXRandR(Display* dpy, Window window,
-                             const XWindowAttributes* xwa,
-                             Monitor* out_monitors, size_t* out_num_monitors,
+static int GetMonitorsXRandR(Display *dpy, Window window,
+                             const XWindowAttributes *xwa,
+                             Monitor *out_monitors, size_t *out_num_monitors,
                              size_t max_monitors) {
   if (!MaybeInitXRandR(dpy)) {
     return 0;
@@ -217,15 +218,14 @@ static int GetMonitorsXRandR(Display* dpy, Window window,
 }
 #endif
 
-static void GetMonitorsGuess(const XWindowAttributes* xwa,
-                             Monitor* out_monitors, size_t* out_num_monitors,
+static void GetMonitorsGuess(const XWindowAttributes *xwa,
+                             Monitor *out_monitors, size_t *out_num_monitors,
                              size_t max_monitors) {
   // XRandR-less dummy fallback.
   const int64_t weighted_size =
       (int64_t)xwa->width * 9 + (int64_t)xwa->height * 8;
-  const size_t guessed_monitors =
-      CLAMP((size_t)(weighted_size / ((int64_t)xwa->height * 16)), 1,
-            max_monitors);
+  const size_t guessed_monitors = CLAMP(
+      (size_t)(weighted_size / ((int64_t)xwa->height * 16)), 1, max_monitors);
   for (size_t i = 0; i < guessed_monitors; ++i) {
     int x = xwa->width * i / guessed_monitors;
     int y = 0;
@@ -236,7 +236,7 @@ static void GetMonitorsGuess(const XWindowAttributes* xwa,
   }
 }
 
-size_t GetMonitors(Display* dpy, Window window, Monitor* out_monitors,
+size_t GetMonitors(Display *dpy, Window window, Monitor *out_monitors,
                    size_t max_monitors) {
   if (max_monitors < 1) {
     return 0;
@@ -276,7 +276,7 @@ size_t GetMonitors(Display* dpy, Window window, Monitor* out_monitors,
   return num_monitors;
 }
 
-void SelectMonitorChangeEvents(Display* dpy, Window window) {
+void SelectMonitorChangeEvents(Display *dpy, Window window) {
 #ifdef HAVE_XRANDR_EXT
   if (MaybeInitXRandR(dpy)) {
     XRRSelectInput(dpy, window,
@@ -289,7 +289,7 @@ void SelectMonitorChangeEvents(Display* dpy, Window window) {
 #endif
 }
 
-int IsMonitorChangeEvent(Display* dpy, int type) {
+int IsMonitorChangeEvent(Display *dpy, int type) {
 #ifdef HAVE_XRANDR_EXT
   if (MaybeInitXRandR(dpy)) {
     switch (type - event_base) {

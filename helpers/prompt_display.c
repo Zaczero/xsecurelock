@@ -33,13 +33,14 @@ static const char *const kPromptDisplayModeNames[] = {
 XSL_STATIC_ASSERT(ARRAY_LEN(kPromptDisplayModeNames) ==
                       PROMPT_DISPLAY_MODE_COUNT,
                   "Prompt display mode names must match the enum");
-XSL_STATIC_ASSERT(PROMPT_DISPLAY_ANIMATED_MIN_CHANGE <=
-                      (PROMPT_DISPLAY_ANIMATED_MARKER_COUNT - 2) / 2,
-                  "Animated prompt modes must always leave a valid next choice");
+XSL_STATIC_ASSERT(
+    PROMPT_DISPLAY_ANIMATED_MIN_CHANGE <=
+        (PROMPT_DISPLAY_ANIMATED_MARKER_COUNT - 2) / 2,
+    "Animated prompt modes must always leave a valid next choice");
 static const char *const kEmoji[] = {
-    "_____", "😂", "❤", "♻", "😍", "♥", "😭", "😊", "😒", "💕", "😘",
-    "😩",     "☺", "👌", "😔", "😁", "😏", "😉", "👍", "⬅", "😅", "🙏",
-    "😌",     "😢", "👀", "💔", "😎", "🎶", "💙", "💜", "🙌", "😳",
+    "_____", "😂", "❤",  "♻",  "😍", "♥",  "😭", "😊", "😒", "💕", "😘",
+    "😩",    "☺",  "👌", "😔", "😁", "😏", "😉", "👍", "⬅",  "😅", "🙏",
+    "😌",    "😢", "👀", "💔", "😎", "🎶", "💙", "💜", "🙌", "😳",
 };
 static const char *const kEmoticons[] = {
     ":-)",  ":-p", ":-O", ":-\\", "(-:",  "d-:", "O-:", "/-:",
@@ -58,11 +59,12 @@ static const char *const kKaomoji[] = {
 };
 XSL_STATIC_ASSERT(ARRAY_LEN(kEmoji) == PROMPT_DISPLAY_ANIMATED_MARKER_COUNT,
                   "Emoji prompt choices must match the animated marker count");
-XSL_STATIC_ASSERT(ARRAY_LEN(kEmoticons) ==
-                      PROMPT_DISPLAY_ANIMATED_MARKER_COUNT,
-                  "Emoticon prompt choices must match the animated marker count");
-XSL_STATIC_ASSERT(ARRAY_LEN(kKaomoji) == PROMPT_DISPLAY_ANIMATED_MARKER_COUNT,
-                  "Kaomoji prompt choices must match the animated marker count");
+XSL_STATIC_ASSERT(
+    ARRAY_LEN(kEmoticons) == PROMPT_DISPLAY_ANIMATED_MARKER_COUNT,
+    "Emoticon prompt choices must match the animated marker count");
+XSL_STATIC_ASSERT(
+    ARRAY_LEN(kKaomoji) == PROMPT_DISPLAY_ANIMATED_MARKER_COUNT,
+    "Kaomoji prompt choices must match the animated marker count");
 
 static int ClearDisplayFailure(char *displaybuf, size_t displaybufsize,
                                size_t *displaylen) {
@@ -123,8 +125,7 @@ static size_t GetMaskedPasswordLength(const struct PromptState *state) {
 
 static int RenderAsterisksPromptDisplay(const struct PromptState *state,
                                         int blink_state, char cursor_char,
-                                        char *displaybuf,
-                                        size_t displaybufsize,
+                                        char *displaybuf, size_t displaybufsize,
                                         size_t *displaylen) {
   if (displaybuf == NULL || displaylen == NULL || displaybufsize == 0) {
     goto fail;
@@ -199,8 +200,7 @@ static int RenderTimePromptDisplay(enum PromptDisplayMode mode,
     uint64_t time_hex =
         (uint64_t)state->last_keystroke.tv_sec * UINT64_C(1000000) +
         (uint64_t)state->last_keystroke.tv_usec;
-    written = snprintf(displaybuf, displaybufsize, "%#" PRIx64,
-                       time_hex);
+    written = snprintf(displaybuf, displaybufsize, "%#" PRIx64, time_hex);
   }
 
   if (written < 0) {
@@ -255,8 +255,9 @@ size_t PromptDisplayMarkerCount(enum PromptDisplayMode mode) {
 }
 
 size_t PromptDisplayMinChange(enum PromptDisplayMode mode) {
-  return PromptDisplayMarkerCount(mode) == 0 ? 0
-                                             : PROMPT_DISPLAY_ANIMATED_MIN_CHANGE;
+  return PromptDisplayMarkerCount(mode) == 0
+             ? 0
+             : PROMPT_DISPLAY_ANIMATED_MIN_CHANGE;
 }
 
 int FormatDiscoPrompt(size_t displaymarker, char *displaybuf,
@@ -306,16 +307,14 @@ int RenderPromptDisplay(enum PromptDisplayMode mode,
       return FormatDiscoPrompt(state->display_marker, displaybuf,
                                displaybufsize, displaylen);
     case PROMPT_DISPLAY_MODE_EMOJI:
-      return RenderArrayPromptDisplay(kEmoji, ARRAY_LEN(kEmoji), state, displaybuf,
-                                      displaybufsize, displaylen);
+      return RenderArrayPromptDisplay(kEmoji, ARRAY_LEN(kEmoji), state,
+                                      displaybuf, displaybufsize, displaylen);
     case PROMPT_DISPLAY_MODE_EMOTICON:
       return RenderArrayPromptDisplay(kEmoticons, ARRAY_LEN(kEmoticons), state,
-                                      displaybuf,
-                                      displaybufsize, displaylen);
+                                      displaybuf, displaybufsize, displaylen);
     case PROMPT_DISPLAY_MODE_KAOMOJI:
       return RenderArrayPromptDisplay(kKaomoji, ARRAY_LEN(kKaomoji), state,
-                                      displaybuf,
-                                      displaybufsize, displaylen);
+                                      displaybuf, displaybufsize, displaylen);
     case PROMPT_DISPLAY_MODE_TIME:
     case PROMPT_DISPLAY_MODE_TIME_HEX:
       return RenderTimePromptDisplay(mode, state, displaybuf, displaybufsize,

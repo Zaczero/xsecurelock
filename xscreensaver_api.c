@@ -31,7 +31,8 @@ void ExportSaverIndex(int index) {
   char saver_index_str[32];
   int saver_index_len =
       snprintf(saver_index_str, sizeof(saver_index_str), "%d", index);
-  if (saver_index_len <= 0 || (size_t)saver_index_len >= sizeof(saver_index_str)) {
+  if (saver_index_len <= 0 ||
+      (size_t)saver_index_len >= sizeof(saver_index_str)) {
     Log("Saver index doesn't fit into buffer");
     return;
   }
@@ -41,8 +42,8 @@ void ExportSaverIndex(int index) {
 }
 
 Window ReadWindowID(void) {
-  unsigned long long raw = GetUnsignedLongLongSetting("XSCREENSAVER_WINDOW",
-                                                      None);
+  unsigned long long raw =
+      GetUnsignedLongLongSetting("XSCREENSAVER_WINDOW", None);
   Window window = (Window)raw;
   if ((unsigned long long)window != raw) {
     const char *value = getenv("XSCREENSAVER_WINDOW");

@@ -61,8 +61,8 @@ void PromptStateBumpDisplayMarker(struct PromptState *state,
     return;
   }
 
-  state->display_marker = NextDisplayMarker(
-      rng, state->display_marker, marker_count, min_change);
+  state->display_marker =
+      NextDisplayMarker(rng, state->display_marker, marker_count, min_change);
 }
 
 void PromptStateWipe(struct PromptState *state) {

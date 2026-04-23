@@ -20,8 +20,7 @@ enum StaticMessageResult {
 enum StaticMessageResult AuthWaitStaticMessage(struct AuthUiContext *ctx,
                                                const char *title,
                                                const char *message,
-                                               bool warning,
-                                               int extra_read_fd);
+                                               bool warning, int extra_read_fd);
 enum PromptSessionResult AuthRunPromptSession(struct AuthUiContext *ctx,
                                               const char *message, bool echo,
                                               int response_fd,

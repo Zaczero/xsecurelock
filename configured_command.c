@@ -4,12 +4,12 @@
 
 #include "configured_command.h"
 
-#include <errno.h>      // for errno, EINTR
-#include <signal.h>     // for sigaction, sigemptyset, SIGPIPE
-#include <stdio.h>      // for snprintf
-#include <stdlib.h>     // for EXIT_FAILURE, EXIT_SUCCESS
-#include <sys/wait.h>   // for waitpid, WEXITSTATUS, WIFEXITED, WIFSIGNALED
-#include <unistd.h>     // for _exit, execl, fork, pid_t, setsid
+#include <errno.h>     // for errno, EINTR
+#include <signal.h>    // for sigaction, sigemptyset, SIGPIPE
+#include <stdio.h>     // for snprintf
+#include <stdlib.h>    // for EXIT_FAILURE, EXIT_SUCCESS
+#include <sys/wait.h>  // for waitpid, WEXITSTATUS, WIFEXITED, WIFSIGNALED
+#include <unistd.h>    // for _exit, execl, fork, pid_t, setsid
 
 #include "env_settings.h"
 #include "logging.h"
@@ -69,7 +69,8 @@ int FormatKeyCommandEnvName(char *dst, size_t dst_size, const char *keyname) {
   return 1;
 }
 
-int RunShellCommandValue(const char *label, const char *command, int background) {
+int RunShellCommandValue(const char *label, const char *command,
+                         int background) {
   if (command == NULL || *command == '\0') {
     return 1;
   }

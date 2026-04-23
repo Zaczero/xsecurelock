@@ -91,9 +91,8 @@ static void LoadDimmerConfig(Display *display, struct DimmerConfig *config) {
       GetNonnegativeIntSetting("XSECURELOCK_DIM_TIME_MS", 2000);
   config->wait_time_ms =
       GetNonnegativeIntSetting("XSECURELOCK_WAIT_TIME_MS", 5000);
-  config->dim_fps = GetClampedFiniteDoubleSetting(
-      "XSECURELOCK_DIM_FPS",
-      default_dim_fps, 1.0, 1000.0);
+  config->dim_fps = GetClampedFiniteDoubleSetting("XSECURELOCK_DIM_FPS",
+                                                  default_dim_fps, 1.0, 1000.0);
   config->dim_alpha =
       GetClampedFiniteDoubleSetting("XSECURELOCK_DIM_ALPHA", 0.875, 0.001, 1.0);
   config->have_compositor = GetBoolSetting(
@@ -212,15 +211,15 @@ static void DitherEffectInit(struct DitherEffect *dimmer,
 
   dimmer->pattern_frames =
       (int)ceil(pow(1 << dimmer->pattern_power, 2) * config->dim_alpha);
-  dimmer->super.frame_count = (int)ceil(config->dim_time_ms * config->dim_fps /
-                                        1000.0);
+  dimmer->super.frame_count =
+      (int)ceil(config->dim_time_ms * config->dim_fps / 1000.0);
   if (dimmer->super.frame_count < 1) {
     dimmer->super.frame_count = 1;
   }
 
   {
-    int max_fill_size = GetClampedIntSetting("XSECURELOCK_DIM_MAX_FILL_SIZE",
-                                             2048, 1, 1 << 30);
+    int max_fill_size =
+        GetClampedIntSetting("XSECURELOCK_DIM_MAX_FILL_SIZE", 2048, 1, 1 << 30);
     int max_fill_patterns = max_fill_size >> dimmer->pattern_power;
     if (max_fill_patterns == 0) {
       max_fill_patterns = 1;
@@ -348,9 +347,9 @@ int main(int argc, char **argv) {
     dimattrs.save_under = 1;
     dimattrs.override_redirect = 1;
     dimmer->PreCreateWindow(dimmer, display, &dimattrs, &dimmask);
-    dim_window = XCreateWindow(display, root_window, 0, 0, w, h, 0,
-                               CopyFromParent, InputOutput, CopyFromParent,
-                               dimmask, &dimattrs);
+    dim_window =
+        XCreateWindow(display, root_window, 0, 0, w, h, 0, CopyFromParent,
+                      InputOutput, CopyFromParent, dimmask, &dimattrs);
     SetWMProperties(display, dim_window, "xsecurelock-dimmer", "dim", argc,
                     argv);
     dimmer->PostCreateWindow(dimmer, display, dim_window);

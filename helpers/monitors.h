@@ -27,12 +27,12 @@ typedef struct {
  * \param max_monitors The size of the array.
  * \return The number of monitors returned in the array.
  */
-size_t GetMonitors(Display* dpy, Window window, Monitor* out_monitors,
+size_t GetMonitors(Display *dpy, Window window, Monitor *out_monitors,
                    size_t max_monitors);
 
 /*! \brief Enable receiving monitor change events for the given display at w.
  */
-void SelectMonitorChangeEvents(Display* dpy, Window window);
+void SelectMonitorChangeEvents(Display *dpy, Window window);
 
 /*! \brief Returns the event type that indicates a change to the monitor
  *    configuration.
@@ -43,6 +43,6 @@ void SelectMonitorChangeEvents(Display* dpy, Window window);
  * \returns 1 if the received event is a monitor change event and GetMonitors
  *   should be called, or 0 otherwise.
  */
-int IsMonitorChangeEvent(Display* dpy, int type);
+int IsMonitorChangeEvent(Display *dpy, int type);
 
 #endif

@@ -32,7 +32,7 @@ void KillAllSaverChildrenSigHandler(int signo) {
   KillAllSaverChildren(signo);
 }
 
-void WatchSaverChild(Display* dpy, Window w, int index, const char* executable,
+void WatchSaverChild(Display *dpy, Window w, int index, const char *executable,
                      int should_be_running) {
   if (index < 0 || index >= MAX_SAVERS) {
     Log("Saver index out of range: !(0 <= %d < %d)", index, MAX_SAVERS);
@@ -63,7 +63,7 @@ void WatchSaverChild(Display* dpy, Window w, int index, const char* executable,
       ExportSaverIndex(index);
 
       {
-        const char* args[3] = {
+        const char *args[3] = {
             executable,
             "-root",  // For XScreenSaver hacks, unused by our own.
             NULL};

@@ -21,7 +21,8 @@ int SignalPipeInit(struct SignalPipe *pipe) {
   if (PipeCloexec(pipe->fds) != 0) {
     return -1;
   }
-  if (SetFdNonblocking(pipe->fds[0]) != 0 || SetFdNonblocking(pipe->fds[1]) != 0) {
+  if (SetFdNonblocking(pipe->fds[0]) != 0 ||
+      SetFdNonblocking(pipe->fds[1]) != 0) {
     int saved_errno = errno;
     SignalPipeClose(pipe);
     errno = saved_errno;

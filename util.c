@@ -70,9 +70,7 @@ int pipe2(int pipefd[2], int flags);
 // without relying on compiler-specific inline assembly.
 static void *(*const volatile memset_impl)(void *, int, size_t) = memset;
 
-void explicit_bzero(void *s, size_t len) {
-  memset_impl(s, 0, len);
-}
+void explicit_bzero(void *s, size_t len) { memset_impl(s, 0, len); }
 #endif
 
 int CloseIfValid(int *fd) {
@@ -236,9 +234,7 @@ static int SetFdFlag(int fd, int get_cmd, int set_cmd, int bit) {
   return fcntl(fd, set_cmd, flags | bit);
 }
 
-int SetFdCloexec(int fd) {
-  return SetCloexec(fd);
-}
+int SetFdCloexec(int fd) { return SetCloexec(fd); }
 
 int SetFdNonblocking(int fd) {
   return SetFdFlag(fd, F_GETFL, F_SETFL, O_NONBLOCK);

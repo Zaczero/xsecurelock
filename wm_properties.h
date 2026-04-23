@@ -19,7 +19,7 @@
  * \param argc The number of arguments the main program received.
  * \param argv The arguments the main program received (becomes WM_COMMAND).
  */
-void SetWMProperties(Display* dpy, Window w, const char* res_class,
-                     const char* res_name, int argc, char* const* argv);
+void SetWMProperties(Display *dpy, Window w, const char *res_class,
+                     const char *res_name, int argc, char *const *argv);
 
 #endif

@@ -37,14 +37,9 @@ static const struct {
   unsigned int mask;
   const char *name;
 } kModifiers[] = {
-    {ShiftMask, "Shift"},
-    {LockMask, "Lock"},
-    {ControlMask, "Control"},
-    {Mod1Mask, "Mod1"},
-    {Mod2Mask, "Mod2"},
-    {Mod3Mask, "Mod3"},
-    {Mod4Mask, "Mod4"},
-    {Mod5Mask, "Mod5"},
+    {ShiftMask, "Shift"}, {LockMask, "Lock"}, {ControlMask, "Control"},
+    {Mod1Mask, "Mod1"},   {Mod2Mask, "Mod2"}, {Mod3Mask, "Mod3"},
+    {Mod4Mask, "Mod4"},   {Mod5Mask, "Mod5"},
 };
 
 int FormatXkbIndicatorText(const struct XkbIndicatorFormatInput *input,
@@ -203,10 +198,8 @@ int GetXkbIndicators(Display *display, bool have_xkb_ext,
     return 0;
   }
 
-  XkbDescPtr xkb =
-      GetKeyboardDescription(display, XkbIndicatorNamesMask |
-                                          XkbGroupNamesMask |
-                                          XkbSymbolsNameMask);
+  XkbDescPtr xkb = GetKeyboardDescription(
+      display, XkbIndicatorNamesMask | XkbGroupNamesMask | XkbSymbolsNameMask);
   if (xkb == NULL) {
     return 0;
   }

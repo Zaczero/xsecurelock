@@ -117,8 +117,8 @@ static void SetWindowProperties(struct LockContext *ctx) {
   XWindowChanges coverchanges = {.stack_mode = Above};
   XConfigureWindow(ctx->runtime.display, ctx->windows.background_window,
                    CWStackMode, &coverchanges);
-  XConfigureWindow(ctx->runtime.display, ctx->windows.auth_window,
-                   CWStackMode, &coverchanges);
+  XConfigureWindow(ctx->runtime.display, ctx->windows.auth_window, CWStackMode,
+                   &coverchanges);
 
   Atom state_atom = XInternAtom(ctx->runtime.display, "_NET_WM_STATE", False);
   Atom fullscreen_atom =
@@ -176,9 +176,8 @@ int LockWindowsInit(struct LockContext *ctx) {
   ctx->windows.height =
       DisplayHeight(ctx->runtime.display, DefaultScreen(ctx->runtime.display));
 
-  XColor black = {.pixel =
-                      BlackPixel(ctx->runtime.display,
-                                 DefaultScreen(ctx->runtime.display))};
+  XColor black = {.pixel = BlackPixel(ctx->runtime.display,
+                                      DefaultScreen(ctx->runtime.display))};
   XQueryColor(ctx->runtime.display,
               DefaultColormap(ctx->runtime.display,
                               DefaultScreen(ctx->runtime.display)),
@@ -194,9 +193,8 @@ int LockWindowsInit(struct LockContext *ctx) {
     background_pixel = xcolor_background.pixel;
   }
 
-  ctx->windows.bg =
-      XCreateBitmapFromData(ctx->runtime.display, ctx->windows.root_window,
-                            "\0", 1, 1);
+  ctx->windows.bg = XCreateBitmapFromData(ctx->runtime.display,
+                                          ctx->windows.root_window, "\0", 1, 1);
   if (ctx->windows.bg == None) {
     Log("XCreateBitmapFromData failed");
     return 0;
@@ -207,9 +205,9 @@ int LockWindowsInit(struct LockContext *ctx) {
     Log("XCreateFontCursor failed");
     return 0;
   }
-  ctx->windows.transparent_cursor = XCreatePixmapCursor(
-      ctx->runtime.display, ctx->windows.bg, ctx->windows.bg, &black, &black,
-      0, 0);
+  ctx->windows.transparent_cursor =
+      XCreatePixmapCursor(ctx->runtime.display, ctx->windows.bg,
+                          ctx->windows.bg, &black, &black, 0, 0);
   if (ctx->windows.transparent_cursor == None) {
     Log("XCreatePixmapCursor failed");
     return 0;
@@ -260,8 +258,8 @@ int LockWindowsInit(struct LockContext *ctx) {
       if (XFixesQueryExtension(ctx->runtime.display, &xfixes_event_base,
                                &xfixes_error_base)) {
         XFixesSetWindowShapeRegion(ctx->runtime.display,
-                                   ctx->windows.composite_window,
-                                   ShapeBounding, 0, 0, 0);
+                                   ctx->windows.composite_window, ShapeBounding,
+                                   0, 0, 0);
       }
     }
 #endif
@@ -273,10 +271,8 @@ int LockWindowsInit(struct LockContext *ctx) {
           ctx->runtime.display, ctx->windows.root_window,
           incompatible_compositor_bits, incompatible_compositor_width,
           incompatible_compositor_height,
-          BlackPixel(ctx->runtime.display,
-                     DefaultScreen(ctx->runtime.display)),
-          WhitePixel(ctx->runtime.display,
-                     DefaultScreen(ctx->runtime.display)),
+          BlackPixel(ctx->runtime.display, DefaultScreen(ctx->runtime.display)),
+          WhitePixel(ctx->runtime.display, DefaultScreen(ctx->runtime.display)),
           DefaultDepth(ctx->runtime.display,
                        DefaultScreen(ctx->runtime.display)));
       if (ctx->windows.obscurer_background_pixmap == None) {
@@ -298,9 +294,10 @@ int LockWindowsInit(struct LockContext *ctx) {
 
   if (!CreateTrackedCoverWindow(
           ctx, &ctx->windows.background_window, ctx->windows.parent_window, 0,
-          0, (unsigned int)ctx->windows.width, (unsigned int)ctx->windows.height,
-          CWBackPixel | CWSaveUnder | CWOverrideRedirect | CWCursor, &coverattrs,
-          "background")) {
+          0, (unsigned int)ctx->windows.width,
+          (unsigned int)ctx->windows.height,
+          CWBackPixel | CWSaveUnder | CWOverrideRedirect | CWCursor,
+          &coverattrs, "background")) {
     return 0;
   }
 
@@ -349,8 +346,8 @@ void LockWindowsResizeToRoot(struct LockContext *ctx, int width, int height) {
   XMoveResizeWindow(ctx->runtime.display, ctx->windows.background_window, 0, 0,
                     width, height);
   XClearWindow(ctx->runtime.display, ctx->windows.background_window);
-  XMoveResizeWindow(ctx->runtime.display, ctx->windows.saver_window, 0, 0, width,
-                    height);
+  XMoveResizeWindow(ctx->runtime.display, ctx->windows.saver_window, 0, 0,
+                    width, height);
 }
 
 void LockWindowsHandleConfigureNotify(struct LockContext *ctx,
@@ -358,7 +355,8 @@ void LockWindowsHandleConfigureNotify(struct LockContext *ctx,
   if (ev->window == ctx->windows.root_window) {
     LockWindowsResizeToRoot(ctx, ev->width, ev->height);
   }
-  if (ctx->windows.auth_window_mapped && ev->window == ctx->windows.auth_window) {
+  if (ctx->windows.auth_window_mapped &&
+      ev->window == ctx->windows.auth_window) {
     LockMaybeRaiseWindow(ctx, ctx->windows.auth_window, 0, 0);
   } else if (ev->window == ctx->windows.background_window) {
     LockMaybeRaiseWindow(ctx, ctx->windows.background_window, 0, 0);
@@ -380,7 +378,8 @@ void LockWindowsHandleVisibilityNotify(struct LockContext *ctx,
     return;
   }
 
-  if (ctx->windows.auth_window_mapped && ev->window == ctx->windows.auth_window) {
+  if (ctx->windows.auth_window_mapped &&
+      ev->window == ctx->windows.auth_window) {
     Log("Someone overlapped the auth window. Undoing that");
     LockMaybeRaiseWindow(ctx, ctx->windows.auth_window, 0, 1);
   } else if (ev->window == ctx->windows.background_window) {
@@ -477,7 +476,8 @@ void LockWindowsCleanup(struct LockContext *ctx) {
 
 #ifdef HAVE_XCOMPOSITE_EXT
   DestroyWindowIfAny(ctx->runtime.display, &ctx->windows.obscurer_window);
-  FreePixmapIfAny(ctx->runtime.display, &ctx->windows.obscurer_background_pixmap);
+  FreePixmapIfAny(ctx->runtime.display,
+                  &ctx->windows.obscurer_background_pixmap);
 #endif
   DestroyWindowIfAny(ctx->runtime.display, &ctx->windows.auth_window);
   DestroyWindowIfAny(ctx->runtime.display, &ctx->windows.saver_window);

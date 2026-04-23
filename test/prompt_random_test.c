@@ -25,10 +25,8 @@ static void ExpectDisplayMarkersStayValid(void) {
 static void ExpectAnimatedModeMetadataProducesValidMarkers(void) {
   struct PromptRng rng;
   enum PromptDisplayMode modes[] = {
-      PROMPT_DISPLAY_MODE_CURSOR,
-      PROMPT_DISPLAY_MODE_DISCO,
-      PROMPT_DISPLAY_MODE_EMOJI,
-      PROMPT_DISPLAY_MODE_EMOTICON,
+      PROMPT_DISPLAY_MODE_CURSOR,  PROMPT_DISPLAY_MODE_DISCO,
+      PROMPT_DISPLAY_MODE_EMOJI,   PROMPT_DISPLAY_MODE_EMOTICON,
       PROMPT_DISPLAY_MODE_KAOMOJI,
   };
 

@@ -160,17 +160,18 @@ static int HandlePromptInputByte(struct AuthUiContext *ctx,
     case '\b':
     case '\177':
       PromptStateDeleteLastGlyph(state);
-      PromptStateBumpDisplayMarker(state, &ctx->runtime.prompt_rng, marker_count,
-                                   min_change);
+      PromptStateBumpDisplayMarker(state, &ctx->runtime.prompt_rng,
+                                   marker_count, min_change);
       return 0;
     case '\001':
     case '\025':
       PromptStateClear(state);
-      PromptStateBumpDisplayMarker(state, &ctx->runtime.prompt_rng, marker_count,
-                                   min_change);
+      PromptStateBumpDisplayMarker(state, &ctx->runtime.prompt_rng,
+                                   marker_count, min_change);
       return 0;
     case '\023':
-      SwitchToNextXkbLayout(ctx->resources.display, ctx->resources.have_xkb_ext);
+      SwitchToNextXkbLayout(ctx->resources.display,
+                            ctx->resources.have_xkb_ext);
       return 0;
     case 0:
       *result = PROMPT_SESSION_RESULT_FAILED;
@@ -196,8 +197,8 @@ static int HandlePromptInputByte(struct AuthUiContext *ctx,
         *result = PROMPT_SESSION_RESULT_FAILED;
         return 1;
       }
-      PromptStateBumpDisplayMarker(state, &ctx->runtime.prompt_rng, marker_count,
-                                   min_change);
+      PromptStateBumpDisplayMarker(state, &ctx->runtime.prompt_rng,
+                                   marker_count, min_change);
       return 0;
   }
 }
@@ -297,8 +298,8 @@ enum PromptSessionResult AuthRunPromptSession(struct AuthUiContext *ctx,
     }
 
     while (!done && !redraw_requested) {
-      switch (WaitForAuthActivity(ctx, -1, &deadline_ms, poll_only,
-                                  &input_byte)) {
+      switch (
+          WaitForAuthActivity(ctx, -1, &deadline_ms, poll_only, &input_byte)) {
         case AUTH_ACTIVITY_REDRAW:
           redraw_requested = true;
           break;

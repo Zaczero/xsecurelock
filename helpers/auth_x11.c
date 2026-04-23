@@ -30,9 +30,9 @@ static void SeedPromptRngFromClock(struct AuthUiContext *ctx) {
   struct timeval tv;
 
   gettimeofday(&tv, NULL);
-  SeedPromptRng(&ctx->runtime.prompt_rng,
-                (uint32_t)tv.tv_sec ^ (uint32_t)tv.tv_usec ^
-                    (uint32_t)getpid());
+  SeedPromptRng(&ctx->runtime.prompt_rng, (uint32_t)tv.tv_sec ^
+                                              (uint32_t)tv.tv_usec ^
+                                              (uint32_t)getpid());
 }
 
 static void InitializeBurnInOffsets(struct AuthUiContext *ctx) {
@@ -78,7 +78,8 @@ static int HandleStaticAuthMessage(struct AuthUiContext *ctx, pid_t childpid,
 static int HandlePromptAuthMessage(struct AuthUiContext *ctx,
                                    const char *message, bool echo,
                                    int response_fd, char response_type) {
-  switch (AuthRunPromptSession(ctx, message, echo, response_fd, response_type)) {
+  switch (
+      AuthRunPromptSession(ctx, message, echo, response_fd, response_type)) {
     case PROMPT_SESSION_RESULT_SUBMITTED:
       return ShowProcessingMessage(ctx);
     case PROMPT_SESSION_RESULT_CANCELLED:
@@ -120,7 +121,8 @@ static int PrepareAuthprotoChildFds(int requestfd[2], int responsefd[2]) {
   if (requestfd[1] == STDIN_FILENO && !DuplicateAwayFromStdio(&requestfd[1])) {
     return 0;
   }
-  if (responsefd[0] == STDOUT_FILENO && !DuplicateAwayFromStdio(&responsefd[0])) {
+  if (responsefd[0] == STDOUT_FILENO &&
+      !DuplicateAwayFromStdio(&responsefd[0])) {
     return 0;
   }
   if (MoveFdTo(&responsefd[0], STDIN_FILENO) != 0) {
@@ -180,14 +182,14 @@ static int Authenticate(struct AuthUiContext *ctx) {
 
     switch (type) {
       case PTYPE_INFO_MESSAGE:
-        keep_running = HandleStaticAuthMessage(ctx, childpid, &already_killed,
-                                               "PAM says", message, false,
-                                               requestfd[0]);
+        keep_running =
+            HandleStaticAuthMessage(ctx, childpid, &already_killed, "PAM says",
+                                    message, false, requestfd[0]);
         break;
       case PTYPE_ERROR_MESSAGE:
-        keep_running = HandleStaticAuthMessage(ctx, childpid, &already_killed,
-                                               "Error", message, true,
-                                               requestfd[0]);
+        keep_running =
+            HandleStaticAuthMessage(ctx, childpid, &already_killed, "Error",
+                                    message, true, requestfd[0]);
         break;
       case PTYPE_PROMPT_LIKE_USERNAME:
         keep_running = HandlePromptAuthMessage(
@@ -198,8 +200,7 @@ static int Authenticate(struct AuthUiContext *ctx) {
             ctx, message, false, responsefd[1], PTYPE_RESPONSE_LIKE_PASSWORD);
         break;
       default:
-        Log("Unknown message type %02x",
-            (unsigned int)(unsigned char)type);
+        Log("Unknown message type %02x", (unsigned int)(unsigned char)type);
         keep_running = 0;
         break;
     }

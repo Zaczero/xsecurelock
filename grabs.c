@@ -22,9 +22,8 @@ static void DebugDumpWindowInfo(const struct LockContext *ctx, Window w) {
   }
 
   char buf[128] = "";
-  int buflen =
-      snprintf(buf, sizeof(buf), "{ xwininfo -all -id %lu; xprop -id %lu; } >&2",
-               w, w);
+  int buflen = snprintf(buf, sizeof(buf),
+                        "{ xwininfo -all -id %lu; xprop -id %lu; } >&2", w, w);
   if (buflen <= 0 || (size_t)buflen >= sizeof(buf)) {
     Log("Wow, pretty large integers you got there");
     return;
@@ -138,11 +137,10 @@ int LockAcquireGrabs(struct LockContext *ctx, int silent, int force) {
   XGrabServer(ctx->runtime.display);
   UnmapAllWindowsState unmap_state;
   int ok = 0;
-  if (InitUnmapAllWindowsState(&unmap_state, ctx->runtime.display,
-                               ctx->windows.root_window,
-                               ctx->windows.tracked_windows,
-                               ctx->windows.tracked_window_count, "xsecurelock",
-                               NULL, force > 1)) {
+  if (InitUnmapAllWindowsState(
+          &unmap_state, ctx->runtime.display, ctx->windows.root_window,
+          ctx->windows.tracked_windows, ctx->windows.tracked_window_count,
+          "xsecurelock", NULL, force > 1)) {
     Log("Trying to force grabbing by unmapping all windows. BAD HACK");
     ok = UnmapAllWindows(&unmap_state, TryAcquireGrabs, &grab_state);
     RemapAllWindows(&unmap_state);

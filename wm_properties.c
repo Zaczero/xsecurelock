@@ -22,15 +22,15 @@ static char **BorrowMutableArgv(char *const *argv) {
   return mutable_argv;
 }
 
-void SetWMProperties(Display* dpy, Window w, const char* res_class,
-                     const char* res_name, int argc, char* const* argv) {
+void SetWMProperties(Display *dpy, Window w, const char *res_class,
+                     const char *res_name, int argc, char *const *argv) {
   XClassHint class_hint = {
       .res_name = BorrowMutableString(res_name),
       .res_class = BorrowMutableString(res_class),
   };
 
   XTextProperty name_prop;
-  char* window_names[] = {BorrowMutableString(res_name)};
+  char *window_names[] = {BorrowMutableString(res_name)};
   if (!XStringListToTextProperty(window_names, 1, &name_prop)) {
     return;
   }

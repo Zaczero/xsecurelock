@@ -7,11 +7,11 @@
 
 #include "wait_pgrp.h"
 
-#include <errno.h>   // for errno, ECHILD, EINTR, ESRCH
-#include <signal.h>  // for kill, sigaddset, sigemptyset, sigprocmask,
-                     // sigsuspend, SIGCHLD, SIGTERM, SIGUSR2
-#include <stdlib.h>  // for EXIT_SUCCESS, WEXITSTATUS, WIFEXITED, WIFSIGNALED
-#include <string.h>  // for memcpy
+#include <errno.h>     // for errno, ECHILD, EINTR, ESRCH
+#include <signal.h>    // for kill, sigaddset, sigemptyset, sigprocmask,
+                       // sigsuspend, SIGCHLD, SIGTERM, SIGUSR2
+#include <stdlib.h>    // for EXIT_SUCCESS, WEXITSTATUS, WIFEXITED, WIFSIGNALED
+#include <string.h>    // for memcpy
 #include <sys/wait.h>  // for waitpid, WNOHANG
 #include <unistd.h>    // for pid_t
 

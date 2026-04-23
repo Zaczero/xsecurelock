@@ -7,7 +7,7 @@
 
 #include "env_settings.h"
 
-#include <assert.h>   // for assert
+#include <assert.h>  // for assert
 #include <errno.h>   // for errno, ERANGE
 #include <limits.h>  // for PATH_MAX
 #include <math.h>    // for isfinite
@@ -19,9 +19,9 @@
 #include "build-config.h"
 #include "logging.h"
 
-unsigned long long GetUnsignedLongLongSetting(const char* name,
+unsigned long long GetUnsignedLongLongSetting(const char *name,
                                               unsigned long long def) {
-  const char* value = getenv(name);
+  const char *value = getenv(name);
   if (value == NULL || value[0] == 0) {
     return def;
   }
@@ -29,7 +29,7 @@ unsigned long long GetUnsignedLongLongSetting(const char* name,
     Log("Ignoring negative value of %s: %s", name, value);
     return def;
   }
-  char* endptr = NULL;
+  char *endptr = NULL;
   errno = 0;
   unsigned long long number = strtoull(value, &endptr, 0);
   if (errno == ERANGE) {
@@ -43,12 +43,12 @@ unsigned long long GetUnsignedLongLongSetting(const char* name,
   return number;
 }
 
-long GetLongSetting(const char* name, long def) {
-  const char* value = getenv(name);
+long GetLongSetting(const char *name, long def) {
+  const char *value = getenv(name);
   if (value == NULL || value[0] == 0) {
     return def;
   }
-  char* endptr = NULL;
+  char *endptr = NULL;
   errno = 0;
   long number = strtol(value, &endptr, 0);
   if (errno == ERANGE) {
@@ -62,11 +62,11 @@ long GetLongSetting(const char* name, long def) {
   return number;
 }
 
-int GetIntSetting(const char* name, int def) {
+int GetIntSetting(const char *name, int def) {
   long lnumber = GetLongSetting(name, def);
   int number = (int)lnumber;
   if (lnumber != (long)number) {
-    const char* value = getenv(name);
+    const char *value = getenv(name);
     Log("Ignoring out-of-range value of %s: %s", name,
         value != NULL ? value : "(default)");
     return def;
@@ -74,7 +74,7 @@ int GetIntSetting(const char* name, int def) {
   return number;
 }
 
-int GetClampedIntSetting(const char* name, int def, int min_value,
+int GetClampedIntSetting(const char *name, int def, int min_value,
                          int max_value) {
   int number = GetIntSetting(name, def);
   if (number < min_value) {
@@ -86,24 +86,24 @@ int GetClampedIntSetting(const char* name, int def, int min_value,
   return number;
 }
 
-int GetBoolSetting(const char* name, int def) {
+int GetBoolSetting(const char *name, int def) {
   return GetIntSetting(name, def) != 0;
 }
 
-int GetNonnegativeIntSetting(const char* name, int def) {
+int GetNonnegativeIntSetting(const char *name, int def) {
   return GetClampedIntSetting(name, def, 0, INT_MAX);
 }
 
-int GetPositiveIntSetting(const char* name, int def) {
+int GetPositiveIntSetting(const char *name, int def) {
   return GetClampedIntSetting(name, def, 1, INT_MAX);
 }
 
-double GetDoubleSetting(const char* name, double def) {
-  const char* value = getenv(name);
+double GetDoubleSetting(const char *name, double def) {
+  const char *value = getenv(name);
   if (value == NULL || value[0] == 0) {
     return def;
   }
-  char* endptr = NULL;
+  char *endptr = NULL;
   errno = 0;
   double number = strtod(value, &endptr);
   if (errno == ERANGE) {
@@ -117,10 +117,10 @@ double GetDoubleSetting(const char* name, double def) {
   return number;
 }
 
-double GetFiniteDoubleSetting(const char* name, double def) {
+double GetFiniteDoubleSetting(const char *name, double def) {
   double number = GetDoubleSetting(name, def);
   if (!isfinite(number)) {
-    const char* value = getenv(name);
+    const char *value = getenv(name);
     Log("Ignoring non-finite value of %s: %s", name,
         value != NULL ? value : "(default)");
     return def;
@@ -128,7 +128,7 @@ double GetFiniteDoubleSetting(const char* name, double def) {
   return number;
 }
 
-double GetClampedFiniteDoubleSetting(const char* name, double def,
+double GetClampedFiniteDoubleSetting(const char *name, double def,
                                      double min_value, double max_value) {
   assert(min_value <= max_value);
   double number = GetFiniteDoubleSetting(name, def);
@@ -141,17 +141,17 @@ double GetClampedFiniteDoubleSetting(const char* name, double def,
   return number;
 }
 
-const char* GetStringSetting(const char* name, const char* def) {
-  const char* value = getenv(name);
+const char *GetStringSetting(const char *name, const char *def) {
+  const char *value = getenv(name);
   if (value == NULL || value[0] == 0) {
     return def;
   }
   return value;
 }
 
-const char* GetExecutablePathSetting(const char* name, const char* def,
+const char *GetExecutablePathSetting(const char *name, const char *def,
                                      int is_auth) {
-  const char* value = getenv(name);
+  const char *value = getenv(name);
   if (value == NULL || value[0] == 0) {
     return def;
   }
@@ -161,7 +161,7 @@ const char* GetExecutablePathSetting(const char* name, const char* def,
         value, HELPER_PATH);
     return def;
   }
-  const char* basename = strrchr(value, '/');
+  const char *basename = strrchr(value, '/');
   if (basename == NULL) {
     basename = value;  // No slash, use as is.
   } else {
@@ -178,14 +178,15 @@ const char* GetExecutablePathSetting(const char* name, const char* def,
       return def;
     }
   }
-  const char* executable_path = value;
+  const char *executable_path = value;
   char helper_path[PATH_MAX];
   if (basename == value) {
     int helper_path_len =
         snprintf(helper_path, sizeof(helper_path), "%s/%s", HELPER_PATH, value);
-    if (helper_path_len <= 0 || (size_t)helper_path_len >= sizeof(helper_path)) {
-      Log("Executable path '%s/%s' does not fit into the buffer",
-          HELPER_PATH, value);
+    if (helper_path_len <= 0 ||
+        (size_t)helper_path_len >= sizeof(helper_path)) {
+      Log("Executable path '%s/%s' does not fit into the buffer", HELPER_PATH,
+          value);
       return def;
     }
     executable_path = helper_path;

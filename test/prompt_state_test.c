@@ -153,9 +153,9 @@ static void ExpectNonMarkerModesKeepMarkerAtZero(void) {
   SeedPromptRng(&rng, 7);
   assert(PromptStateAppendByte(&state, 'x'));
 
-  PromptStateBumpDisplayMarker(&state, &rng,
-                               PromptDisplayMarkerCount(PROMPT_DISPLAY_MODE_TIME),
-                               PromptDisplayMinChange(PROMPT_DISPLAY_MODE_TIME));
+  PromptStateBumpDisplayMarker(
+      &state, &rng, PromptDisplayMarkerCount(PROMPT_DISPLAY_MODE_TIME),
+      PromptDisplayMinChange(PROMPT_DISPLAY_MODE_TIME));
   assert(state.display_marker == 0);
 
   PromptStateBumpDisplayMarker(
