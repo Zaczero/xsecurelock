@@ -507,6 +507,7 @@ static void HandleClientMessage(struct LockContext *ctx) {
     return;
   }
 
+#ifdef DEBUG_EVENTS
   char *message_type = XGetAtomName(
       ctx->runtime.display, ctx->runtime.sensitive.ev.xclient.message_type);
   Log("Received unexpected ClientMessage event %s on window %lu",
@@ -515,6 +516,7 @@ static void HandleClientMessage(struct LockContext *ctx) {
   if (message_type != NULL) {
     XFree(message_type);
   }
+#endif
 }
 
 static int HandleScreenSaverEvent(struct LockContext *ctx) {
