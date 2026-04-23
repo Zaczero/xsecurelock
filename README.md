@@ -545,6 +545,18 @@ location: `/usr/local/libexec/xsecurelock/helpers`).
     protocol module and let it do the actual authentication; that way the
     authentication module can focus on the user interface alone.
 
+In other words, an authentication module owns the user interface and returns
+zero only after the user has successfully authenticated. The default `auth_x11`
+module starts the configured `XSECURELOCK_AUTHPROTO`, translates keyboard input
+and authproto packets into prompts/messages, and exits with the authproto
+result.
+
+Custom auth modules should treat a crash or nonzero exit as failed
+authentication, because the main locker will keep the session locked. If a
+custom UI needs system authentication, prefer speaking the authproto protocol
+to a small `authproto_` helper instead of linking privileged or PAM-specific
+logic directly into the graphical UI.
+
 # Authentication Protocol Modules
 
 The following authentication protocol ("authproto") modules are included:
@@ -573,6 +585,37 @@ start with `authproto_` and be installed together with the included
     zero. If it returns with any other status (including e.g. a segfault),
     XSecureLock assumes failed authentication.
 
+The packet format is:
+
+```
+<type> <byte-length>
+<payload>
+```
+
+where `<payload>` is exactly `<byte-length>` bytes followed by a newline. For
+example, an authproto can ask for a password by writing:
+
+```
+P 9
+Password:
+```
+
+It then reads one response packet from standard input:
+
+*   `p`: password-like response.
+*   `u`: username-like response.
+*   `x`: explicit cancellation, such as auth timeout or user cancellation.
+
+Info and error packets use lowercase types and do not require a direct
+response:
+
+*   `i`: informational message, such as "Please touch the device".
+*   `e`: error message.
+
+Only uppercase request packets expect a response. Info/error packets and
+response packets are one-way. Use exit status zero only for successful
+authentication; all other statuses keep the screen locked.
+
 # Screen Saver Modules
 
 The following screen saver modules are included:
@@ -594,7 +637,7 @@ The following screen saver modules are included:
 ## Writing Your Own Module
 
 The screen saver module is a separate executable, whose name must start with
-`saver_` and be installed together with the included `auth_` modules (default
+`saver_` and be installed together with the included `saver_` modules (default
 location: `/usr/local/libexec/xsecurelock/helpers`).
 
 *   Input: receives the 0-based index of the screen saver (remember: one saver
@@ -604,6 +647,53 @@ location: `/usr/local/libexec/xsecurelock/helpers`).
     unlock the screen. It should exit promptly.
 *   Reset condition: the saver child will receive SIGUSR1 when the auth dialog
     is closed and `XSECURELOCK_SAVER_RESET_ON_AUTH_CLOSE`.
+
+The saver is a visual helper only. The main xsecurelock process owns the actual
+lock windows and grabs, so a saver crash does not unlock the screen. A saver may
+therefore be a small wrapper around another program, as long as that program can
+draw into or below `$XSCREENSAVER_WINDOW` and exits promptly on `SIGTERM`.
+
+Minimal custom saver:
+
+```sh
+#!/bin/sh
+exec sleep 86400
+```
+
+Run a program that can embed into an existing X11 window, such as `xterm`:
+
+```sh
+#!/bin/sh
+exec xterm -into "$XSCREENSAVER_WINDOW" -e htop
+```
+
+Show one image per monitor with `mpv`:
+
+```sh
+#!/bin/sh
+image=${XSECURELOCK_IMAGE_PATH:-"$HOME/Pictures/lock.png"}
+exec mpv --no-input-terminal --really-quiet --no-audio \
+  --no-stop-screensaver --wid="$XSCREENSAVER_WINDOW" --loop-file=inf "$image"
+```
+
+For multi-monitor setups, `saver_multiplex` starts one saver per monitor and
+sets `$XSCREENSAVER_SAVER_INDEX` to `0`, `1`, and so on. A custom saver can use
+that index to choose monitor-specific content:
+
+```sh
+#!/bin/sh
+case "$XSCREENSAVER_SAVER_INDEX" in
+  0) image=$HOME/Pictures/left-lock.png ;;
+  1) image=$HOME/Pictures/right-lock.png ;;
+  *) image=$HOME/Pictures/lock.png ;;
+esac
+exec mpv --no-input-terminal --really-quiet --no-audio \
+  --no-stop-screensaver --wid="$XSCREENSAVER_WINDOW" --loop-file=inf "$image"
+```
+
+Saver commands run with the user's privileges and environment. Treat custom
+saver scripts and `~/.xscreensaver` program entries as trusted configuration,
+and avoid displaying sensitive files unless that is intentional.
 
 # Security Design
 
