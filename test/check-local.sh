@@ -57,6 +57,7 @@ echo "Running native smoke tests"
 "$builddir"/prompt_random_test
 "$builddir"/env_settings_test
 "$builddir"/wait_pgrp_test
+"$srcdir"/test/saver_xscreensaver_smoke.sh "$builddir"/helpers/saver_xscreensaver
 printf 'P 7\nhunter2\n' > "$builddir"/cat_authproto.fixture
 "$builddir"/cat_authproto < "$builddir"/cat_authproto.fixture > "$builddir"/cat_authproto.out
 cmp -s "$builddir"/cat_authproto.fixture "$builddir"/cat_authproto.out || {
