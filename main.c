@@ -648,10 +648,12 @@ static int InitializeLockContextRuntime(struct LockContext *ctx) {
     if (info == NULL) {
       Log("XScreenSaverAllocInfo failed");
     } else {
-      XScreenSaverQueryInfo(ctx->runtime.display, ctx->windows.root_window,
-                            info);
-      if (info->state == ScreenSaverOn && info->kind == ScreenSaverBlanked &&
-          ctx->config.saver_stop_on_blank) {
+      if (!XScreenSaverQueryInfo(ctx->runtime.display, ctx->windows.root_window,
+                                 info)) {
+        Log("XScreenSaverQueryInfo failed");
+      } else if (info->state == ScreenSaverOn &&
+                 info->kind == ScreenSaverBlanked &&
+                 ctx->config.saver_stop_on_blank) {
         ctx->runtime.xss_requested_saver_state =
             WATCH_CHILDREN_SAVER_DISABLED;
       }
