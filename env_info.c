@@ -1,3 +1,5 @@
+#include "config.h"
+
 #include "env_info.h"
 
 #include <errno.h>

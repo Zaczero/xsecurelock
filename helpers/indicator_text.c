@@ -1,3 +1,5 @@
+#include "config.h"
+
 #include "indicator_text.h"
 
 #include <string.h>

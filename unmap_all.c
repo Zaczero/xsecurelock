@@ -1,3 +1,5 @@
+#include "config.h"
+
 #include "unmap_all.h"
 
 #include <X11/X.h>            // for Window, None, IsUnmapped

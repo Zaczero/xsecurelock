@@ -1,3 +1,5 @@
+#include "config.h"
+
 #include "prompt_random.h"
 
 #include <assert.h>

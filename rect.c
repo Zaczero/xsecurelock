@@ -1,3 +1,5 @@
+#include "config.h"
+
 #include "rect.h"
 
 static int RectRight(Rect rect) { return rect.x + rect.w; }

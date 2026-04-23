@@ -271,7 +271,8 @@ prompt_random_test_SOURCES = \
 	helpers/prompt_glyph.c helpers/prompt_glyph.h \
 	helpers/prompt_display.c helpers/prompt_display.h \
 	helpers/prompt_random.c helpers/prompt_random.h \
-	test/prompt_random_test.c
+	test/prompt_random_test.c \
+	util.c util.h
 env_settings_test_SOURCES = \
 	env_settings.c env_settings.h \
 	logging.c logging.h \

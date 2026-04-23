@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-#include "wait_pgrp.h"
+#include "config.h"
 
-#include "build-config.h"
+#include "wait_pgrp.h"
 
 #include <errno.h>   // for errno, ECHILD, EINTR, ESRCH
 #include <signal.h>  // for kill, sigaddset, sigemptyset, sigprocmask,
@@ -26,6 +26,7 @@ limitations under the License.
 #include <sys/wait.h>  // for waitpid, WNOHANG
 #include <unistd.h>    // for pid_t
 
+#include "build-config.h"
 #include "logging.h"  // for Log, LogErrno
 #include "time_util.h"
 

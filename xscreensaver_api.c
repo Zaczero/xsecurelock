@@ -14,11 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+#include "config.h"
+
 #include "xscreensaver_api.h"
 
 #include <X11/X.h>   // for Window
-#include <stdlib.h>  // for getenv, setenv
 #include <stdio.h>   // for fprintf, stderr
+#include <stdlib.h>  // for getenv, setenv
 
 #include "env_settings.h"  // for GetUnsignedLongLongSetting
 #include "logging.h"

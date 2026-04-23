@@ -1,3 +1,5 @@
+#include "config.h"
+
 #include "logging.h"
 
 #include <errno.h>   // for errno

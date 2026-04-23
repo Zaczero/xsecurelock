@@ -17,7 +17,7 @@ limitations under the License.
 #ifndef ENV_INFO_H
 #define ENV_INFO_H
 
-#include <stdlib.h>
+#include <stddef.h>
 
 /*! \brief Loads the current host name.
  *

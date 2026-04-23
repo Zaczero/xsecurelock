@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-#include "env_settings.h"
+#include "config.h"
 
-#include "build-config.h"
+#include "env_settings.h"
 
 #include <assert.h>   // for assert
 #include <errno.h>   // for errno, ERANGE
@@ -27,6 +27,7 @@ limitations under the License.
 #include <string.h>  // for strchr
 #include <unistd.h>  // for access, X_OK
 
+#include "build-config.h"
 #include "logging.h"
 
 unsigned long long GetUnsignedLongLongSetting(const char* name,
