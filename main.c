@@ -168,7 +168,7 @@ static void LoadDefaults(struct LockConfig *config) {
       "XSECURELOCK_GLOBAL_SAVER", GLOBAL_SAVER_EXECUTABLE, 0);
   config->have_switch_user_command =
       GetStringSetting("XSECURELOCK_SWITCH_USER_COMMAND", "")[0] != '\0';
-  config->force_grab = GetIntSetting("XSECURELOCK_FORCE_GRAB", 0);
+  config->force_grab = GetClampedIntSetting("XSECURELOCK_FORCE_GRAB", 0, 0, 2);
   config->debug_window_info =
       GetBoolSetting("XSECURELOCK_DEBUG_WINDOW_INFO", 0);
   config->blank_timeout = GetIntSetting("XSECURELOCK_BLANK_TIMEOUT", 600);
@@ -608,8 +608,10 @@ static int AcquireInitialGrabs(struct LockContext *ctx) {
   int retries = 10;
 
   for (; retries >= 0; --retries) {
+    int force_grab =
+        retries < last_normal_attempt ? ctx->config.force_grab : 0;
     if (LockAcquireGrabs(ctx, retries > last_normal_attempt,
-                         retries < last_normal_attempt)) {
+                         force_grab)) {
       return 1;
     }
     if (ctx->windows.previous_focused_window == None) {
