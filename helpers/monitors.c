@@ -231,12 +231,10 @@ static int GetMonitorsXRandR(Display* dpy, Window window,
 static void GetMonitorsGuess(const XWindowAttributes* xwa,
                              Monitor* out_monitors, size_t* out_num_monitors,
                              size_t max_monitors) {
-  int64_t weighted_size = 0;
-  size_t guessed_monitors = 0;
-
   // XRandR-less dummy fallback.
-  weighted_size = (int64_t)xwa->width * 9 + (int64_t)xwa->height * 8;
-  guessed_monitors =
+  const int64_t weighted_size =
+      (int64_t)xwa->width * 9 + (int64_t)xwa->height * 8;
+  const size_t guessed_monitors =
       CLAMP((size_t)(weighted_size / ((int64_t)xwa->height * 16)), 1,
             max_monitors);
   for (size_t i = 0; i < guessed_monitors; ++i) {

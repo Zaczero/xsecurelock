@@ -300,15 +300,12 @@ int main(int argc, char **argv) {
 
     {
       int64_t current_time_ms = 0;
-      int status = 0;
-      bool should_be_running = false;
-
       if (GetMonotonicTimeMs(&current_time_ms) != 0) {
         LogErrno("GetMonotonicTimeMs");
         goto done;
       }
 
-      should_be_running =
+      const bool should_be_running =
           state.still_idle &&
           (current_time_ms - state.start_time_ms <=
            (int64_t)state.dim_time_ms + (int64_t)state.wait_time_ms);
@@ -317,6 +314,7 @@ int main(int argc, char **argv) {
         LogErrno("KillPgrp");
       }
 
+      int status = 0;
       (void)WaitPgrp("idle", &state.childpid, 0, !should_be_running, &status);
     }
   }

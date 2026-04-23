@@ -215,13 +215,12 @@ static int TotalMessageRowHeight(const struct AuthTextRow *rows, size_t row_coun
 }
 
 void AuthPlaySound(struct AuthUiContext *ctx, enum AuthSound sound) {
-  XKeyboardState state;
-  XKeyboardControl control;
-
   if (!ctx->config.auth_sounds) {
     return;
   }
 
+  XKeyboardState state;
+  XKeyboardControl control;
   XGetKeyboardControl(ctx->resources.display, &state);
 
   control.bell_percent = 50;

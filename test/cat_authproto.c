@@ -6,9 +6,8 @@
 int main(void) {
   int eof_permitted = 0;
   for (;;) {
-    char type;
-    char *message;
-    type = ReadPacket(0, &message, eof_permitted);
+    char *message = NULL;
+    char type = ReadPacket(0, &message, eof_permitted);
     if (type == 0) {
       return 0;
     }

@@ -273,9 +273,10 @@ static int Authenticate(struct pam_conv *conv, pam_handle_t **pam) {
 int main(void) {
   setlocale(LC_CTYPE, "");
 
-  struct pam_conv conv;
-  conv.conv = Converse;
-  conv.appdata_ptr = NULL;
+  struct pam_conv conv = {
+      .conv = Converse,
+      .appdata_ptr = NULL,
+  };
 
   pam_handle_t *pam = NULL;
   int status = Authenticate(&conv, &pam);

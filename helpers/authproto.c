@@ -87,13 +87,10 @@ static void ClearAndFreePacket(char **message, size_t len) {
 }
 
 char ReadPacket(int fd, char **message, int eof_permitted) {
-  char type;
+  char type = 0;
   *message = NULL;
-  {
-    int read_status = ReadExact(fd, &type, 1, eof_permitted);
-    if (read_status <= 0) {
-      return 0;
-    }
+  if (ReadExact(fd, &type, 1, eof_permitted) <= 0) {
+    return 0;
   }
   if (type == 0) {
     Log("invalid packet type 0");

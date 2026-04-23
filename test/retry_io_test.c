@@ -272,10 +272,11 @@ static void TestRetryPollHighFd(void) {
   signal_count = 0;
   StartTimerMs(50);
 
-  struct pollfd pfd;
-  pfd.fd = high_fd;
-  pfd.events = POLLIN | POLLHUP;
-  pfd.revents = 0;
+  struct pollfd pfd = {
+      .fd = high_fd,
+      .events = POLLIN | POLLHUP,
+      .revents = 0,
+  };
 
   int ready = RetryPoll(&pfd, 1, 1000);
 

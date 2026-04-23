@@ -140,10 +140,8 @@ double GetFiniteDoubleSetting(const char* name, double def) {
 
 double GetClampedFiniteDoubleSetting(const char* name, double def,
                                      double min_value, double max_value) {
-  double number = 0.0;
-
   assert(min_value <= max_value);
-  number = GetFiniteDoubleSetting(name, def);
+  double number = GetFiniteDoubleSetting(name, def);
   if (number < min_value) {
     return min_value;
   }
