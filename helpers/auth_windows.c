@@ -90,6 +90,10 @@ static int CreateOrUpdatePerMonitorWindow(struct AuthUiContext *ctx, size_t i,
   if (y + h > monitor->y + monitor->height) {
     h = monitor->y + monitor->height - y;
   }
+  if (w <= 0 || h <= 0) {
+    Log("Auth dialog has no visible area after clipping");
+    return 0;
+  }
   Rect new_rect = {.x = x, .y = y, .w = w, .h = h};
 
   if (i < ctx->windows.count) {
@@ -164,15 +168,18 @@ static int CreateOrUpdatePerMonitorWindow(struct AuthUiContext *ctx, size_t i,
   }
 
 #ifdef HAVE_XFT_EXT
-  ctx->windows.xft_draws[i] = XftDrawCreate(
-      ctx->resources.display, ctx->windows.windows[i],
-      DefaultVisual(ctx->resources.display,
-                    DefaultScreen(ctx->resources.display)),
-      ctx->resources.colormap);
-  if (ctx->resources.xft_font != NULL && ctx->windows.xft_draws[i] == NULL) {
-    Log("XftDrawCreate failed");
-    CleanupPerMonitorWindow(ctx, i);
-    return 0;
+  ctx->windows.xft_draws[i] = NULL;
+  if (ctx->resources.xft_font != NULL) {
+    ctx->windows.xft_draws[i] = XftDrawCreate(
+        ctx->resources.display, ctx->windows.windows[i],
+        DefaultVisual(ctx->resources.display,
+                      DefaultScreen(ctx->resources.display)),
+        ctx->resources.colormap);
+    if (ctx->windows.xft_draws[i] == NULL) {
+      Log("XftDrawCreate failed");
+      CleanupPerMonitorWindow(ctx, i);
+      return 0;
+    }
   }
 #endif
 
