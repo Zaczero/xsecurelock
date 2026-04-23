@@ -58,7 +58,7 @@ impossible! If this should happen to you, switch to another terminal
 of the screen.
 
 ```
-git clone https://github.com/google/xsecurelock.git
+git clone https://github.com/Zaczero/xsecurelock.git
 cd xsecurelock
 sh autogen.sh
 ./configure --with-pam-service-name=SERVICE-NAME
@@ -820,7 +820,3 @@ This has the following known issues:
 
 The code is released under the Apache 2.0 license. See the LICENSE file for more
 details.
-
-This project is not an official Google project. It is not supported by Google
-and Google specifically disclaims all warranties as to its quality,
-merchantability, or fitness for a particular purpose.

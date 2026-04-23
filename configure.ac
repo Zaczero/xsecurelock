@@ -3,7 +3,7 @@
 
 define([thisversion],[1.9.0])
 define([nextversion],[1.9.0])
-AC_INIT([xsecurelock],[thisversion],[rpolzer@google.com])
+AC_INIT([xsecurelock],[thisversion],[https://github.com/Zaczero/xsecurelock/issues])
 AM_INIT_AUTOMAKE([-Wall subdir-objects foreign])
 AC_PROG_CC
 AC_LANG([C])

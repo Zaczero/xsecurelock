@@ -34,11 +34,11 @@ is complete; this can be used as a notification mechanism if desired.
 
 # REPORTING BUGS
 
-The official bug tracker is at <https://github.com/google/xsecurelock/issues/>.
+The official bug tracker is at <https://github.com/Zaczero/xsecurelock/issues/>.
 
 # COPYRIGHT
 
-The code is released unser the Apache 2.0 license. See the LICENSE file for more
+The code is released under the Apache 2.0 license. See the LICENSE file for more
 details.
 
 # SEE ALSO
@@ -47,5 +47,5 @@ details.
 
 The *README.md* file included with XSecureLock contains full documentation.
 
-The XSecureLock source  code and all documentation may be downloaded on
-<https://github.com/google/xsecurelock/>.
+The XSecureLock source code and all documentation may be downloaded from
+<https://github.com/Zaczero/xsecurelock/>.

@@ -152,7 +152,6 @@ authproto_pam_SOURCES = \
 endif
 
 doc_DATA = \
-	CONTRIBUTING \
 	LICENSE \
 	README.md
 
@@ -298,7 +297,6 @@ env_helpstr.inc: README.md # Autogenerate for --help.
 main.$(OBJEXT): env_helpstr.inc
 
 EXTRA_DIST = \
-	CONTRIBUTING \
 	LICENSE \
 	README.md \
 	autogen.sh \
