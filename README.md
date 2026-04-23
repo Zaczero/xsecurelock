@@ -393,10 +393,14 @@ Options to XSecureLock can be passed by environment variables:
     must have the same unit.
 *   `XSECURELOCK_IMAGE_DURATION_SECONDS`: how long to show each still image
     played by `saver_mpv`. Defaults to 1.
-*   `XSECURELOCK_KEY_%s_COMMAND` where `%s` is the name of an X11 keysym (find
-    using `xev`): a shell command to execute when the specified key is pressed.
-    Useful e.g. for media player control. Beware: be cautious about what you
-    run with this, as it may yield attackers control over your computer.
+*   `XSECURELOCK_KEY_%s_COMMAND`: shell command to execute when a special key is
+    pressed, useful e.g. for media player control. `%s` is the case-sensitive
+    X11 keysym name, not a keycode or hexadecimal keysym value. Find it with
+    `xev -event keyboard`; for example, if `xev` prints
+    `keysym 0x1008ff14, XF86AudioPlay`, set
+    `XSECURELOCK_KEY_XF86AudioPlay_COMMAND`. This hook is mainly for special
+    keys that do not produce normal text input. Beware: be cautious about what
+    you run with this, as it may yield attackers control over your computer.
 *   `XSECURELOCK_LIST_VIDEOS_COMMAND`: shell command to list all video files to
     potentially play by `saver_mpv` or `saver_mplayer`. Defaults to
     `find ~/Videos -type f`.
