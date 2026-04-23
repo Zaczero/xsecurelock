@@ -51,7 +51,7 @@ static int AllocXftColorOrLog(struct AuthUiResources *resources,
 static XftFont *FixedXftFontOpenName(Display *display, int screen,
                                      const char *font_name) {
   XftFont *xft_font = XftFontOpenName(display, screen, font_name);
-#ifdef HAVE_FONTCONFIG
+#if defined(HAVE_FONTCONFIG) && defined(FC_COLOR)
   FcBool iscol = FcFalse;
   if (xft_font != NULL &&
       FcPatternGetBool(xft_font->pattern, FC_COLOR, 0, &iscol) ==
@@ -61,6 +61,9 @@ static XftFont *FixedXftFontOpenName(Display *display, int screen,
     XftFontClose(display, xft_font);
     return NULL;
   }
+#elif defined(HAVE_FONTCONFIG)
+#warning "Fontconfig lacks FC_COLOR. May crash trying to use emoji fonts."
+  Log("Fontconfig lacks FC_COLOR. May crash trying to use emoji fonts.");
 #else
 #warning "Xft enabled without fontconfig. May crash trying to use emoji fonts."
   Log("Xft enabled without fontconfig. May crash trying to use emoji fonts.");
