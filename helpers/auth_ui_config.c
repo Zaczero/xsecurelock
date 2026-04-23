@@ -2,13 +2,14 @@
 
 #include "auth_ui_config.h"
 
-#include <limits.h>
 #include <string.h>
 
 #include "../env_info.h"
 #include "../env_settings.h"
 #include "../logging.h"
 #include "build-config.h"
+
+enum { AUTH_UI_MAX_INSET_SETTING = 4096 };
 
 void AuthUiContextInit(struct AuthUiContext *ctx, int argc, char **argv) {
   memset(ctx, 0, sizeof(*ctx));
@@ -63,9 +64,11 @@ int AuthUiConfigLoad(struct AuthUiConfig *config) {
   config->auth_cursor_blink =
       GetBoolSetting("XSECURELOCK_AUTH_CURSOR_BLINK", 1);
   config->auth_padding =
-      GetNonnegativeIntSetting("XSECURELOCK_AUTH_PADDING", 16);
+      GetClampedIntSetting("XSECURELOCK_AUTH_PADDING", 16, 0,
+                           AUTH_UI_MAX_INSET_SETTING);
   config->auth_border_size =
-      GetNonnegativeIntSetting("XSECURELOCK_AUTH_BORDER_SIZE", 0);
+      GetClampedIntSetting("XSECURELOCK_AUTH_BORDER_SIZE", 0, 0,
+                           AUTH_UI_MAX_INSET_SETTING);
   config->auth_x_position =
       GetClampedIntSetting("XSECURELOCK_AUTH_X_POSITION", 50, 0, 100);
   config->auth_y_position =
