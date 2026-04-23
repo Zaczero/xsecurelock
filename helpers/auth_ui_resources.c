@@ -54,7 +54,9 @@ static XftFont *FixedXftFontOpenName(Display *display, int screen,
 #ifdef HAVE_FONTCONFIG
   FcBool iscol = FcFalse;
   if (xft_font != NULL &&
-      FcPatternGetBool(xft_font->pattern, FC_COLOR, 0, &iscol) && iscol) {
+      FcPatternGetBool(xft_font->pattern, FC_COLOR, 0, &iscol) ==
+          FcResultMatch &&
+      iscol) {
     Log("Colored font %s is not supported by Xft", font_name);
     XftFontClose(display, xft_font);
     return NULL;
