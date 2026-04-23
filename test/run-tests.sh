@@ -10,26 +10,20 @@ rm -f ./*.log
 if [ "$#" -eq 0 ]; then
   set -- *.xdo
 else
-  resolved_tests=$(
-    for arg in "$@"; do
-      test_name=${arg##*/}
-      case "$test_name" in
-        *.xdo) ;;
-        *) test_name="$test_name.xdo" ;;
-      esac
-      if [ ! -f "$test_name" ]; then
-        echo "Unknown test: $arg" >&2
-        exit 1
-      fi
-      printf '%s\n' "$test_name"
-    done
-  )
-  set --
-  while IFS= read -r test_name; do
+  original_count=$#
+  for arg in "$@"; do
+    test_name=${arg##*/}
+    case "$test_name" in
+      *.xdo) ;;
+      *) test_name="$test_name.xdo" ;;
+    esac
+    if [ ! -f "$test_name" ]; then
+      echo "Unknown test: $arg" >&2
+      exit 1
+    fi
     set -- "$@" "$test_name"
-  done <<EOF
-$resolved_tests
-EOF
+  done
+  shift "$original_count"
 fi
 
 if [ "$#" -eq 0 ]; then
