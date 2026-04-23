@@ -382,12 +382,8 @@ static int HandlePointerWakeEvent(struct LockContext *ctx) {
   return WakeUp(ctx, NULL);
 }
 
-static int HandleKeyPressEvent(struct LockContext *ctx) {
-  LockScreenNoLongerBlanked(ctx);
-
+static bool LookupKeypress(struct LockContext *ctx) {
   Status lookup_status = XLookupNone;
-  bool have_key = true;
-  bool do_wake_up = true;
   ctx->runtime.sensitive.keysym = NoSymbol;
 
   if (ctx->windows.xic != NULL) {
@@ -396,10 +392,10 @@ static int HandleKeyPressEvent(struct LockContext *ctx) {
         ctx->runtime.sensitive.buf, sizeof(ctx->runtime.sensitive.buf) - 1,
         &ctx->runtime.sensitive.keysym, &lookup_status);
     if (ctx->runtime.sensitive.len <= 0) {
-      have_key = false;
+      return false;
     } else if (lookup_status != XLookupChars &&
                lookup_status != XLookupBoth) {
-      have_key = false;
+      return false;
     }
   } else {
     ctx->runtime.sensitive.len = XLookupString(
@@ -407,52 +403,82 @@ static int HandleKeyPressEvent(struct LockContext *ctx) {
         sizeof(ctx->runtime.sensitive.buf) - 1, &ctx->runtime.sensitive.keysym,
         NULL);
     if (ctx->runtime.sensitive.len <= 0) {
-      have_key = false;
+      return false;
     }
   }
 
-  if (have_key &&
-      (size_t)ctx->runtime.sensitive.len >= sizeof(ctx->runtime.sensitive.buf)) {
+  if ((size_t)ctx->runtime.sensitive.len >= sizeof(ctx->runtime.sensitive.buf)) {
     Log("Received invalid length from XLookupString: %d",
         ctx->runtime.sensitive.len);
-    have_key = false;
+    return false;
   }
+  return true;
+}
 
+static bool ApplyControlKeyTranslations(struct LockContext *ctx) {
   if (ctx->runtime.sensitive.keysym == XK_Tab &&
       (ctx->runtime.sensitive.ev.xkey.state & ControlMask)) {
     ctx->runtime.sensitive.buf[0] = '\023';
     ctx->runtime.sensitive.buf[1] = '\0';
-  } else if (ctx->runtime.sensitive.keysym == XK_BackSpace &&
-             (ctx->runtime.sensitive.ev.xkey.state & ControlMask)) {
+    return true;
+  }
+  if (ctx->runtime.sensitive.keysym == XK_BackSpace &&
+      (ctx->runtime.sensitive.ev.xkey.state & ControlMask)) {
     ctx->runtime.sensitive.buf[0] = '\025';
     ctx->runtime.sensitive.buf[1] = '\0';
-  } else if (ctx->config.have_switch_user_command &&
-             (ctx->runtime.sensitive.keysym == XK_o ||
-              ctx->runtime.sensitive.keysym == XK_0) &&
-             (((ctx->runtime.sensitive.ev.xkey.state & ControlMask) &&
-               (ctx->runtime.sensitive.ev.xkey.state & Mod1Mask)) ||
-              (ctx->runtime.sensitive.ev.xkey.state & Mod4Mask))) {
+    return true;
+  }
+  if (ctx->config.have_switch_user_command &&
+      (ctx->runtime.sensitive.keysym == XK_o ||
+       ctx->runtime.sensitive.keysym == XK_0) &&
+      (((ctx->runtime.sensitive.ev.xkey.state & ControlMask) &&
+        (ctx->runtime.sensitive.ev.xkey.state & Mod1Mask)) ||
+       (ctx->runtime.sensitive.ev.xkey.state & Mod4Mask))) {
     (void)RunShellCommandFromEnv("XSECURELOCK_SWITCH_USER_COMMAND", 1);
     ctx->runtime.sensitive.buf[0] = '\025';
     ctx->runtime.sensitive.buf[1] = '\0';
-  } else if (have_key) {
-    if (ctx->runtime.sensitive.len == 1 &&
-        ctx->runtime.sensitive.buf[0] == '\r') {
-      ctx->runtime.sensitive.buf[0] = '\n';
-    }
-    ctx->runtime.sensitive.buf[ctx->runtime.sensitive.len] = '\0';
-  } else {
-    ctx->runtime.sensitive.buf[0] = '\0';
-    const char *keyname = XKeysymToString(ctx->runtime.sensitive.keysym);
-    if (keyname != NULL) {
-      char env_name[64];
-      if (FormatKeyCommandEnvName(env_name, sizeof(env_name), keyname)) {
-        const char *command = GetStringSetting(env_name, "");
-        if (*command != '\0') {
-          (void)RunShellCommandFromEnv(env_name, 1);
-          do_wake_up = false;
-        }
+    return true;
+  }
+  return false;
+}
+
+static bool RunConfiguredKeyCommandIfAny(struct LockContext *ctx) {
+  const char *keyname = XKeysymToString(ctx->runtime.sensitive.keysym);
+  if (keyname == NULL) {
+    return false;
+  }
+
+  char env_name[64];
+  if (!FormatKeyCommandEnvName(env_name, sizeof(env_name), keyname)) {
+    return false;
+  }
+
+  const char *command = GetStringSetting(env_name, "");
+  if (*command == '\0') {
+    return false;
+  }
+
+  (void)RunShellCommandFromEnv(env_name, 1);
+  return true;
+}
+
+static int HandleKeyPressEvent(struct LockContext *ctx) {
+  bool have_key = false;
+  bool do_wake_up = true;
+
+  LockScreenNoLongerBlanked(ctx);
+  have_key = LookupKeypress(ctx);
+
+  if (!ApplyControlKeyTranslations(ctx)) {
+    if (have_key) {
+      if (ctx->runtime.sensitive.len == 1 &&
+          ctx->runtime.sensitive.buf[0] == '\r') {
+        ctx->runtime.sensitive.buf[0] = '\n';
       }
+      ctx->runtime.sensitive.buf[ctx->runtime.sensitive.len] = '\0';
+    } else {
+      ctx->runtime.sensitive.buf[0] = '\0';
+      do_wake_up = !RunConfiguredKeyCommandIfAny(ctx);
     }
   }
 
@@ -575,6 +601,178 @@ static int ProcessPendingXEvents(struct LockContext *ctx, int *more_pending) {
   return 0;
 }
 
+static int AcquireInitialGrabs(struct LockContext *ctx) {
+  int last_normal_attempt = ctx->config.force_grab ? 1 : 0;
+  int retries = 10;
+
+  for (; retries >= 0; --retries) {
+    if (LockAcquireGrabs(ctx, retries > last_normal_attempt,
+                         retries < last_normal_attempt)) {
+      return 1;
+    }
+    if (ctx->windows.previous_focused_window == None) {
+      XGetInputFocus(ctx->runtime.display, &ctx->windows.previous_focused_window,
+                     &ctx->windows.previous_revert_focus_to);
+      XSetInputFocus(ctx->runtime.display, PointerRoot, RevertToPointerRoot,
+                     CurrentTime);
+      XFlush(ctx->runtime.display);
+    }
+    (void)SleepMs(100);
+  }
+
+  Log("Failed to grab. Giving up.");
+  return 0;
+}
+
+static int InitializeLockContextRuntime(struct LockContext *ctx) {
+  if (MLOCK_PAGE(&ctx->runtime.sensitive, sizeof(ctx->runtime.sensitive)) < 0) {
+    LogErrno("mlock");
+  }
+
+  if (SignalPipeInit(&ctx->runtime.signal_pipe) != 0) {
+    LogErrno("SignalPipeInit");
+    return 0;
+  }
+  SignalPipeSetWriteFdForHandler(ctx->runtime.signal_pipe.fds[1]);
+
+  if (!InstallSignalHandlers()) {
+    return 0;
+  }
+
+  InitWaitPgrp();
+  XFlush(ctx->runtime.display);
+
+#ifdef HAVE_XSCREENSAVER_EXT
+  if (ctx->runtime.scrnsaver_event_base != 0) {
+    XScreenSaverInfo *info = XScreenSaverAllocInfo();
+    if (info == NULL) {
+      Log("XScreenSaverAllocInfo failed");
+    } else {
+      XScreenSaverQueryInfo(ctx->runtime.display, ctx->windows.root_window,
+                            info);
+      if (info->state == ScreenSaverOn && info->kind == ScreenSaverBlanked &&
+          ctx->config.saver_stop_on_blank) {
+        ctx->runtime.xss_requested_saver_state =
+            WATCH_CHILDREN_SAVER_DISABLED;
+      }
+      XFree(info);
+    }
+  }
+#endif
+
+  LockBlankingInit(ctx);
+  return 1;
+}
+
+static int RunLockMainLoop(struct LockContext *ctx, int *have_pending_x_events) {
+  XFlush(ctx->runtime.display);
+  if (WatchChildren(ctx, ctx->runtime.xss_requested_saver_state, NULL)) {
+    return 1;
+  }
+
+  (void)SleepMs(ctx->config.saver_delay_ms);
+  LockWindowsMap(ctx);
+  XSetErrorHandler(JustLogErrorsHandler);
+
+  ctx->runtime.x11_fd = ConnectionNumber(ctx->runtime.display);
+  if (ctx->runtime.x11_fd == ctx->runtime.xss_sleep_lock_fd &&
+      ctx->runtime.xss_sleep_lock_fd != -1) {
+    Log("XSS_SLEEP_LOCK_FD matches DISPLAY - what?!? We're probably "
+        "inhibiting sleep now");
+    ctx->runtime.xss_sleep_lock_fd = -1;
+  }
+
+  for (;;) {
+    struct pollfd fds[2] = {
+        {.fd = ctx->runtime.x11_fd, .events = POLLIN | POLLHUP, .revents = 0},
+        {.fd = ctx->runtime.signal_pipe.fds[0],
+         .events = POLLIN | POLLHUP,
+         .revents = 0},
+    };
+    int ready =
+        RetryPoll(fds, ARRAY_LEN(fds),
+                  *have_pending_x_events ? 0 : 1000 / WATCH_CHILDREN_HZ);
+    if (ready < 0) {
+      LogErrno("poll");
+    }
+
+    if (fds[1].revents & (POLLIN | POLLHUP)) {
+      SignalPipeDrain(ctx->runtime.signal_pipe.fds[0], "signal pipe");
+    }
+    if (HandleSignalFlags(ctx)) {
+      return 1;
+    }
+
+    enum WatchChildrenState requested_saver_state =
+        (ctx->config.saver_stop_on_blank && ctx->blanking.blanked)
+            ? WATCH_CHILDREN_SAVER_DISABLED
+            : ctx->runtime.xss_requested_saver_state;
+    if (WatchChildren(ctx, requested_saver_state, NULL)) {
+      return 1;
+    }
+
+    XUndefineCursor(ctx->runtime.display, ctx->windows.saver_window);
+
+#ifdef ALWAYS_REINSTATE_GRABS
+    ctx->runtime.need_to_reinstate_grabs = true;
+#endif
+    if (ctx->runtime.need_to_reinstate_grabs) {
+      ctx->runtime.need_to_reinstate_grabs = false;
+      if (!LockAcquireGrabs(ctx, 0, 0)) {
+        Log("Critical: could not reacquire grabs. The screen is now UNLOCKED! "
+            "Trying again next frame.");
+        ctx->runtime.need_to_reinstate_grabs = true;
+      }
+    }
+
+#ifdef AUTO_RAISE
+    if (ctx->windows.auth_window_mapped) {
+      LockMaybeRaiseWindow(ctx, ctx->windows.auth_window, 0, 0);
+    }
+    LockMaybeRaiseWindow(ctx, ctx->windows.background_window, 0, 0);
+#ifdef HAVE_XCOMPOSITE_EXT
+    if (ctx->windows.obscurer_window != None) {
+      LockMaybeRaiseWindow(ctx, ctx->windows.obscurer_window, 1, 0);
+    }
+#endif
+#endif
+
+    ReapNotifyCommand(ctx);
+
+    if (ProcessPendingXEvents(ctx, have_pending_x_events)) {
+      return 1;
+    }
+  }
+}
+
+static void CleanupLockContextRuntime(struct LockContext *ctx) {
+  if (ctx->runtime.terminate_signal != 0) {
+    KillAllSaverChildrenSigHandler(ctx->runtime.terminate_signal);
+    KillAuthChildSigHandler(ctx->runtime.terminate_signal);
+  }
+
+  if (ctx->runtime.display != NULL) {
+    LockUnblankScreen(ctx);
+  }
+
+  if (ctx->runtime.display != NULL &&
+      ctx->windows.previous_focused_window != None) {
+    XSetErrorHandler(SilentlyIgnoreErrorsHandler);
+    XSetInputFocus(ctx->runtime.display, ctx->windows.previous_focused_window,
+                   ctx->windows.previous_revert_focus_to, CurrentTime);
+    XSetErrorHandler(JustLogErrorsHandler);
+  }
+
+  explicit_bzero(&ctx->runtime.sensitive, sizeof(ctx->runtime.sensitive));
+  (void)CloseIfValid(&ctx->runtime.xss_sleep_lock_fd);
+  SignalPipeClose(&ctx->runtime.signal_pipe);
+  LockWindowsCleanup(ctx);
+  if (ctx->runtime.display != NULL) {
+    XCloseDisplay(ctx->runtime.display);
+    ctx->runtime.display = NULL;
+  }
+}
+
 int main(int argc, char **argv) {
   struct LockContext ctx;
   int status = EXIT_FAILURE;
@@ -641,172 +839,21 @@ int main(int argc, char **argv) {
   }
 #endif
 
-  {
-    int last_normal_attempt = ctx.config.force_grab ? 1 : 0;
-    int retries = 10;
-
-    for (; retries >= 0; --retries) {
-      if (LockAcquireGrabs(&ctx, retries > last_normal_attempt,
-                           retries < last_normal_attempt)) {
-        break;
-      }
-      if (ctx.windows.previous_focused_window == None) {
-        XGetInputFocus(ctx.runtime.display, &ctx.windows.previous_focused_window,
-                       &ctx.windows.previous_revert_focus_to);
-        XSetInputFocus(ctx.runtime.display, PointerRoot, RevertToPointerRoot,
-                       CurrentTime);
-        XFlush(ctx.runtime.display);
-      }
-      (void)SleepMs(100);
-    }
-    if (retries < 0) {
-      Log("Failed to grab. Giving up.");
-      goto done;
-    }
-  }
-
-  if (MLOCK_PAGE(&ctx.runtime.sensitive, sizeof(ctx.runtime.sensitive)) < 0) {
-    LogErrno("mlock");
+  if (!AcquireInitialGrabs(&ctx)) {
     goto done;
   }
 
-  if (SignalPipeInit(&ctx.runtime.signal_pipe) != 0) {
-    LogErrno("SignalPipeInit");
+  if (!InitializeLockContextRuntime(&ctx)) {
     goto done;
   }
-  SignalPipeSetWriteFdForHandler(ctx.runtime.signal_pipe.fds[1]);
-
-  if (!InstallSignalHandlers()) {
-    goto done;
-  }
-
-  InitWaitPgrp();
-  XFlush(ctx.runtime.display);
-
-#ifdef HAVE_XSCREENSAVER_EXT
-  if (ctx.runtime.scrnsaver_event_base != 0) {
-    XScreenSaverInfo *info = XScreenSaverAllocInfo();
-    if (info == NULL) {
-      Log("XScreenSaverAllocInfo failed");
-    } else {
-      XScreenSaverQueryInfo(ctx.runtime.display, ctx.windows.root_window, info);
-      if (info->state == ScreenSaverOn && info->kind == ScreenSaverBlanked &&
-          ctx.config.saver_stop_on_blank) {
-        ctx.runtime.xss_requested_saver_state =
-            WATCH_CHILDREN_SAVER_DISABLED;
-      }
-      XFree(info);
-    }
-  }
-#endif
-
-  LockBlankingInit(&ctx);
 
   status = EXIT_SUCCESS;
-  XFlush(ctx.runtime.display);
-  if (WatchChildren(&ctx, ctx.runtime.xss_requested_saver_state, NULL)) {
+  if (RunLockMainLoop(&ctx, &have_pending_x_events)) {
     goto done;
-  }
-
-  (void)SleepMs(ctx.config.saver_delay_ms);
-  LockWindowsMap(&ctx);
-  XSetErrorHandler(JustLogErrorsHandler);
-
-  ctx.runtime.x11_fd = ConnectionNumber(ctx.runtime.display);
-  if (ctx.runtime.x11_fd == ctx.runtime.xss_sleep_lock_fd &&
-      ctx.runtime.xss_sleep_lock_fd != -1) {
-    Log("XSS_SLEEP_LOCK_FD matches DISPLAY - what?!? We're probably "
-        "inhibiting sleep now");
-    ctx.runtime.xss_sleep_lock_fd = -1;
-  }
-
-  for (;;) {
-    struct pollfd fds[2] = {
-        {.fd = ctx.runtime.x11_fd, .events = POLLIN | POLLHUP, .revents = 0},
-        {.fd = ctx.runtime.signal_pipe.fds[0],
-         .events = POLLIN | POLLHUP,
-         .revents = 0},
-    };
-    int ready = RetryPoll(fds, ARRAY_LEN(fds),
-                          have_pending_x_events ? 0 : 1000 / WATCH_CHILDREN_HZ);
-    if (ready < 0) {
-      LogErrno("poll");
-    }
-
-    if (fds[1].revents & (POLLIN | POLLHUP)) {
-      SignalPipeDrain(ctx.runtime.signal_pipe.fds[0], "signal pipe");
-    }
-    if (HandleSignalFlags(&ctx)) {
-      goto done;
-    }
-
-    enum WatchChildrenState requested_saver_state =
-        (ctx.config.saver_stop_on_blank && ctx.blanking.blanked)
-            ? WATCH_CHILDREN_SAVER_DISABLED
-            : ctx.runtime.xss_requested_saver_state;
-    if (WatchChildren(&ctx, requested_saver_state, NULL)) {
-      goto done;
-    }
-
-    XUndefineCursor(ctx.runtime.display, ctx.windows.saver_window);
-
-#ifdef ALWAYS_REINSTATE_GRABS
-    ctx.runtime.need_to_reinstate_grabs = true;
-#endif
-    if (ctx.runtime.need_to_reinstate_grabs) {
-      ctx.runtime.need_to_reinstate_grabs = false;
-      if (!LockAcquireGrabs(&ctx, 0, 0)) {
-        Log("Critical: could not reacquire grabs. The screen is now UNLOCKED! "
-            "Trying again next frame.");
-        ctx.runtime.need_to_reinstate_grabs = true;
-      }
-    }
-
-#ifdef AUTO_RAISE
-    if (ctx.windows.auth_window_mapped) {
-      LockMaybeRaiseWindow(&ctx, ctx.windows.auth_window, 0, 0);
-    }
-    LockMaybeRaiseWindow(&ctx, ctx.windows.background_window, 0, 0);
-#ifdef HAVE_XCOMPOSITE_EXT
-    if (ctx.windows.obscurer_window != None) {
-      LockMaybeRaiseWindow(&ctx, ctx.windows.obscurer_window, 1, 0);
-    }
-#endif
-#endif
-
-    ReapNotifyCommand(&ctx);
-
-    if (ProcessPendingXEvents(&ctx, &have_pending_x_events)) {
-      goto done;
-    }
   }
 
 done:
-  if (ctx.runtime.terminate_signal != 0) {
-    KillAllSaverChildrenSigHandler(ctx.runtime.terminate_signal);
-    KillAuthChildSigHandler(ctx.runtime.terminate_signal);
-  }
-
-  if (ctx.runtime.display != NULL) {
-    LockUnblankScreen(&ctx);
-  }
-
-  if (ctx.runtime.display != NULL &&
-      ctx.windows.previous_focused_window != None) {
-    XSetErrorHandler(SilentlyIgnoreErrorsHandler);
-    XSetInputFocus(ctx.runtime.display, ctx.windows.previous_focused_window,
-                   ctx.windows.previous_revert_focus_to, CurrentTime);
-    XSetErrorHandler(JustLogErrorsHandler);
-  }
-
-  explicit_bzero(&ctx.runtime.sensitive, sizeof(ctx.runtime.sensitive));
-  (void)CloseIfValid(&ctx.runtime.xss_sleep_lock_fd);
-  SignalPipeClose(&ctx.runtime.signal_pipe);
-  LockWindowsCleanup(&ctx);
-  if (ctx.runtime.display != NULL) {
-    XCloseDisplay(ctx.runtime.display);
-    ctx.runtime.display = NULL;
-  }
+  CleanupLockContextRuntime(&ctx);
 
   if (ctx.runtime.terminate_signal != 0) {
     struct sigaction sa = {.sa_flags = 0, .sa_handler = SIG_DFL};
