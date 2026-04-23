@@ -39,6 +39,8 @@ static int ValidWindowSize(int width, int height) {
 }
 
 static unsigned int ObscurerDimension(int size) {
+  // Keep the obscurer inset by 1px to avoid fullscreen-window unredirect
+  // heuristics in compositors; the composite overlay is the full-screen cover.
   return (size > 2) ? (unsigned int)(size - 2) : 1U;
 }
 
