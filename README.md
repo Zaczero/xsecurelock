@@ -292,6 +292,10 @@ Options to XSecureLock can be passed by environment variables:
     before giving up and reverting to the screen saver. This also applies to
     PAM modules that display informational messages while waiting for external
     input, such as U2F prompts.
+*   `XSECURELOCK_AUTH_TITLE`: custom title prefix for the login screen of
+    `auth_x11`. When set, this replaces the generated `username@hostname`
+    prefix while keeping the current authentication prompt/status title after
+    it.
 *   `XSECURELOCK_AUTH_WARNING_COLOR`: specifies the X11 color (see manpage of
     XParseColor) for the warning text of the auth dialog.
 *   `XSECURELOCK_AUTH_PADDING`: padding between auth dialog content and its

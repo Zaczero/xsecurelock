@@ -21,6 +21,7 @@ void AuthUiContextInit(struct AuthUiContext *ctx, int argc, char **argv) {
   ctx->config.foreground_color = "white";
   ctx->config.warning_color = "red";
   ctx->config.font_name = "";
+  ctx->config.auth_title = "";
   ctx->config.auth_cursor_blink = true;
   ctx->config.auth_padding = 16;
   ctx->config.auth_x_position = 50;
@@ -43,6 +44,7 @@ int AuthUiConfigLoad(struct AuthUiConfig *config) {
       GetNonnegativeIntSetting("XSECURELOCK_BURNIN_MITIGATION_DYNAMIC", 0);
   config->prompt_timeout =
       GetNonnegativeIntSetting("XSECURELOCK_AUTH_TIMEOUT", 5 * 60);
+  config->auth_title = GetStringSetting("XSECURELOCK_AUTH_TITLE", "");
   config->show_username = GetBoolSetting("XSECURELOCK_SHOW_USERNAME", 1);
   config->show_hostname =
       GetClampedIntSetting("XSECURELOCK_SHOW_HOSTNAME", 1, 0, 2);

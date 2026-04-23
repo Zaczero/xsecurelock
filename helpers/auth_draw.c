@@ -13,9 +13,9 @@
 #include <fontconfig/fontconfig.h>
 #endif
 
-#include "../buf_util.h"
 #include "../time_util.h"
 #include "../util.h"
+#include "auth_title.h"
 #include "auth_windows.h"
 #include "xkb.h"
 
@@ -126,52 +126,6 @@ static void DrawDialogBorder(const struct AuthUiContext *ctx,
                  rect_w, rect_h);
 }
 
-static void TruncatingAppendBytes(char **output, size_t *output_size,
-                                  const char *input, size_t input_size) {
-  if (output == NULL || output_size == NULL || *output == NULL ||
-      *output_size == 0) {
-    return;
-  }
-  if (input_size >= *output_size) {
-    input_size = *output_size - 1;
-  }
-  (void)AppendBytes(output, output_size, input, input_size);
-}
-
-static void BuildTitle(const struct AuthUiContext *ctx, char *output,
-                       size_t output_size, const char *input) {
-  if (output_size == 0) {
-    return;
-  }
-  output[0] = '\0';
-
-  if (ctx->config.show_username) {
-    TruncatingAppendBytes(&output, &output_size, ctx->config.username,
-                          strlen(ctx->config.username));
-  }
-
-  if (ctx->config.show_username && ctx->config.show_hostname) {
-    TruncatingAppendBytes(&output, &output_size, "@", 1);
-  }
-
-  if (ctx->config.show_hostname) {
-    size_t hostname_len = ctx->config.show_hostname > 1
-                              ? strlen(ctx->config.hostname)
-                              : strcspn(ctx->config.hostname, ".");
-    TruncatingAppendBytes(&output, &output_size, ctx->config.hostname,
-                          hostname_len);
-  }
-
-  if (*input == '\0') {
-    return;
-  }
-
-  if (ctx->config.show_username || ctx->config.show_hostname) {
-    TruncatingAppendBytes(&output, &output_size, " - ", 3);
-  }
-  TruncatingAppendBytes(&output, &output_size, input, strlen(input));
-}
-
 enum { AUTH_MESSAGE_MAX_ROWS = 6 };
 
 struct AuthTextRow {
@@ -258,7 +212,9 @@ int AuthDisplayMessage(struct AuthUiContext *ctx, const char *title,
   struct AuthTextRow rows[AUTH_MESSAGE_MAX_ROWS];
   size_t row_count = 0;
 
-  BuildTitle(ctx, full_title, sizeof(full_title), title);
+  AuthBuildTitle(full_title, sizeof(full_title), ctx->config.auth_title,
+                 ctx->config.show_username, ctx->config.show_hostname,
+                 ctx->config.username, ctx->config.hostname, title);
 
   (void)GetXkbIndicators(ctx->resources.display, ctx->resources.have_xkb_ext,
                          ctx->config.show_keyboard_layout,

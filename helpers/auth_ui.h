@@ -33,6 +33,7 @@ struct AuthUiConfig {
   int prompt_timeout;
   enum PromptDisplayMode prompt_display_mode;
   bool have_switch_user_command;
+  const char *auth_title;
   bool show_username;
   int show_hostname;
   bool show_datetime;
