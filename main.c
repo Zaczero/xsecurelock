@@ -68,7 +68,6 @@ limitations under the License.
 #define MAX_X_EVENTS_PER_TICK 128
 
 #undef ALWAYS_REINSTATE_GRABS
-#undef AUTO_RAISE
 
 static volatile sig_atomic_t g_wakeup_requested = 0;
 static volatile sig_atomic_t g_terminate_signal = 0;
@@ -181,6 +180,7 @@ static void LoadDefaults(struct LockConfig *config) {
       GetNonnegativeIntSetting("XSECURELOCK_SAVER_DELAY_MS", 0);
   config->saver_stop_on_blank =
       GetBoolSetting("XSECURELOCK_SAVER_STOP_ON_BLANK", 1);
+  config->auto_raise = GetBoolSetting("XSECURELOCK_AUTO_RAISE", 0);
   config->background_color =
       GetStringSetting("XSECURELOCK_BACKGROUND_COLOR", "black");
 #ifdef HAVE_XCOMPOSITE_EXT
@@ -729,17 +729,17 @@ static int RunLockMainLoop(struct LockContext *ctx, int *have_pending_x_events) 
       }
     }
 
-#ifdef AUTO_RAISE
-    if (ctx->windows.auth_window_mapped) {
-      LockMaybeRaiseWindow(ctx, ctx->windows.auth_window, 0, 0);
-    }
-    LockMaybeRaiseWindow(ctx, ctx->windows.background_window, 0, 0);
+    if (ctx->config.auto_raise) {
+      if (ctx->windows.auth_window_mapped) {
+        LockMaybeRaiseWindow(ctx, ctx->windows.auth_window, 1, 0);
+      }
+      LockMaybeRaiseWindow(ctx, ctx->windows.background_window, 1, 0);
 #ifdef HAVE_XCOMPOSITE_EXT
-    if (ctx->windows.obscurer_window != None) {
-      LockMaybeRaiseWindow(ctx, ctx->windows.obscurer_window, 1, 0);
+      if (ctx->windows.obscurer_window != None) {
+        LockMaybeRaiseWindow(ctx, ctx->windows.obscurer_window, 1, 0);
+      }
+#endif
     }
-#endif
-#endif
 
     ReapNotifyCommand(ctx);
 

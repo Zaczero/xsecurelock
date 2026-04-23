@@ -397,6 +397,9 @@ Options to XSecureLock can be passed by environment variables:
 *   `XSECURELOCK_LIST_VIDEOS_COMMAND`: shell command to list all video files to
     potentially play by `saver_mpv` or `saver_mplayer`. Defaults to
     `find ~/Videos -type f`.
+*   `XSECURELOCK_AUTO_RAISE`: periodically try to raise the lock windows.
+    Disabled by default. This is a compositor compatibility workaround for
+    notification stacks that do not generate useful visibility events.
 *   `XSECURELOCK_NO_COMPOSITE`: disables covering the composite overlay window.
     This switches to a more traditional way of locking, but may allow desktop
     notifications to be visible on top of the screen lock. Not recommended.
@@ -615,8 +618,11 @@ exploits, the following measures are taken:
     for easy auditing.
 *   The main process regularly refreshes the screen grabs in case they get lost
     for whatever reason.
-*   The main process regularly brings its window to the front, to avoid leaking
-    information from notification messages that are OverrideRedirect.
+*   When XComposite is available, the main process uses the composite overlay
+    window to reduce lock-screen transparency issues. It also reacts to
+    visibility and configure events to keep its windows on top, and can use
+    `XSECURELOCK_AUTO_RAISE=1` as a compatibility fallback on compositor stacks
+    where those events are insufficient.
 *   The main process resizes its window to the size of the root window, should
     the root window size change, to avoid leaking information by attaching a
     secondary display.
@@ -711,7 +717,8 @@ This has the following known issues:
 *   In general, most compositor issues will become visible in form of a text
     "INCOMPATIBLE COMPOSITOR, PLEASE FIX!" being displayed. A known good
     compositor is `compton --backend glx --paint-on-overlay`. In worst case
-    you can turn off our workaround for transparent windows by setting
+    try `XSECURELOCK_AUTO_RAISE=1` first; if that still does not help, you can
+    turn off our workaround for transparent windows by setting
     `XSECURELOCK_NO_COMPOSITE=1`.
 
 # License

@@ -38,6 +38,7 @@ struct LockConfig {
   bool saver_reset_on_auth_close;
   int saver_delay_ms;
   bool saver_stop_on_blank;
+  bool auto_raise;
   const char *background_color;
 #ifdef HAVE_XCOMPOSITE_EXT
   bool no_composite;

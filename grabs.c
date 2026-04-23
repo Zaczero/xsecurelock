@@ -48,17 +48,23 @@ void LockMaybeRaiseWindow(struct LockContext *ctx, Window w, int silent,
     Window grandparent = None;
     if (!XQueryTree(ctx->runtime.display, parent, &root, &grandparent,
                     &siblings, &nsiblings)) {
-      Log("XQueryTree failed on the parent");
+      if (!silent) {
+        Log("XQueryTree failed on the parent");
+      }
       siblings = NULL;
       nsiblings = 0;
     }
   } else {
-    Log("XQueryTree failed on self");
+    if (!silent) {
+      Log("XQueryTree failed on self");
+    }
     siblings = NULL;
     nsiblings = 0;
   }
   if (nsiblings == 0) {
-    Log("No siblings found");
+    if (!silent) {
+      Log("No siblings found");
+    }
   } else if (w == siblings[nsiblings - 1]) {
     if (force && !silent) {
       Log("MaybeRaiseWindow miss: something obscured my window %lu but I can't "
@@ -66,9 +72,11 @@ void LockMaybeRaiseWindow(struct LockContext *ctx, Window w, int silent,
           w);
     }
   } else {
-    Log("MaybeRaiseWindow hit: window %lu was above my window %lu",
-        siblings[nsiblings - 1], w);
-    DebugDumpWindowInfo(ctx, siblings[nsiblings - 1]);
+    if (!silent) {
+      Log("MaybeRaiseWindow hit: window %lu was above my window %lu",
+          siblings[nsiblings - 1], w);
+      DebugDumpWindowInfo(ctx, siblings[nsiblings - 1]);
+    }
     need_raise = 1;
   }
   XFree(siblings);
