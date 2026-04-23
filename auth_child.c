@@ -89,7 +89,8 @@ static int ContainsNonControl(const char *buf) {
     // high bytes in UTF-8 locales but we do want to forward anything UTF-8.
     // An alternative could be walking the string with multibyte functions and
     // using iswprint - but I'd rather not do that anywhere security critical.
-    if (*buf < '\000' || (*buf > '\037' && *buf != '\177')) {
+    unsigned char ch = (unsigned char)*buf;
+    if (ch > '\037' && ch != '\177') {
       return 1;
     }
     ++buf;

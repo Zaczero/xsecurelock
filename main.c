@@ -386,8 +386,8 @@ static int HandleKeyPressEvent(struct LockContext *ctx) {
   LockScreenNoLongerBlanked(ctx);
 
   Status lookup_status = XLookupNone;
-  int have_key = 1;
-  int do_wake_up = 1;
+  bool have_key = true;
+  bool do_wake_up = true;
   ctx->runtime.sensitive.keysym = NoSymbol;
 
   if (ctx->windows.xic != NULL) {
@@ -396,10 +396,10 @@ static int HandleKeyPressEvent(struct LockContext *ctx) {
         ctx->runtime.sensitive.buf, sizeof(ctx->runtime.sensitive.buf) - 1,
         &ctx->runtime.sensitive.keysym, &lookup_status);
     if (ctx->runtime.sensitive.len <= 0) {
-      have_key = 0;
+      have_key = false;
     } else if (lookup_status != XLookupChars &&
                lookup_status != XLookupBoth) {
-      have_key = 0;
+      have_key = false;
     }
   } else {
     ctx->runtime.sensitive.len = XLookupString(
@@ -407,7 +407,7 @@ static int HandleKeyPressEvent(struct LockContext *ctx) {
         sizeof(ctx->runtime.sensitive.buf) - 1, &ctx->runtime.sensitive.keysym,
         NULL);
     if (ctx->runtime.sensitive.len <= 0) {
-      have_key = 0;
+      have_key = false;
     }
   }
 
@@ -415,7 +415,7 @@ static int HandleKeyPressEvent(struct LockContext *ctx) {
       (size_t)ctx->runtime.sensitive.len >= sizeof(ctx->runtime.sensitive.buf)) {
     Log("Received invalid length from XLookupString: %d",
         ctx->runtime.sensitive.len);
-    have_key = 0;
+    have_key = false;
   }
 
   if (ctx->runtime.sensitive.keysym == XK_Tab &&
@@ -450,7 +450,7 @@ static int HandleKeyPressEvent(struct LockContext *ctx) {
         const char *command = GetStringSetting(env_name, "");
         if (*command != '\0') {
           (void)RunShellCommandFromEnv(env_name, 1);
-          do_wake_up = 0;
+          do_wake_up = false;
         }
       }
     }
@@ -471,7 +471,7 @@ static int HandleFocusEvent(struct LockContext *ctx) {
   if (!LockAcquireGrabs(ctx, 0, 0)) {
     Log("Critical: could not reacquire grabs after NotifyUngrab. The screen is "
         "now UNLOCKED! Trying again next frame.");
-    ctx->runtime.need_to_reinstate_grabs = 1;
+    ctx->runtime.need_to_reinstate_grabs = true;
   }
   return 0;
 }
@@ -751,14 +751,14 @@ int main(int argc, char **argv) {
     XUndefineCursor(ctx.runtime.display, ctx.windows.saver_window);
 
 #ifdef ALWAYS_REINSTATE_GRABS
-    ctx.runtime.need_to_reinstate_grabs = 1;
+    ctx.runtime.need_to_reinstate_grabs = true;
 #endif
     if (ctx.runtime.need_to_reinstate_grabs) {
-      ctx.runtime.need_to_reinstate_grabs = 0;
+      ctx.runtime.need_to_reinstate_grabs = false;
       if (!LockAcquireGrabs(&ctx, 0, 0)) {
         Log("Critical: could not reacquire grabs. The screen is now UNLOCKED! "
             "Trying again next frame.");
-        ctx.runtime.need_to_reinstate_grabs = 1;
+        ctx.runtime.need_to_reinstate_grabs = true;
       }
     }
 

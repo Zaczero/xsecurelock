@@ -15,6 +15,7 @@
 
 #include "../buf_util.h"
 #include "../time_util.h"
+#include "../util.h"
 #include "auth_windows.h"
 #include "xkb.h"
 
@@ -34,6 +35,8 @@ static const int kSounds[][2] = {
     /* AUTH_SOUND_ERROR=   */ {NOTE_A3, NOTE_DS3},
     /* AUTH_SOUND_SUCCESS= */ {NOTE_DS4, NOTE_E4},
 };
+XSL_STATIC_ASSERT(ARRAY_LEN(kSounds) == AUTH_SOUND_SUCCESS + 1,
+                  "Auth sound table must match enum AuthSound");
 
 static int TextAscent(const struct AuthUiContext *ctx) {
 #ifdef HAVE_XFT_EXT

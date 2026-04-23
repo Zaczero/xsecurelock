@@ -33,6 +33,20 @@ static int AppendIndicatorName(char **output, size_t *output_size,
   return 0;
 }
 
+static const struct {
+  unsigned int mask;
+  const char *name;
+} kModifiers[] = {
+    {ShiftMask, "Shift"},
+    {LockMask, "Lock"},
+    {ControlMask, "Control"},
+    {Mod1Mask, "Mod1"},
+    {Mod2Mask, "Mod2"},
+    {Mod3Mask, "Mod3"},
+    {Mod4Mask, "Mod4"},
+    {Mod5Mask, "Mod5"},
+};
+
 int FormatXkbIndicatorText(const struct XkbIndicatorFormatInput *input,
                            struct XkbIndicators *result) {
   if (input == NULL || result == NULL) {
@@ -64,22 +78,12 @@ int FormatXkbIndicatorText(const struct XkbIndicatorFormatInput *input,
   }
 
   if (input->show_locks_and_latches) {
-    struct {
-      unsigned int mask;
-      const char *name;
-    } modifiers[] = {
-        {ShiftMask, "Shift"},   {LockMask, "Lock"},
-        {ControlMask, "Control"}, {Mod1Mask, "Mod1"},
-        {Mod2Mask, "Mod2"},     {Mod3Mask, "Mod3"},
-        {Mod4Mask, "Mod4"},     {Mod5Mask, "Mod5"},
-    };
-
-    for (size_t i = 0; i < sizeof(modifiers) / sizeof(*modifiers); ++i) {
-      if (!(input->implicit_mods & modifiers[i].mask)) {
+    for (size_t i = 0; i < sizeof(kModifiers) / sizeof(*kModifiers); ++i) {
+      if (!(input->implicit_mods & kModifiers[i].mask)) {
         continue;
       }
       if (!AppendIndicatorName(&output, &output_size, &have_output,
-                               modifiers[i].name)) {
+                               kModifiers[i].name)) {
         break;
       }
     }
@@ -185,8 +189,8 @@ int HaveXkbExtension(Display *display) {
 #endif
 }
 
-int GetXkbIndicators(Display *display, int have_xkb_ext,
-                     int show_keyboard_layout, int show_locks_and_latches,
+int GetXkbIndicators(Display *display, bool have_xkb_ext,
+                     bool show_keyboard_layout, bool show_locks_and_latches,
                      struct XkbIndicators *result) {
   if (result == NULL) {
     return 0;
@@ -283,7 +287,7 @@ int GetXkbIndicators(Display *display, int have_xkb_ext,
 #endif
 }
 
-void SwitchToNextXkbLayout(Display *display, int have_xkb_ext) {
+void SwitchToNextXkbLayout(Display *display, bool have_xkb_ext) {
 #ifdef HAVE_XKB_EXT
   if (!have_xkb_ext) {
     return;

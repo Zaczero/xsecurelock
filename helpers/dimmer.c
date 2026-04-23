@@ -31,6 +31,7 @@ limitations under the License.
 #include <X11/Xatom.h>  // for XA_CARDINAL
 #include <X11/Xlib.h>   // for Display, XColor, XSetWindowAttributes
 #include <math.h>       // for pow, ceil, frexp, nextafter, sqrt
+#include <stdbool.h>    // for bool
 #include <stdint.h>     // for int64_t
 #include <stdio.h>      // for snprintf
 #include <string.h>     // for memset
@@ -46,7 +47,7 @@ struct DimmerConfig {
   int wait_time_ms;
   double dim_fps;
   double dim_alpha;
-  int have_compositor;
+  bool have_compositor;
   XColor dim_color;
 };
 

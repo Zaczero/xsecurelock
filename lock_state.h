@@ -32,7 +32,7 @@ struct LockConfig {
   char *const *notify_command;
   bool have_switch_user_command;
   int force_grab;
-  int debug_window_info;
+  bool debug_window_info;
   int blank_timeout;
   const char *blank_dpms_state;
   bool saver_reset_on_auth_close;
@@ -88,7 +88,7 @@ struct LockRuntime {
   int x11_fd;
   int xss_sleep_lock_fd;
   struct SignalPipe signal_pipe;
-  int need_to_reinstate_grabs;
+  bool need_to_reinstate_grabs;
   pid_t notify_command_pid;
   enum WatchChildrenState xss_requested_saver_state;
   int scrnsaver_event_base;

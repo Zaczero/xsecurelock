@@ -1,6 +1,7 @@
 #ifndef XSECURELOCK_HELPERS_XKB_H
 #define XSECURELOCK_HELPERS_XKB_H
 
+#include <stdbool.h>
 #include <stddef.h>
 
 #include <X11/Xlib.h>
@@ -9,8 +10,8 @@
 
 struct XkbIndicators {
   char text[XKB_INDICATOR_TEXT_SIZE];
-  int warning;
-  int have_multiple_layouts;
+  bool warning;
+  bool have_multiple_layouts;
 };
 
 struct XkbIndicatorFormatInput {
@@ -18,17 +19,17 @@ struct XkbIndicatorFormatInput {
   unsigned int implicit_mods;
   const char *const *indicator_names;
   size_t indicator_count;
-  int show_keyboard_layout;
-  int show_locks_and_latches;
-  int have_multiple_layouts;
+  bool show_keyboard_layout;
+  bool show_locks_and_latches;
+  bool have_multiple_layouts;
 };
 
 int HaveXkbExtension(Display *display);
-int GetXkbIndicators(Display *display, int have_xkb_ext,
-                     int show_keyboard_layout, int show_locks_and_latches,
+int GetXkbIndicators(Display *display, bool have_xkb_ext,
+                     bool show_keyboard_layout, bool show_locks_and_latches,
                      struct XkbIndicators *result);
 int FormatXkbIndicatorText(const struct XkbIndicatorFormatInput *input,
                            struct XkbIndicators *result);
-void SwitchToNextXkbLayout(Display *display, int have_xkb_ext);
+void SwitchToNextXkbLayout(Display *display, bool have_xkb_ext);
 
 #endif  // XSECURELOCK_HELPERS_XKB_H

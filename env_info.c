@@ -75,8 +75,8 @@ int GetUserName(char* username_buf, size_t username_buflen) {
   }
   size_t username_len = strlen(pwd->pw_name);
   if (username_len >= username_buflen) {
-    Log("Username too long: got %d, want < %d", (int)username_len,
-        (int)username_buflen);
+    Log("Username too long: got %zu, want < %zu", username_len,
+        username_buflen);
     goto done;
   }
   memcpy(username_buf, pwd->pw_name, username_len + 1);

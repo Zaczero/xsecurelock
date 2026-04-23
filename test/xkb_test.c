@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <stdbool.h>
 #include <string.h>
 
 #include <X11/X.h>
@@ -8,14 +9,14 @@
 static void ExpectLayoutOnlyFormatting(void) {
   struct XkbIndicatorFormatInput input = {
       .layout_name = "English (US)",
-      .show_keyboard_layout = 1,
+      .show_keyboard_layout = true,
   };
   struct XkbIndicators indicators = {0};
 
   assert(FormatXkbIndicatorText(&input, &indicators));
   assert(strcmp(indicators.text, "Keyboard: English (US)") == 0);
-  assert(indicators.warning == 0);
-  assert(indicators.have_multiple_layouts == 0);
+  assert(!indicators.warning);
+  assert(!indicators.have_multiple_layouts);
 }
 
 static void ExpectIndicatorListFormatting(void) {
@@ -23,27 +24,27 @@ static void ExpectIndicatorListFormatting(void) {
   struct XkbIndicatorFormatInput input = {
       .indicator_names = indicator_names,
       .indicator_count = 2,
-      .have_multiple_layouts = 1,
+      .have_multiple_layouts = true,
   };
   struct XkbIndicators indicators = {0};
 
   assert(FormatXkbIndicatorText(&input, &indicators));
   assert(strcmp(indicators.text, "Keyboard: Num Lock, Compose") == 0);
-  assert(indicators.warning == 0);
-  assert(indicators.have_multiple_layouts == 1);
+  assert(!indicators.warning);
+  assert(indicators.have_multiple_layouts);
 }
 
 static void ExpectLockAndLatchFormatting(void) {
   struct XkbIndicatorFormatInput input = {
       .implicit_mods = ShiftMask | LockMask | Mod4Mask,
-      .show_locks_and_latches = 1,
+      .show_locks_and_latches = true,
   };
   struct XkbIndicators indicators = {0};
 
   assert(FormatXkbIndicatorText(&input, &indicators));
   assert(strcmp(indicators.text, "Keyboard: Shift, Lock, Mod4") == 0);
-  assert(indicators.warning == 1);
-  assert(indicators.have_multiple_layouts == 0);
+  assert(indicators.warning);
+  assert(!indicators.have_multiple_layouts);
 }
 
 static void ExpectCombinedFormatting(void) {
@@ -52,15 +53,15 @@ static void ExpectCombinedFormatting(void) {
       .layout_name = "us",
       .indicator_names = indicator_names,
       .indicator_count = 1,
-      .show_keyboard_layout = 1,
-      .have_multiple_layouts = 1,
+      .show_keyboard_layout = true,
+      .have_multiple_layouts = true,
   };
   struct XkbIndicators indicators = {0};
 
   assert(FormatXkbIndicatorText(&input, &indicators));
   assert(strcmp(indicators.text, "Keyboard: us, Num Lock") == 0);
-  assert(indicators.warning == 0);
-  assert(indicators.have_multiple_layouts == 1);
+  assert(!indicators.warning);
+  assert(indicators.have_multiple_layouts);
 }
 
 static void ExpectEmptyFormattingProducesEmptyText(void) {
@@ -69,8 +70,8 @@ static void ExpectEmptyFormattingProducesEmptyText(void) {
 
   assert(FormatXkbIndicatorText(&input, &indicators));
   assert(strcmp(indicators.text, "") == 0);
-  assert(indicators.warning == 0);
-  assert(indicators.have_multiple_layouts == 0);
+  assert(!indicators.warning);
+  assert(!indicators.have_multiple_layouts);
 }
 
 static void ExpectOverflowKeepsPartialOutput(void) {
@@ -82,16 +83,16 @@ static void ExpectOverflowKeepsPartialOutput(void) {
       .layout_name = "us",
       .indicator_names = indicator_names,
       .indicator_count = 1,
-      .show_keyboard_layout = 1,
-      .have_multiple_layouts = 1,
+      .show_keyboard_layout = true,
+      .have_multiple_layouts = true,
       .implicit_mods = LockMask,
   };
   struct XkbIndicators indicators = {0};
 
   assert(FormatXkbIndicatorText(&input, &indicators));
   assert(strcmp(indicators.text, "Keyboard: us") == 0);
-  assert(indicators.warning == 1);
-  assert(indicators.have_multiple_layouts == 1);
+  assert(indicators.warning);
+  assert(indicators.have_multiple_layouts);
 }
 
 int main(void) {
