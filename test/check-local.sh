@@ -42,21 +42,28 @@ export ASAN_OPTIONS='detect_leaks=1:halt_on_error=1:abort_on_error=1'
 export UBSAN_OPTIONS='print_stacktrace=1:halt_on_error=1'
 
 echo "Running native smoke tests"
+"$builddir"/buf_util_test
 "$builddir"/rect_test
 "$builddir"/authproto_bounds_test
+"$builddir"/configured_command_test
 "$builddir"/dimmer_bayer_test
 "$builddir"/prompt_display_test
+"$builddir"/prompt_glyph_test
 "$builddir"/prompt_state_test
 "$builddir"/explicit_bzero_test
 "$builddir"/explicit_bzero_fallback_test
 "$builddir"/retry_io_test
 "$builddir"/retry_io_fallback_test
+"$builddir"/signal_pipe_test
 "$builddir"/indicator_text_test
 "$builddir"/xkb_test
 "$builddir"/mlock_page_test
+"$builddir"/mlock_page_overflow_test
 "$builddir"/prompt_random_test
 "$builddir"/env_settings_test
 "$builddir"/wait_pgrp_test
+"$builddir"/xscreensaver_api_test
+"$builddir"/unmap_all_test
 "$srcdir"/test/saver_xscreensaver_smoke.sh "$builddir"/helpers/saver_xscreensaver
 printf 'P 7\nhunter2\n' > "$builddir"/cat_authproto.fixture
 "$builddir"/cat_authproto < "$builddir"/cat_authproto.fixture > "$builddir"/cat_authproto.out

@@ -33,6 +33,13 @@ static void ExpectOverflowFallsBackToNone(void) {
   }
 }
 
+static void ExpectNegativeValueFallsBackToNone(void) {
+  setenv("XSCREENSAVER_WINDOW", "-1", 1);
+  if (ReadWindowID() != None) {
+    abort();
+  }
+}
+
 static void ExpectSaverIndexUsesSignedFormatting(void) {
   const char *value = NULL;
 
@@ -48,6 +55,7 @@ int main(void) {
   ExpectUnsetFallsBackToNone();
   ExpectRoundTripWindowID();
   ExpectOverflowFallsBackToNone();
+  ExpectNegativeValueFallsBackToNone();
   ExpectSaverIndexUsesSignedFormatting();
   unsetenv("XSCREENSAVER_WINDOW");
   unsetenv("XSCREENSAVER_SAVER_INDEX");

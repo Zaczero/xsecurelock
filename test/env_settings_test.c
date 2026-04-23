@@ -27,6 +27,11 @@ static void ExpectValuesClampToBounds(void) {
   if (GetClampedIntSetting("XSECURELOCK_TEST_INT", 12, 0, 100) != 100) {
     abort();
   }
+
+  setenv("XSECURELOCK_TEST_INT", "-5", 1);
+  if (GetClampedIntSetting("XSECURELOCK_TEST_INT", 2048, 1, 1 << 30) != 1) {
+    abort();
+  }
 }
 
 static void ExpectInRangeValuePassesThrough(void) {

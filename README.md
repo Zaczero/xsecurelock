@@ -75,10 +75,11 @@ make check
 ```
 
 This builds a temporary out-of-tree clang/ASan/UBSan install, runs the native
-smoke tests (`rect_test` and a `cat_authproto` packet round-trip), and then
-runs the default XDO smoke suite against the installed prefix. `make check`
-requires `clang`, `startx`, `Xephyr`, `xdotool`, and `htpasswd` to be present
-in `PATH`.
+helper and unit smoke tests (for example `rect_test`, `retry_io_test`,
+`env_settings_test`, `signal_pipe_test`, and a `cat_authproto` packet
+round-trip), and then runs the default XDO smoke suite against the installed
+prefix. `make check` requires `clang`, `startx`, `Xephyr`, `xdotool`, and
+`htpasswd` to be present in `PATH`.
 
 For manual XDO runs, the existing harness stays available:
 
