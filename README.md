@@ -405,6 +405,10 @@ Options to XSecureLock can be passed by environment variables:
     to do so by the Linux-PAM Application Developers' Guide. This may work
     around bugs in third-party PAM authentication modules. If this solves a
     problem for you, please report a bug against said PAM module.
+*   `XSECURELOCK_ALLOW_NULL_PAM_AUTHTOK`: allow PAM authentication to accept
+    null authentication tokens if the PAM stack permits them. Disabled by
+    default so empty-password PAM policy does not unlock an existing session
+    unless you opt in explicitly.
 *   `XSECURELOCK_NO_XRANDR`: disables multi monitor support using XRandR.
 *   `XSECURELOCK_NO_XRANDR15`: disables multi monitor support using XRandR 1.5
     and fall back to XRandR 1.2. Not recommended.

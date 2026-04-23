@@ -175,6 +175,7 @@ static int CallPAMWithRetries(int (*pam_call)(pam_handle_t *, int),
 static int Authenticate(struct pam_conv *conv, pam_handle_t **pam) {
   const char *service_name =
       GetStringSetting("XSECURELOCK_PAM_SERVICE", PAM_SERVICE_NAME);
+  int pam_auth_flags = 0;
   if (strchr(service_name, '/')) {
     // As this binary might be running with setuid privileges, we should better
     // refuse potentially dangerous parameters. This works around PAM
@@ -219,7 +220,15 @@ static int Authenticate(struct pam_conv *conv, pam_handle_t **pam) {
     return status;
   }
 
-  status = CallPAMWithRetries(pam_authenticate, *pam, 0);
+#ifdef PAM_DISALLOW_NULL_AUTHTOK
+  if (!GetBoolSetting("XSECURELOCK_ALLOW_NULL_PAM_AUTHTOK", 0)) {
+    // A screen locker should not silently inherit permissive null-password PAM
+    // policy unless the operator opts in explicitly.
+    pam_auth_flags |= PAM_DISALLOW_NULL_AUTHTOK;
+  }
+#endif
+
+  status = CallPAMWithRetries(pam_authenticate, *pam, pam_auth_flags);
   if (status != PAM_SUCCESS) {
     if (!conv_error) {
       Log("pam_authenticate: %s", pam_strerror(*pam, status));
