@@ -104,20 +104,23 @@ static int AuthDialogInset(const struct AuthUiContext *ctx) {
 
 static void DrawDialogBorder(const struct AuthUiContext *ctx,
                              size_t window_index, int region_w, int region_h) {
-  int border_offset;
-
   if (ctx->config.auth_border_size <= 0) {
+    return;
+  }
+
+  int rect_w = region_w - ctx->config.auth_border_size - 1;
+  int rect_h = region_h - ctx->config.auth_border_size - 1;
+  if (rect_w <= 0 || rect_h <= 0) {
     return;
   }
 
   XSetLineAttributes(ctx->resources.display, ctx->windows.gcs[window_index],
                      ctx->config.auth_border_size, LineSolid, CapButt,
                      JoinMiter);
-  border_offset = ctx->config.auth_border_size / 2;
+  int border_offset = ctx->config.auth_border_size / 2;
   XDrawRectangle(ctx->resources.display, ctx->windows.windows[window_index],
                  ctx->windows.gcs[window_index], border_offset, border_offset,
-                 region_w - ctx->config.auth_border_size - 1,
-                 region_h - ctx->config.auth_border_size - 1);
+                 rect_w, rect_h);
 }
 
 static void TruncatingAppendBytes(char **output, size_t *output_size,
