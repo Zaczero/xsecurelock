@@ -55,6 +55,15 @@ void StartPgrp(void);
  * failed.
  */
 int ExecvHelper(const char *path, const char *const argv[]);
+
+/*! \brief Spawns a helper process and terminates the child if exec fails.
+ *
+ * This is intended for forked children that cannot recover from an exec
+ * failure. It logs the exec failure through ExecvHelper(), sleeps briefly to
+ * keep error reporting readable, and then exits the child with EXIT_FAILURE.
+ *
+ * \return This function does not return.
+ */
 void ExecvHelperOrExit(const char *path, const char *const argv[]);
 
 /*! \brief Kills the given process group.
