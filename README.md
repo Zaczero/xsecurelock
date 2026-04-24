@@ -191,6 +191,27 @@ exit 0
 
 Don't forget to mark the script executable.
 
+## Running from systemd
+
+XSecureLock must run inside the graphical X11 session it is locking. A system
+service, or a user service started without the session environment, cannot
+usually open the display and will fail with an error such as `Could not connect
+to $DISPLAY`.
+
+For automatic locking, prefer running XSecureLock through the session itself,
+for example with `xss-lock` as shown below. If you do wrap it in a
+`systemd --user` service, import the X11 environment after graphical login
+before starting the service:
+
+```
+systemctl --user import-environment DISPLAY XAUTHORITY
+dbus-update-activation-environment --systemd DISPLAY XAUTHORITY
+```
+
+The exact unit wiring is desktop-specific, but the important invariant is that
+the process must have the same `DISPLAY` and X authority as the logged-in X11
+session.
+
 # Automatic Locking
 
 To automatically lock the screen after some time of inactivity, use
