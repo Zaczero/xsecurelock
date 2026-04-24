@@ -1,0 +1,63 @@
+#!/bin/sh
+# Example lock command for XFCE.
+#
+# XFCE waits for its configured lock command to exit. Run xsecurelock in the
+# background, but only return after xsecurelock confirms that the screen is
+# actually locked.
+
+if command -v pgrep >/dev/null 2>&1 &&
+   pgrep -xu "$(id -u)" xsecurelock >/dev/null 2>&1; then
+  exit 0
+fi
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/xsecurelock-xfce.XXXXXX") || exit 1
+fifo=$tmpdir/locked
+notified=$tmpdir/notified
+status_file=$tmpdir/status
+
+cleanup() {
+  if [ ! -e "$notified" ] && [ -n "$lock_pid" ]; then
+    kill "$lock_pid" 2>/dev/null || true
+  fi
+  if [ -n "$reader_pid" ]; then
+    kill "$reader_pid" 2>/dev/null || true
+  fi
+  rm -rf "$tmpdir"
+}
+
+lock_pid=
+reader_pid=
+trap cleanup EXIT
+
+mkfifo "$fifo" || exit 1
+(read -r _ < "$fifo" && : > "$notified") &
+reader_pid=$!
+
+(
+  trap 'kill "$lock_pid" 2>/dev/null || true' EXIT INT HUP TERM
+  xsecurelock -- /bin/sh -c 'printf "%s\n" locked > "$1"' xfce_lock_command "$fifo" &
+  lock_pid=$!
+  wait "$lock_pid"
+  status=$?
+  trap - EXIT INT HUP TERM
+  if [ -d "$tmpdir" ]; then
+    printf '%s\n' "$status" > "$status_file"
+  fi
+) &
+lock_pid=$!
+
+while :; do
+  if [ -e "$notified" ]; then
+    wait "$reader_pid"
+    reader_pid=
+    exit 0
+  fi
+
+  if [ -e "$status_file" ]; then
+    status=$(cat "$status_file")
+    [ "$status" -eq 0 ] && status=1
+    exit "$status"
+  fi
+
+  sleep 1
+done

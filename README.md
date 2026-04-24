@@ -246,6 +246,22 @@ The exact unit wiring is desktop-specific, but the important invariant is that
 the process must have the same `DISPLAY` and X authority as the logged-in X11
 session.
 
+## Running from XFCE
+
+XFCE waits for its configured lock command to exit. Running `xsecurelock`
+directly there can delay suspend until the screen is unlocked, because
+XSecureLock normally stays in the foreground while the session is locked.
+
+Use a small wrapper that starts XSecureLock in the background and exits only
+after XSecureLock reports that locking succeeded. An example is installed as
+`doc/examples/xfce_lock_command`; copy it to a location in `PATH`, make it
+executable, and configure XFCE to use it:
+
+```
+sudo install -m 755 doc/examples/xfce_lock_command /usr/local/bin/xsecurelock-xfce
+xfconf-query --channel xfce4-session --property /general/LockCommand --set xsecurelock-xfce
+```
+
 # Automatic Locking
 
 To automatically lock the screen after some time of inactivity, use

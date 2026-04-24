@@ -344,7 +344,8 @@ EXTRA_DIST = \
 
 examplesdir = $(docdir)/examples
 dist_examples_DATA = \
-	doc/examples/saver_livestreams
+	doc/examples/saver_livestreams \
+	doc/examples/xfce_lock_command
 
 if HAVE_DOXYGEN
 doxyfile.stamp:
