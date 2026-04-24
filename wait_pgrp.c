@@ -133,9 +133,9 @@ void ExecvHelperOrExit(const char *path, const char *const argv[]) {
 int KillPgrp(pid_t pid, int signo) {
   int ret = kill(-pid, signo);
   if (ret < 0 && errno == ESRCH) {
-    // Note: this shouldn't happen as StartPgrp() should ensure that we never
-    // get here. Remove this workaround once we made sure this really does not
-    // happen. TODO(divVerent).
+    // StartPgrp() normally keeps a placeholder process alive so the process
+    // group remains signalable after the leader exits. If that invariant did
+    // not hold, try the leader PID directly.
     LogErrno("Unable to kill process group %d - falling back to leader only",
              (int)pid);
     // Might mean the process is not a process group leader - but might also
