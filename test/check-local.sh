@@ -5,7 +5,7 @@ set -eu
 srcdir=$1
 maketool=${MAKE:-make}
 
-for tool in clang startx Xephyr xdotool htpasswd; do
+for tool in clang startx Xephyr xdotool htpasswd xset; do
   if ! command -v "$tool" >/dev/null 2>&1; then
     echo "error: make check requires '$tool' in PATH" >&2
     exit 1
@@ -83,6 +83,7 @@ PATH="$prefix/bin:$PATH" ./run-tests.sh \
   test-wrong-password \
   test-sigusr2-starts-auth \
   test-saver-auth-open-notify \
+  test-xss-activation-keeps-saver \
   test-global-saver-relative-override \
   test-authproto-static-info-advance \
   test-authproto-static-info-timeout

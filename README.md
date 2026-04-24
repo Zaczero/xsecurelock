@@ -577,7 +577,9 @@ Options to XSecureLock can be passed by environment variables:
     display and reduce the black flash.
 *   `XSECURELOCK_SAVER_STOP_ON_BLANK`: specifies if the saver is stopped
     when the screen is blanked (DPMS or XSS) to save power. This only controls the
-    saver child; it does not change who decides when blanking happens.
+    saver child; it does not change who decides when blanking happens. Set this
+    to 0 if `xss-lock` is only triggering the lock and you want the configured
+    saver to remain visible until xsecurelock's own blank/DPMS timeout.
 *   `XSECURELOCK_XSCREENSAVER_PATH`: location where XScreenSaver hacks are
     installed for use by `saver_xscreensaver`.
 

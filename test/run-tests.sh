@@ -47,6 +47,10 @@ htpasswd_bin=$(command -v htpasswd) || {
   echo "htpasswd is required to run the XDO tests." >&2
   exit 1
 }
+xset_bin=$(command -v xset) || {
+  echo "xset is required to run the XDO tests." >&2
+  exit 1
+}
 
 display_in_use() {
   [ -e "/tmp/.X11-unix/X$1" ] && return 0
@@ -91,6 +95,7 @@ export PATH
 PATH=$(dirname "$startx_bin"):$PATH
 PATH=$(dirname "$xdotool_bin"):$PATH
 PATH=$(dirname "$htpasswd_bin"):$PATH
+PATH=$(dirname "$xset_bin"):$PATH
 
 for test in "$@"; do
   "$startx_bin" \

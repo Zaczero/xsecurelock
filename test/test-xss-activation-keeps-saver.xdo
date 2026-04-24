@@ -1,0 +1,21 @@
+#preexec export XSECURELOCK_NO_COMPOSITE=1
+#preexec export XSECURELOCK_SAVER_STOP_ON_BLANK=0
+
+# Assert that xsecurelock is running, and saving the screen.
+search --name background
+search --name saver
+sleep 1
+search --name saver_multiplex_screen
+
+# XScreenSaver activation should not stop the saver when stop-on-blank is off.
+exec --sync xset s activate
+sleep 1
+search --name saver_multiplex_screen
+
+# Enter the password.
+search --maxdepth 0 ''
+type 'hunter2'
+sleep 2
+
+# Assert that xsecurelock is now gone.
+exec --sync /bin/sh -c '! xdotool search --name background exec echo fail'

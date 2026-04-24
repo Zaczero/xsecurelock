@@ -516,6 +516,16 @@ static void HandleClientMessage(struct LockContext *ctx) {
 #endif
 }
 
+#ifdef HAVE_XSCREENSAVER_EXT
+static enum WatchChildrenState ScreenSaverRequestedState(
+    const struct LockContext *ctx, int state, int kind) {
+  return ctx->config.saver_stop_on_blank && state == ScreenSaverOn &&
+                 kind == ScreenSaverBlanked
+             ? WATCH_CHILDREN_SAVER_DISABLED
+             : WATCH_CHILDREN_NORMAL;
+}
+#endif
+
 static int HandleScreenSaverEvent(struct LockContext *ctx) {
 #ifdef HAVE_XSCREENSAVER_EXT
   if (ctx->runtime.scrnsaver_event_base != 0 &&
@@ -523,9 +533,8 @@ static int HandleScreenSaverEvent(struct LockContext *ctx) {
           ctx->runtime.scrnsaver_event_base + ScreenSaverNotify) {
     XScreenSaverNotifyEvent *xss_ev =
         (XScreenSaverNotifyEvent *)&ctx->runtime.sensitive.ev;
-    ctx->runtime.xss_requested_saver_state = xss_ev->state == ScreenSaverOn
-                                                 ? WATCH_CHILDREN_SAVER_DISABLED
-                                                 : WATCH_CHILDREN_NORMAL;
+    ctx->runtime.xss_requested_saver_state =
+        ScreenSaverRequestedState(ctx, xss_ev->state, xss_ev->kind);
     return 1;
   }
 #endif
@@ -651,10 +660,9 @@ static int InitializeLockContextRuntime(struct LockContext *ctx) {
       if (!XScreenSaverQueryInfo(ctx->runtime.display, ctx->windows.root_window,
                                  info)) {
         Log("XScreenSaverQueryInfo failed");
-      } else if (info->state == ScreenSaverOn &&
-                 info->kind == ScreenSaverBlanked &&
-                 ctx->config.saver_stop_on_blank) {
-        ctx->runtime.xss_requested_saver_state = WATCH_CHILDREN_SAVER_DISABLED;
+      } else {
+        ctx->runtime.xss_requested_saver_state =
+            ScreenSaverRequestedState(ctx, info->state, info->kind);
       }
       XFree(info);
     }
