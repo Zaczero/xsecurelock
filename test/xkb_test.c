@@ -64,6 +64,30 @@ static void ExpectCombinedFormatting(void) {
   assert(indicators.have_multiple_layouts);
 }
 
+static void ExpectCapsLockUsesKeyboardState(void) {
+  const char *indicator_names[] = {"Caps Lock", "Group 2"};
+  struct XkbIndicatorFormatInput input = {
+      .layout_name = "Hebrew",
+      .indicator_names = indicator_names,
+      .indicator_count = 2,
+      .show_keyboard_layout = true,
+      .have_multiple_layouts = true,
+  };
+  struct XkbIndicators indicators = {0};
+
+  assert(FormatXkbIndicatorText(&input, &indicators));
+  assert(strcmp(indicators.text, "Keyboard: Hebrew, Group 2") == 0);
+  assert(!indicators.warning);
+  assert(indicators.have_multiple_layouts);
+
+  input.caps_lock_active = true;
+  input.implicit_mods = LockMask;
+  assert(FormatXkbIndicatorText(&input, &indicators));
+  assert(strcmp(indicators.text, "Keyboard: Hebrew, Caps Lock, Group 2") == 0);
+  assert(indicators.warning);
+  assert(indicators.have_multiple_layouts);
+}
+
 static void ExpectEmptyFormattingProducesEmptyText(void) {
   struct XkbIndicatorFormatInput input = {0};
   struct XkbIndicators indicators = {0};
@@ -100,6 +124,7 @@ int main(void) {
   ExpectIndicatorListFormatting();
   ExpectLockAndLatchFormatting();
   ExpectCombinedFormatting();
+  ExpectCapsLockUsesKeyboardState();
   ExpectEmptyFormattingProducesEmptyText();
   ExpectOverflowKeepsPartialOutput();
   return 0;

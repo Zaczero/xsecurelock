@@ -33,6 +33,10 @@ static int AppendIndicatorName(char **output, size_t *output_size,
   return 0;
 }
 
+static bool IsCapsLockIndicatorName(const char *name) {
+  return name != NULL && strcmp(name, "Caps Lock") == 0;
+}
+
 static const struct {
   unsigned int mask;
   const char *name;
@@ -83,7 +87,15 @@ int FormatXkbIndicatorText(const struct XkbIndicatorFormatInput *input,
       }
     }
   } else {
+    if (input->caps_lock_active &&
+        !AppendIndicatorName(&output, &output_size, &have_output,
+                             "Caps Lock")) {
+      goto done;
+    }
     for (size_t i = 0; i < input->indicator_count; ++i) {
+      if (IsCapsLockIndicatorName(input->indicator_names[i])) {
+        continue;
+      }
       if (!AppendIndicatorName(&output, &output_size, &have_output,
                                input->indicator_names[i])) {
         break;
@@ -257,6 +269,7 @@ int GetXkbIndicators(Display *display, bool have_xkb_ext,
   struct XkbIndicatorFormatInput input = {
       .layout_name = layout_name,
       .implicit_mods = state.latched_mods | state.locked_mods,
+      .caps_lock_active = (state.locked_mods & LockMask) != 0,
       .indicator_names = indicator_name_views,
       .indicator_count = indicator_count,
       .show_keyboard_layout = show_keyboard_layout,

@@ -17,6 +17,7 @@ struct XkbIndicators {
 struct XkbIndicatorFormatInput {
   const char *layout_name;
   unsigned int implicit_mods;
+  bool caps_lock_active;
   const char *const *indicator_names;
   size_t indicator_count;
   bool show_keyboard_layout;
