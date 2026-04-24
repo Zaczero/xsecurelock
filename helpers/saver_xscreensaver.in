@@ -147,6 +147,7 @@ select_saver() {
 # On SIGUSR1, we exit the saver and retry the selection.
 sigusr1_caught=false
 trap 'sigusr1_caught=true' USR1
+trap '' USR2
 
 while :; do
   saver=$(select_saver)

@@ -96,9 +96,12 @@ void StartPgrp(void) {
     // Child process.
     // Just wait forever. We'll get SIGTERM'd when it's time to go.
     struct sigaction sa = {.sa_flags = 0, .sa_handler = SIG_IGN};
-    sigemptyset(&sa.sa_mask);  // Don't die of SIGUSR1 (saver reset).
+    sigemptyset(&sa.sa_mask);  // Don't die of saver lifecycle notifications.
     if (sigaction(SIGUSR1, &sa, NULL) != 0) {
       LogErrno("sigaction(SIGUSR1)");
+    }
+    if (sigaction(SIGUSR2, &sa, NULL) != 0) {
+      LogErrno("sigaction(SIGUSR2)");
     }
 
     const char *args[2] = {"pgrp_placeholder", NULL};

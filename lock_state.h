@@ -36,6 +36,7 @@ struct LockConfig {
   int blank_timeout;
   const char *blank_dpms_state;
   bool saver_reset_on_auth_close;
+  bool saver_notify_on_auth_open;
   int saver_delay_ms;
   bool saver_stop_on_blank;
   bool auto_raise;

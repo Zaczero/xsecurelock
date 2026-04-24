@@ -164,6 +164,8 @@ static void LoadDefaults(struct LockConfig *config) {
       GetStringSetting("XSECURELOCK_BLANK_DPMS_STATE", "off");
   config->saver_reset_on_auth_close =
       GetBoolSetting("XSECURELOCK_SAVER_RESET_ON_AUTH_CLOSE", 0);
+  config->saver_notify_on_auth_open =
+      GetBoolSetting("XSECURELOCK_SAVER_NOTIFY_ON_AUTH_OPEN", 0);
   config->saver_delay_ms =
       GetNonnegativeIntSetting("XSECURELOCK_SAVER_DELAY_MS", 0);
   config->saver_stop_on_blank =
@@ -256,11 +258,12 @@ static int WatchChildren(struct LockContext *ctx, enum WatchChildrenState state,
                          const char *stdinbuf) {
   int want_auth = WantAuthChild(state == WATCH_CHILDREN_FORCE_AUTH);
   int auth_running = 0;
+  int auth_started = 0;
 
   if (want_auth) {
     if (WatchAuthChild(ctx->windows.auth_window, ctx->config.auth_executable,
                        state == WATCH_CHILDREN_FORCE_AUTH, stdinbuf,
-                       &auth_running)) {
+                       &auth_running, &auth_started)) {
       WatchSaverChild(ctx->runtime.display, ctx->windows.saver_window, 0,
                       ctx->config.saver_executable, 0);
       return 1;
@@ -273,9 +276,13 @@ static int WatchChildren(struct LockContext *ctx, enum WatchChildrenState state,
     }
   }
 
+  int saver_should_be_running = state != WATCH_CHILDREN_SAVER_DISABLED;
   WatchSaverChild(ctx->runtime.display, ctx->windows.saver_window, 0,
-                  ctx->config.saver_executable,
-                  state != WATCH_CHILDREN_SAVER_DISABLED);
+                  ctx->config.saver_executable, saver_should_be_running);
+  if (auth_started && saver_should_be_running &&
+      ctx->config.saver_notify_on_auth_open) {
+    KillAllSaverChildren(SIGUSR2);
+  }
 
   if (auth_running) {
     LockUnblankScreen(ctx);

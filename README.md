@@ -545,6 +545,9 @@ Options to XSecureLock can be passed by environment variables:
     saver module when the auth dialog closes. Resetting is done by sending
     `SIGUSR1` to the saver, which may either just terminate, or handle this
     specifically to do a cheaper reset.
+*   `XSECURELOCK_SAVER_NOTIFY_ON_AUTH_OPEN`: specifies whether to notify the
+    saver module when the auth dialog opens. Notification is done by sending
+    `SIGUSR2` to the saver. Disabled by default.
 *   `XSECURELOCK_SHOW_DATETIME`: whether to show local date and time on the
     login. Disabled by default.
 *   `XSECURELOCK_SHOW_HOSTNAME`: whether to show the hostname on the login
@@ -716,6 +719,8 @@ location: `/usr/local/libexec/xsecurelock`).
     unlock the screen. It should exit promptly.
 *   Reset condition: the saver child will receive SIGUSR1 when the auth dialog
     is closed and `XSECURELOCK_SAVER_RESET_ON_AUTH_CLOSE`.
+*   Auth-open notification: the saver child will receive SIGUSR2 when the auth
+    dialog opens and `XSECURELOCK_SAVER_NOTIFY_ON_AUTH_OPEN` is enabled.
 
 The saver is a visual helper only. The main xsecurelock process owns the actual
 lock windows and grabs, so a saver crash does not unlock the screen. A saver may

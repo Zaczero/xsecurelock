@@ -5,4 +5,5 @@
 
 # Just sleep for an arbitrary long time. The main process is already
 # taking care of blanking.
+trap '' USR2
 exec sleep 86400

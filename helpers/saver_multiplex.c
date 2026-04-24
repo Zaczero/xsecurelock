@@ -10,7 +10,7 @@
 #include <X11/Xlib.h>  // for XEvent, XFlush, XNextEvent, XOpenDi...
 #include <errno.h>     // for errno, EAGAIN, EINTR, EWOULDBLOCK
 #include <poll.h>      // for pollfd, POLLIN, POLLHUP
-#include <signal.h>    // for sigaction, SIGTERM, SIGUSR1
+#include <signal.h>    // for sigaction, SIGTERM, SIGUSR1, SIGUSR2
 #include <stdbool.h>   // for bool
 #include <stdlib.h>    // for EXIT_FAILURE, setenv
 #include <string.h>    // for memcmp, memcpy, memset
@@ -47,11 +47,18 @@ struct SaverMultiplexState {
 };
 
 static volatile sig_atomic_t g_reset_requested = 0;
+static volatile sig_atomic_t g_auth_open_requested = 0;
 static volatile sig_atomic_t g_terminate_signal = 0;
 
 static void HandleSIGUSR1(int unused_signo) {
   (void)unused_signo;
   g_reset_requested = 1;
+  SignalPipeNotifyFromHandler();
+}
+
+static void HandleSIGUSR2(int unused_signo) {
+  (void)unused_signo;
+  g_auth_open_requested = 1;
   SignalPipeNotifyFromHandler();
 }
 
@@ -81,6 +88,12 @@ static int InstallSignalHandlers(void) {
     return 0;
   }
 
+  sa.sa_handler = HandleSIGUSR2;
+  if (sigaction(SIGUSR2, &sa, NULL) != 0) {
+    LogErrno("sigaction(SIGUSR2)");
+    return 0;
+  }
+
   sa.sa_flags = SA_RESETHAND;
   sa.sa_handler = HandleSIGTERM;
   if (sigaction(SIGTERM, &sa, NULL) != 0) {
@@ -97,12 +110,14 @@ static int HandleSignalFlags(struct SaverMultiplexState *state) {
     g_terminate_signal = 0;
     return 1;
   }
-  if (!g_reset_requested) {
-    return 0;
+  if (g_reset_requested) {
+    g_reset_requested = 0;
+    KillAllSaverChildren(SIGUSR1);
   }
-
-  g_reset_requested = 0;
-  KillAllSaverChildren(SIGUSR1);
+  if (g_auth_open_requested) {
+    g_auth_open_requested = 0;
+    KillAllSaverChildren(SIGUSR2);
+  }
   return 0;
 }
 

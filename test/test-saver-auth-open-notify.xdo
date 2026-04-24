@@ -1,0 +1,21 @@
+#preexec . ./saver-auth-open-notify-preexec.sh
+
+# Assert that xsecurelock is running, and saving the screen.
+search --name background
+search --name saver
+exec --sync /bin/sh -c 'i=0; while [ "$i" -lt 50 ]; do [ -s "$XSECURELOCK_TEST_SAVER_PID_FILE" ] && exit 0; i=$((i + 1)); sleep 0.1; done; exit 1'
+
+# Opening auth should notify the saver exactly once and keep it running.
+exec --sync /bin/sh -c 'kill -USR2 "$XSECURELOCK_PID"'
+exec --sync /bin/sh -c 'i=0; while [ "$i" -lt 50 ]; do [ "$(wc -l < "$XSECURELOCK_TEST_SAVER_SIGNAL_FILE" 2>/dev/null || echo 0)" -ge 1 ] && exit 0; i=$((i + 1)); sleep 0.1; done; exit 1'
+exec --sync /bin/sh -c 'pid=$(cat "$XSECURELOCK_TEST_SAVER_PID_FILE"); kill -0 "$pid"'
+sleep 1
+exec --sync /bin/sh -c 'test "$(wc -l < "$XSECURELOCK_TEST_SAVER_SIGNAL_FILE")" -eq 1'
+
+# Enter the password.
+search --maxdepth 0 ''
+type 'hunter2'
+sleep 2
+
+# Assert that xsecurelock is now gone.
+exec --sync /bin/sh -c '! xdotool search --name background exec echo fail'

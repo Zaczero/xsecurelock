@@ -88,7 +88,9 @@ static int ContainsNonControl(const char *buf) {
 }
 
 int WatchAuthChild(Window w, const char *executable, int force_auth,
-                   const char *stdinbuf, int *auth_running) {
+                   const char *stdinbuf, int *auth_running, int *auth_started) {
+  *auth_started = 0;
+
   if (auth_child_pid != 0) {
     // Check if auth child returned.
     int status;
@@ -137,6 +139,7 @@ int WatchAuthChild(Window w, const char *executable, int force_auth,
         (void)CloseIfValid(&pc[0]);
         auth_child_fd = pc[1];
         auth_child_pid = pid;
+        *auth_started = 1;
 
         if (stdinbuf != NULL &&
             (DiscardFirstKeypress() || !ContainsNonControl(stdinbuf))) {

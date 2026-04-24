@@ -34,10 +34,12 @@ int WantAuthChild(int force_auth);
  *   child.
  * \param auth_running Will be set to the status of the current auth child (i.e.
  *   true iff it is running).
+ * \param auth_started Will be set to true iff a new auth child was spawned by
+ *   this call.
  * \return true if authentication was successful, i.e. if the auth child exited
  *   with status zero.
  */
 int WatchAuthChild(Window w, const char *executable, int force_auth,
-                   const char *stdinbuf, int *auth_running);
+                   const char *stdinbuf, int *auth_running, int *auth_started);
 
 #endif
