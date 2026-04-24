@@ -343,7 +343,10 @@ Options to XSecureLock can be passed by environment variables:
     response to an auth prompt or static PAM message shown by `auth_x11`
     before giving up and reverting to the screen saver. This also applies to
     PAM modules that display informational messages while waiting for external
-    input, such as U2F prompts.
+    input, such as U2F prompts. This does not itself blank or power off the
+    display; use `XSECURELOCK_BLANK_TIMEOUT` and
+    `XSECURELOCK_BLANK_DPMS_STATE` to control what happens after the auth prompt
+    closes.
 *   `XSECURELOCK_AUTH_TITLE`: custom title prefix for the login screen of
     `auth_x11`. When set, this replaces the generated `username@hostname`
     prefix while keeping the current authentication prompt/status title after
@@ -369,15 +372,23 @@ Options to XSecureLock can be passed by environment variables:
 *   `XSECURELOCK_BLANK_TIMEOUT`: specifies the time (in seconds) before telling
     X11 to fully blank the screen; a negative value disables xsecurelock-managed
     blanking. The time is measured since the closing of the auth window or
-    xsecurelock startup. Setting this to 0 is rather nonsensical, as
-    key-release events (e.g. from the keystroke to launch xsecurelock or from
-    pressing escape to close the auth dialog) always wake up the screen. Set
-    this to `-1` if you want external DPMS or screen saver policy to control
-    blanking timing instead of xsecurelock.
+    xsecurelock startup. Set this to `0` if you want xsecurelock to reblank
+    immediately after the auth window closes, for example after
+    `XSECURELOCK_AUTH_TIMEOUT`. For manual-lock workflows, a small positive
+    value may be less surprising because key-release events from launching
+    xsecurelock or closing the auth dialog can wake the screen again. Set this
+    to `-1` if you want external DPMS or screen saver policy to control blanking
+    timing instead of xsecurelock.
 *   `XSECURELOCK_BLANK_DPMS_STATE`: specifies which DPMS state to put the screen
     in when xsecurelock performs blanking (one of standby, suspend, off and on,
     where "on" means to not invoke DPMS at all). This setting only matters when
     `XSECURELOCK_BLANK_TIMEOUT` is nonnegative.
+
+    For example, to close the auth prompt after 5 seconds and immediately ask
+    X11 to power off the display again:
+
+        XSECURELOCK_AUTH_TIMEOUT=5 XSECURELOCK_BLANK_TIMEOUT=0 \
+        XSECURELOCK_BLANK_DPMS_STATE=off xsecurelock
 *   `XSECURELOCK_BURNIN_MITIGATION`: specifies the number of pixels the prompt
     of `auth_x11` may be moved at startup to mitigate possible burn-in
     effects due to the auth dialog being displayed all the time (e.g. when
