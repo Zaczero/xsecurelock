@@ -53,6 +53,7 @@ struct AuthUiConfig {
   int burnin_mitigation_max_offset_change;
   bool show_keyboard_layout;
   bool show_locks_and_latches;
+  const char *layout_switch_key_name;
   char hostname[AUTH_UI_HOSTNAME_BUFFER_SIZE];
   char username[AUTH_UI_USERNAME_BUFFER_SIZE];
 };

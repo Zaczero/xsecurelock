@@ -42,6 +42,7 @@
 #include "env_settings.h"
 #include "grabs.h"
 #include "io_util.h"
+#include "keysym_config.h"
 #include "lock_state.h"
 #include "lock_windows.h"
 #include "logging.h"
@@ -170,6 +171,8 @@ static void LoadDefaults(struct LockConfig *config) {
   config->auto_raise = GetBoolSetting("XSECURELOCK_AUTO_RAISE", 0);
   config->background_color =
       GetStringSetting("XSECURELOCK_BACKGROUND_COLOR", "black");
+  (void)GetKeySymSetting("XSECURELOCK_LAYOUT_SWITCH_KEYSYM", "Tab",
+                         &config->layout_switch_keysym);
 #ifdef HAVE_XCOMPOSITE_EXT
   config->no_composite = GetBoolSetting("XSECURELOCK_NO_COMPOSITE", 0);
   config->composite_obscurer =
@@ -404,7 +407,7 @@ static bool LookupKeypress(struct LockContext *ctx) {
 }
 
 static bool ApplyControlKeyTranslations(struct LockContext *ctx) {
-  if (ctx->runtime.sensitive.keysym == XK_Tab &&
+  if (ctx->runtime.sensitive.keysym == ctx->config.layout_switch_keysym &&
       (ctx->runtime.sensitive.ev.xkey.state & ControlMask)) {
     ctx->runtime.sensitive.buf[0] = '\023';
     ctx->runtime.sensitive.buf[1] = '\0';

@@ -4,6 +4,7 @@
 
 #include <X11/X.h>
 #include <X11/Xlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <time.h>
 
@@ -242,8 +243,11 @@ int AuthDisplayMessage(struct AuthUiContext *ctx, const char *title,
   rows[row_count++] =
       MeasureTextRow(ctx, indicators.text, indicators.warning != 0, 1);
   if (indicators.have_multiple_layouts) {
-    rows[row_count++] = MeasureTextRow(
-        ctx, "Press Ctrl-Tab to switch keyboard layout", false, 1);
+    char layout_switch_hint[96];
+    (void)snprintf(layout_switch_hint, sizeof(layout_switch_hint),
+                   "Press Ctrl-%s to switch keyboard layout",
+                   ctx->config.layout_switch_key_name);
+    rows[row_count++] = MeasureTextRow(ctx, layout_switch_hint, false, 1);
   }
   if (ctx->config.have_switch_user_command) {
     rows[row_count++] = MeasureTextRow(

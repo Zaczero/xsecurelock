@@ -40,6 +40,7 @@ struct LockConfig {
   bool saver_stop_on_blank;
   bool auto_raise;
   const char *background_color;
+  KeySym layout_switch_keysym;
 #ifdef HAVE_XCOMPOSITE_EXT
   bool no_composite;
   bool composite_obscurer;

@@ -6,6 +6,7 @@
 
 #include "../env_info.h"
 #include "../env_settings.h"
+#include "../keysym_config.h"
 #include "../logging.h"
 #include "build-config.h"
 
@@ -27,6 +28,7 @@ void AuthUiContextInit(struct AuthUiContext *ctx, int argc, char **argv) {
   ctx->config.auth_x_position = 50;
   ctx->config.auth_y_position = 50;
   ctx->config.show_keyboard_layout = true;
+  ctx->config.layout_switch_key_name = "Tab";
   ctx->windows.dirty = true;
 }
 
@@ -78,6 +80,8 @@ int AuthUiConfigLoad(struct AuthUiConfig *config) {
       GetBoolSetting("XSECURELOCK_SHOW_KEYBOARD_LAYOUT", 1);
   config->show_locks_and_latches =
       GetBoolSetting("XSECURELOCK_SHOW_LOCKS_AND_LATCHES", 0);
+  config->layout_switch_key_name =
+      GetKeySymSetting("XSECURELOCK_LAYOUT_SWITCH_KEYSYM", "Tab", NULL);
 #endif
 
   if (!GetPromptDisplayModeFromFlags(paranoid_password_flag,

@@ -552,6 +552,9 @@ Options to XSecureLock can be passed by environment variables:
     hostname, 1 for showing the short form, and 2 for showing the long form.
 *   `XSECURELOCK_SHOW_KEYBOARD_LAYOUT`: whether to show the name of the current
     keyboard layout. Enabled by default.
+*   `XSECURELOCK_LAYOUT_SWITCH_KEYSYM`: X11 keysym to use with Ctrl for
+    switching keyboard layouts. Defaults to `Tab`; set this to `space` for
+    Ctrl-Space. Use the case-sensitive keysym name from `xev -event keyboard`.
 *   `XSECURELOCK_SHOW_USERNAME`: whether to show the username on the login
     screen of `auth_x11`.
 *   `XSECURELOCK_SINGLE_AUTH_WINDOW`: whether to show only a single auth window
