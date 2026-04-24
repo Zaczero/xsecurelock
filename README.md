@@ -431,7 +431,9 @@ Options to XSecureLock can be passed by environment variables:
     powered off and have a chat client behind or similar).
 *   `XSECURELOCK_FONT`: X11 or FontConfig font name to use for `auth_x11`.
     You can get a list of supported font names by running `xlsfonts` and
-    `fc-list`.
+    `fc-list`. Unicode prompt modes need a regular text font that contains the
+    required glyphs; icon fonts and unsupported color emoji fonts may not render
+    useful password feedback.
 *   `XSECURELOCK_FORCE_GRAB`: When grabbing fails, try stealing the grab from
     other windows (a value of `2` steals from all descendants of the root
     window, while a value of `1` only steals from client windows). This works
@@ -575,9 +577,15 @@ Options to XSecureLock can be passed by environment variables:
 
 <!-- ENV VARIABLES END -->
 
-Additionally, command line arguments following a `--` argument will be executed
-via `execvp` once locking is successful; this can be used to notify a calling
-process of successful locking.
+Additionally, command line arguments following `--` are executed via `execvp`
+once locking is successful. This is intended for callers that need a reliable
+"locked" notification.
+
+Set environment variables before `xsecurelock`, for example:
+
+```sh
+XSECURELOCK_PASSWORD_PROMPT=disco xsecurelock
+```
 
 # Authentication Modules
 

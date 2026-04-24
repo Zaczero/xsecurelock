@@ -142,10 +142,30 @@ static void SetWindowProperties(struct LockContext *ctx) {
 #endif
 }
 
+static XIM OpenInputMethod(Display *display) {
+  if (!XSupportsLocale()) {
+    Log("Current locale is not supported by Xlib; non-ASCII password input may "
+        "not work");
+    return NULL;
+  }
+
+  if (XSetLocaleModifiers("") == NULL) {
+    Log("XSetLocaleModifiers failed; falling back to Latin-1 keyboard input");
+    return NULL;
+  }
+
+  XIM xim = XOpenIM(display, NULL, NULL, NULL);
+  if (xim != NULL) {
+    return xim;
+  }
+
+  Log("XOpenIM failed; falling back to Latin-1 keyboard input");
+  return NULL;
+}
+
 static void InitInputMethod(struct LockContext *ctx) {
-  ctx->windows.xim = XOpenIM(ctx->runtime.display, NULL, NULL, NULL);
+  ctx->windows.xim = OpenInputMethod(ctx->runtime.display);
   if (ctx->windows.xim == NULL) {
-    Log("XOpenIM failed. Assuming Latin-1 encoding");
     return;
   }
 
@@ -163,7 +183,9 @@ static void InitInputMethod(struct LockContext *ctx) {
       return;
     }
   }
-  Log("XCreateIC failed. Assuming Latin-1 encoding");
+  Log("XCreateIC failed; falling back to Latin-1 keyboard input");
+  XCloseIM(ctx->windows.xim);
+  ctx->windows.xim = NULL;
 }
 
 int LockWindowsInit(struct LockContext *ctx) {
