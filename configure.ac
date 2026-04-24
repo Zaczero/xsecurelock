@@ -308,9 +308,11 @@ if test x$have_pam = xtrue; then
 
   AC_ARG_ENABLE([pam_check_account_type],
                 AS_HELP_STRING([--enable-pam-check-account-type],
-                               [Enable checking of PAM accounting result. Only
-                                enable this if accounting is properly configured
-                                on your system; especially keep this disabled if
+                               [Enable checking ordinary PAM accounting
+                                failures. Required expired-password changes are
+                                always enforced. Only enable this if accounting
+                                is properly configured on your system;
+                                especially keep this disabled if
                                 --with-pam-service-name is set to an
                                 authentication-only service name like
                                 common-auth.]),

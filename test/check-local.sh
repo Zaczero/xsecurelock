@@ -46,6 +46,8 @@ echo "Running native smoke tests"
 "$builddir"/buf_util_test
 "$builddir"/rect_test
 "$builddir"/authproto_bounds_test
+"$builddir"/authproto_pam_flow_test
+"$builddir"/authproto_pam_flow_check_account_test
 "$builddir"/auth_title_test
 "$builddir"/configured_command_test
 "$builddir"/dimmer_bayer_test

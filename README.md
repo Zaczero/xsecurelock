@@ -70,10 +70,11 @@ Optional documentation and validation tools:
 
 # Installation
 
-NOTE: In these instructions, please replace SERVICE-NAME by the name of an
-appropriate and existing file in `/etc/pam.d`. If xscreensaver is installed,
-`xscreensaver` should always be a good choice; otherwise, on Debian and Ubuntu,
-`common-auth` would work. This will be used as default and can be overridden
+Replace SERVICE-NAME with an existing file in `/etc/pam.d`. If xscreensaver is
+installed, `xscreensaver` is usually a good choice. On Debian and Ubuntu,
+`common-auth` is only enough for password checking; use a dedicated service with
+`auth`, `account` and `password` rules if you want login-like account checks or
+expired-password changes. This service is only the default and can be overridden
 with [`XSECURELOCK_PAM_SERVICE`](#options).
 
 Configuring a broken or missing SERVICE-NAME will render unlocking the screen
@@ -89,6 +90,19 @@ sh autogen.sh
 make
 sudo make install
 ```
+
+## PAM service privileges
+
+On many Linux systems, PAM password checks work without making XSecureLock
+setuid because `pam_unix` delegates the sensitive part to its own helper.
+Account checks and expired-password changes may need extra privileges,
+depending on the PAM stack.
+
+`make install` does not set setuid or setgid bits. If you need full login-like
+PAM behavior, install `authproto_pam` with the privileges required by your PAM
+service, typically as a root-owned setuid helper on Linux. Pair this with a
+dedicated PAM service and consider `--enable-pam-check-account-type` if ordinary
+account failures should also block unlocking.
 
 # Testing
 

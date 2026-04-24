@@ -19,6 +19,10 @@
 
 // IWYU pragma: no_include <security/_pam_types.h>
 
+#ifdef XSECURELOCK_TEST_FORCE_NO_PAM_CHECK_ACCOUNT_TYPE
+#undef PAM_CHECK_ACCOUNT_TYPE
+#endif
+
 //! Set if a conversation error has happened during the last PAM call.
 static int conv_error = 0;
 
@@ -229,16 +233,12 @@ static int Authenticate(struct pam_conv *conv, pam_handle_t **pam) {
   if (status2 == PAM_NEW_AUTHTOK_REQD) {
     status2 =
         CallPAMWithRetries(pam_chauthtok, *pam, PAM_CHANGE_EXPIRED_AUTHTOK);
-#ifdef PAM_CHECK_ACCOUNT_TYPE
     if (status2 != PAM_SUCCESS) {
       if (!conv_error) {
         Log("pam_chauthtok: %s", pam_strerror(*pam, status2));
       }
       return status2;
     }
-#else
-    (void)status2;
-#endif
   }
 
 #ifdef PAM_CHECK_ACCOUNT_TYPE
