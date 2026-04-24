@@ -242,9 +242,23 @@ xset s 300 5
 xss-lock -n /usr/lib/xsecurelock/dimmer -l -- xsecurelock
 ```
 
-The option `-l` is critical as it makes sure not to allow machine suspend before
-the screen saver is active - otherwise previous screen content may show up for a
-short time after wakeup!
+The option `-l` is critical because it transfers logind's delay lock to
+`xsecurelock`. This delays suspend until `xsecurelock` has closed
+`XSS_SLEEP_LOCK_FD`, so previous screen content is not briefly visible after
+wakeup.
+
+This is a readiness signal, not a suspend cancellation mechanism. If
+`xsecurelock` exits before locking, for example because another client is
+holding a pointer grab, the delay lock is closed and suspend can continue. For
+suspend paths that must tolerate a held mouse button or a similar temporary
+grab, use the opt-in force-grab mode:
+
+```
+xss-lock -n /usr/lib/xsecurelock/dimmer -l -- env XSECURELOCK_FORCE_GRAB=1 xsecurelock
+```
+
+See `XSECURELOCK_FORCE_GRAB` and "Forcing Grabs" below for the tradeoffs; it can
+interfere with some window managers and should not be enabled blindly.
 
 NOTE: When using `xss-lock`, it's recommended to not launch `xsecurelock`
 directly for manual locking, but to manually lock using `xset s activate`. This
@@ -598,7 +612,8 @@ Options to XSecureLock can be passed by environment variables:
 
 Additionally, command line arguments following `--` are executed via `execvp`
 once locking is successful. This is intended for callers that need a reliable
-"locked" notification.
+"locked" notification; unlike the sleep-lock file descriptor used by
+`xss-lock -l`, it is not run when locking fails during startup.
 
 Set environment variables before `xsecurelock`, for example:
 
