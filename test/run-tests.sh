@@ -48,6 +48,28 @@ htpasswd_bin=$(command -v htpasswd) || {
   exit 1
 }
 
+display_in_use() {
+  [ -e "/tmp/.X11-unix/X$1" ] && return 0
+  if command -v ss >/dev/null 2>&1 &&
+     ss -xl 2>/dev/null | grep -q "/tmp/.X11-unix/X$1"; then
+    return 0
+  fi
+  return 1
+}
+
+test_display=${XSECURELOCK_TEST_DISPLAY:-}
+if [ -z "$test_display" ]; then
+  display_number=42
+  while display_in_use "$display_number"; do
+    display_number=$((display_number + 1))
+    if [ "$display_number" -gt 99 ]; then
+      echo "Could not find a free X display for XDO tests." >&2
+      exit 1
+    fi
+  done
+  test_display=:$display_number
+fi
+
 case " $* " in
   *" test-xrandr.xdo "*) 
     command -v xwininfo >/dev/null 2>&1 || {
@@ -74,7 +96,7 @@ for test in "$@"; do
   "$startx_bin" \
     /bin/sh "$PWD"/run-test.sh "$test" \
     -- \
-    "$xephyr" :42 -retro -screen 640x480 \
+    "$xephyr" "$test_display" -retro -screen 640x480 \
     2>&1 |\
   tee "$test.log" |\
   grep "^Test $test status: 0\\.$"

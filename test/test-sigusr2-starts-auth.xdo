@@ -1,0 +1,23 @@
+#preexec export XSECURELOCK_NO_COMPOSITE=1
+
+# Assert that xsecurelock is running, and saving the screen.
+search --name background
+search --name saver
+sleep 1
+search --name saver_multiplex_screen
+
+# SIGUSR2 after the lock is active should wake auth without a keypress.
+exec --sync /bin/sh -c 'kill -USR2 "$XSECURELOCK_PID"'
+sleep 2
+
+# Assert that auth is running and the saver child has stopped.
+exec --sync /bin/sh -c 'pgrep -P "$XSECURELOCK_PID" -x auth_x11 >/dev/null'
+exec --sync /bin/sh -c '! xdotool search --name saver_multiplex_screen >/dev/null 2>&1'
+
+# Enter the password.
+search --maxdepth 0 ''
+type 'hunter2'
+sleep 2
+
+# Assert that xsecurelock is now gone.
+exec --sync /bin/sh -c '! xdotool search --name background exec echo fail'

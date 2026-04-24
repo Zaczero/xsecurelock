@@ -191,6 +191,21 @@ exit 0
 
 Don't forget to mark the script executable.
 
+## Showing the auth prompt immediately
+
+By default, XSecureLock starts in the saver/blank state and opens the auth
+prompt after user activity. If you want the auth prompt visible immediately
+after the screen is locked, use the post-lock command hook to send `SIGUSR2`
+after XSecureLock has finished acquiring its grabs:
+
+```
+xsecurelock -- /bin/sh -c 'kill -USR2 "$PPID"'
+```
+
+Avoid starting XSecureLock in the background and immediately signaling it from
+the parent shell; that can race with startup before the signal handler is
+installed.
+
 ## Running from systemd
 
 XSecureLock must run inside the graphical X11 session it is locking. A system
