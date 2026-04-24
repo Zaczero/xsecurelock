@@ -64,6 +64,7 @@ EOF
 cat > "$config_saver_dir/fake-hack" <<'EOF'
 #!/bin/sh
 set -eu
+fake-helper
 printf '%s\n' "$#" > "$XSL_ARGC_FILE"
 printf '%s\n' "$1" > "$XSL_ARG1_FILE"
 printf '%s\n' "$2" > "$XSL_ARG2_FILE"
@@ -71,13 +72,21 @@ helper_pid=$(cat "$XSL_HELPER_PID_FILE")
 kill "$helper_pid"
 EOF
 chmod +x "$config_saver_dir/fake-hack"
+cat > "$config_saver_dir/fake-helper" <<'EOF'
+#!/bin/sh
+set -eu
+printf 'found\n' > "$XSL_HELPER_LOOKUP_FILE"
+EOF
+chmod +x "$config_saver_dir/fake-helper"
 
 XSL_ARGC_FILE=$tmpdir/config.argc \
 XSL_ARG1_FILE=$tmpdir/config.arg1 \
 XSL_ARG2_FILE=$tmpdir/config.arg2 \
+XSL_HELPER_LOOKUP_FILE=$tmpdir/config.helper \
 XSL_HELPER_PID_FILE=$tmpdir/config.pid \
   run_helper_once "$config_home" "$config_saver_dir" "$tmpdir/config.pid"
 
+assert_file_content "$tmpdir/config.helper" "found"
 assert_file_content "$tmpdir/config.argc" "2"
 assert_file_content "$tmpdir/config.arg1" "--label"
 assert_file_content "$tmpdir/config.arg2" "hello world"

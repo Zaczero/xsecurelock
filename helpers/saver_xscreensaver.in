@@ -4,6 +4,10 @@
 # SPDX-License-Identifier: Apache-2.0
 
 : "${XSECURELOCK_XSCREENSAVER_PATH:=@path_to_xscreensaver@}"
+if [ -n "$XSECURELOCK_XSCREENSAVER_PATH" ]; then
+  PATH=$XSECURELOCK_XSCREENSAVER_PATH${PATH:+:$PATH}
+  export PATH
+fi
 
 TAB='	'
 xscreensaver_resources=
