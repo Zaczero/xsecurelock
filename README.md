@@ -1,5 +1,8 @@
 # About XSecureLock
 
+> [!NOTE]
+> This repository is a maintained fork of the discontinued upstream [`google/xsecurelock`](https://github.com/google/xsecurelock). It keeps the same security-focused design while carrying practical bug fixes, targeted new features, and compatibility work for X11 desktop environments.
+
 XSecureLock is an X11 screen lock utility designed with the primary goal of
 security.
 
