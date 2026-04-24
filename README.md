@@ -55,6 +55,11 @@ or explicitly configured:
 *   `pamtester` (for `authproto_pamtester`)
 *   `xscreensaver` for XScreenSaver hacks (for `saver_xscreensaver`)
 
+Packagers can force script helper installation by passing the final runtime
+tool path to `configure`, such as `--with-mpv=/usr/bin/mpv` or
+`--with-mplayer=/usr/bin/mplayer`. The target executable does not need to be
+present in the build environment when an absolute path is specified.
+
 Optional documentation and validation tools:
 
 *   `pandoc` to generate the man page

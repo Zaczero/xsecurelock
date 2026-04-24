@@ -269,11 +269,11 @@ RP_SEARCH_PROG(htpasswd, [$PATH],
 
 RP_SEARCH_PROG(mplayer, [$PATH],
                [HAVE_MPLAYER], [mplayer], [check],
-               [Install saver_mplayer (specify --with-mplayer=/usr/bin/mplayer to set the path to use)])
+               [Install saver_mplayer (use --with-mplayer=/usr/bin/mplayer to force a runtime path)])
 
 RP_SEARCH_PROG(mpv, [$PATH],
                [HAVE_MPV], [mpv], [check],
-               [Install saver_mpv (specify --with-mpv=/usr/bin/mpv to set the path to use)])
+               [Install saver_mpv (use --with-mpv=/usr/bin/mpv to force a runtime path)])
 
 RP_SEARCH_PROG(pamtester, [$PATH],
                [HAVE_PAMTESTER], [pamtester], [check],
