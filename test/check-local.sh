@@ -52,6 +52,7 @@ echo "Running native smoke tests"
 "$builddir"/blanking_test
 "$builddir"/configured_command_test
 "$builddir"/dimmer_bayer_test
+"$builddir"/dimmer_opacity_test
 "$builddir"/prompt_display_test
 "$builddir"/prompt_glyph_test
 "$builddir"/prompt_state_test

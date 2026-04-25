@@ -21,7 +21,7 @@
 #include <X11/Xlib.h>   // for Display, XColor, XSetWindowAttributes
 #include <math.h>       // for pow, ceil, frexp, nextafter, sqrt
 #include <stdbool.h>    // for bool
-#include <stdint.h>     // for int64_t
+#include <stdint.h>     // for int64_t, uint32_t
 #include <stdio.h>      // for snprintf
 #include <string.h>     // for memset
 
@@ -30,6 +30,7 @@
 #include "../time_util.h"      // for SleepMs, SleepNs
 #include "../wm_properties.h"  // for SetWMProperties
 #include "dimmer_bayer.h"      // for DimmerBayerPoint
+#include "dimmer_opacity.h"    // for DimmerOpacityFromSrgbAlpha
 
 struct DimmerConfig {
   int dim_time_ms;
@@ -247,10 +248,10 @@ static void OpacityEffectPreCreateWindow(void *unused_self,
 static void OpacityEffectPostCreateWindow(void *self, Display *display,
                                           Window dim_window) {
   struct OpacityEffect *dimmer = self;
-  long value = 0;
+  unsigned long property_value = 0;
 
   XChangeProperty(display, dim_window, dimmer->property_atom, XA_CARDINAL, 32,
-                  PropModeReplace, (unsigned char *)&value, 1);
+                  PropModeReplace, (const unsigned char *)&property_value, 1);
 }
 
 static double sRGBToLinear(double value) {
@@ -274,12 +275,13 @@ static void OpacityEffectDrawFrame(void *self, Display *display,
   double srgb_min = LinearTosRGB(linear_min);
   double srgb_max = LinearTosRGB(linear_max);
   double srgb_alpha = 1.0 - (srgb_max - srgb_min);
-  long value = nextafter(0xffffffff, 0) * srgb_alpha;
+  uint32_t opacity32 = DimmerOpacityFromSrgbAlpha(srgb_alpha);
+  unsigned long property_value = (unsigned long)opacity32;
 
   (void)unused_w;
   (void)unused_h;
   XChangeProperty(display, dim_window, dimmer->property_atom, XA_CARDINAL, 32,
-                  PropModeReplace, (unsigned char *)&value, 1);
+                  PropModeReplace, (const unsigned char *)&property_value, 1);
   XFlush(display);
 }
 
