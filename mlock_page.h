@@ -70,7 +70,12 @@ static inline int MlockPage(const void *ptr, size_t size) {
     return -1;
   }
   uintptr_t end = last_page + page_size_u;
-  return mlock((void *)start, end - start);
+  uintptr_t lock_size = end - start;
+  if (lock_size > (uintptr_t)SIZE_MAX) {
+    errno = EINVAL;
+    return -1;
+  }
+  return mlock((void *)start, (size_t)lock_size);
 #elif HAVE_MLOCKALL
   return mlockall(MCL_CURRENT);
 #else

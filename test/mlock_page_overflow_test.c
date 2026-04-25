@@ -13,6 +13,12 @@ int main(void) {
   errno = 0;
   assert(MLOCK_PAGE((const void *)(uintptr_t)(UINTPTR_MAX - 1), 1) == -1);
   assert(errno == EINVAL);
+
+#if SIZE_MAX < UINTPTR_MAX
+  errno = 0;
+  assert(MLOCK_PAGE((const void *)(uintptr_t)1, SIZE_MAX) == -1);
+  assert(errno == EINVAL);
+#endif
 #endif
   return 0;
 }
