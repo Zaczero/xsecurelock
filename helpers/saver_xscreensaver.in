@@ -125,13 +125,20 @@ fi
 case "$mode" in
   one)
     savers=$(list_savers true)
-    count=$(printf '%s\n' "$savers" | wc -l)
     ;;
   *)
     savers=$(list_savers false)
-    count=$(printf '%s\n' "$savers" | wc -l)
     ;;
 esac
+if [ -n "$savers" ]; then
+  count=$(printf '%s\n' "$savers" | wc -l)
+else
+  count=0
+fi
+if [ "$count" -le 0 ]; then
+  echo >&2 "xsecurelock: No saver selected. Giving up."
+  exec ./saver_blank
+fi
 
 select_saver() {
   case "$mode" in
@@ -139,7 +146,8 @@ select_saver() {
       printf '%s\n' "$savers" | grep "^$selected$(printf '\t')"
       ;;
     *)
-      printf '%s\n' "$savers" | tail -n +$((selected % count + 1))
+      printf '%s\n' "$savers" |
+        awk -v start="$((selected % count + 1))" 'NR >= start'
       ;;
   esac | head -n 1 | cut -f 2-
 }
