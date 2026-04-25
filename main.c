@@ -642,7 +642,10 @@ static int InitializeLockContextRuntime(struct LockContext *ctx) {
     LogErrno("SignalPipeInit");
     return 0;
   }
-  SignalPipeSetWriteFdForHandler(ctx->runtime.signal_pipe.fds[1]);
+  if (!SignalPipeSetWriteFdForHandler(ctx->runtime.signal_pipe.fds[1])) {
+    LogErrno("SignalPipeSetWriteFdForHandler");
+    return 0;
+  }
 
   if (!InstallSignalHandlers()) {
     return 0;

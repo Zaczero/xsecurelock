@@ -255,7 +255,10 @@ int main(int argc, char **argv) {
     LogErrno("SignalPipeInit");
     goto done;
   }
-  SignalPipeSetWriteFdForHandler(state.signal_pipe.fds[1]);
+  if (!SignalPipeSetWriteFdForHandler(state.signal_pipe.fds[1])) {
+    LogErrno("SignalPipeSetWriteFdForHandler");
+    goto done;
+  }
 
   if (!InstallSignalHandlers()) {
     goto done;

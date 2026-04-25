@@ -32,7 +32,7 @@ static void TestSignalPipeInit(void) {
 static void TestSignalPipeNotify(void) {
   struct SignalPipe pipe;
   assert(SignalPipeInit(&pipe) == 0);
-  SignalPipeSetWriteFdForHandler(pipe.fds[1]);
+  assert(SignalPipeSetWriteFdForHandler(pipe.fds[1]));
 
   SignalPipeNotifyFromHandler();
 
@@ -46,7 +46,7 @@ static void TestSignalPipeNotify(void) {
 static void TestSignalPipeDrain(void) {
   struct SignalPipe pipe;
   assert(SignalPipeInit(&pipe) == 0);
-  SignalPipeSetWriteFdForHandler(pipe.fds[1]);
+  assert(SignalPipeSetWriteFdForHandler(pipe.fds[1]));
 
   SignalPipeNotifyFromHandler();
   SignalPipeNotifyFromHandler();
@@ -63,7 +63,7 @@ static void TestSignalPipeDrain(void) {
 static void TestSignalPipeDisabledNotify(void) {
   struct SignalPipe pipe;
   assert(SignalPipeInit(&pipe) == 0);
-  SignalPipeSetWriteFdForHandler(-1);
+  assert(SignalPipeSetWriteFdForHandler(-1));
 
   SignalPipeNotifyFromHandler();
 
@@ -78,7 +78,7 @@ static void TestSignalPipeCloseClearsWriteFd(void) {
   struct SignalPipe first_pipe;
   struct SignalPipe second_pipe;
   assert(SignalPipeInit(&first_pipe) == 0);
-  SignalPipeSetWriteFdForHandler(first_pipe.fds[1]);
+  assert(SignalPipeSetWriteFdForHandler(first_pipe.fds[1]));
   SignalPipeClose(&first_pipe);
 
   assert(SignalPipeInit(&second_pipe) == 0);
@@ -91,11 +91,27 @@ static void TestSignalPipeCloseClearsWriteFd(void) {
   SignalPipeClose(&second_pipe);
 }
 
+static void TestSignalPipeExplicitClearPreventsNotify(void) {
+  struct SignalPipe pipe;
+  assert(SignalPipeInit(&pipe) == 0);
+  assert(SignalPipeSetWriteFdForHandler(pipe.fds[1]));
+  assert(SignalPipeSetWriteFdForHandler(-1));
+
+  SignalPipeNotifyFromHandler();
+
+  char ch = 0;
+  assert(read(pipe.fds[0], &ch, 1) < 0);
+  assert(errno == EAGAIN || errno == EWOULDBLOCK);
+
+  SignalPipeClose(&pipe);
+}
+
 int main(void) {
   TestSignalPipeInit();
   TestSignalPipeNotify();
   TestSignalPipeDrain();
   TestSignalPipeDisabledNotify();
   TestSignalPipeCloseClearsWriteFd();
+  TestSignalPipeExplicitClearPreventsNotify();
   return 0;
 }

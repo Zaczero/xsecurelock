@@ -25,8 +25,11 @@ int SignalPipeInit(struct SignalPipe *pipe);
  *
  * The caller is responsible for passing the current write end, or -1 to disable
  * notifications.
+ *
+ * \return 1 if the file descriptor was accepted, or 0 if it cannot be
+ *   represented safely in signal-handler shared state.
  */
-void SignalPipeSetWriteFdForHandler(int fd);
+int SignalPipeSetWriteFdForHandler(int fd);
 
 /*! \brief Wakes the main loop from a signal handler.
  *
