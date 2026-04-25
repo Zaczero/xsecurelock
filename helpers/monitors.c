@@ -41,7 +41,8 @@ static int MaybeInitXRandR(Display *dpy) {
   have_xrandr15_ext = 0;
 #endif
   if (XRRQueryExtension(dpy, &event_base, &error_base)) {
-    int major, minor;
+    int major;
+    int minor;
     if (XRRQueryVersion(dpy, &major, &minor)) {
       // XRandR before 1.2 can't connect multiple screens to one, so the
       // default root window size tracking is sufficient for that.
@@ -129,8 +130,8 @@ static void AddClippedMonitor(Monitor *out_monitors, size_t *num_monitors,
   }
   int x = (int)((int64_t)clipped.x - (int64_t)clip.x);
   int y = (int)((int64_t)clipped.y - (int64_t)clip.y);
-  AddMonitor(out_monitors, num_monitors, max_monitors, x, y,
-             clipped.w, clipped.h);
+  AddMonitor(out_monitors, num_monitors, max_monitors, x, y, clipped.w,
+             clipped.h);
 }
 
 #ifdef HAVE_XRANDR_EXT
@@ -153,9 +154,10 @@ static int GetMonitorsXRandR12(Display *dpy, Window window, int wx, int wy,
       // of that one should always be onscreen anyway (even though they
       // may not be, as cloned displays can have different panning
       // settings).
-      RRCrtc crtc = (output->crtc    ? output->crtc
-                     : output->ncrtc ? output->crtcs[0]
-                                     : 0);
+      RRCrtc crtc = output->crtc;
+      if (crtc == 0 && output->ncrtc) {
+        crtc = output->crtcs[0];
+      }
       XRRCrtcInfo *info = (crtc ? XRRGetCrtcInfo(dpy, screenres, crtc) : 0);
       if (info != NULL) {
         if (info->width <= (unsigned int)INT_MAX &&
@@ -190,12 +192,10 @@ static int GetMonitorsXRandR15(Display *dpy, Window window, int wx, int wy,
   }
   for (int i = 0; i < num_rrmonitors; ++i) {
     XRRMonitorInfo *info = &rrmonitors[i];
-    AddClippedMonitor(out_monitors, out_num_monitors, max_monitors,
-                      (Rect){.x = info->x,
-                             .y = info->y,
-                             .w = info->width,
-                             .h = info->height},
-                      (Rect){.x = wx, .y = wy, .w = ww, .h = wh});
+    AddClippedMonitor(
+        out_monitors, out_num_monitors, max_monitors,
+        (Rect){.x = info->x, .y = info->y, .w = info->width, .h = info->height},
+        (Rect){.x = wx, .y = wy, .w = ww, .h = wh});
   }
   XRRFreeMonitors(rrmonitors);
   return *out_num_monitors != 0;
@@ -211,7 +211,8 @@ static int GetMonitorsXRandR(Display *dpy, Window window,
   }
 
   // Translate to absolute coordinates so we can compare them to XRandR data.
-  int wx, wy;
+  int wx;
+  int wy;
   Window child;
   if (!XTranslateCoordinates(dpy, window, DefaultRootWindow(dpy), xwa->x,
                              xwa->y, &wx, &wy, &child)) {
@@ -237,7 +238,7 @@ static void GetMonitorsGuess(const XWindowAttributes *xwa,
                              size_t max_monitors) {
   // XRandR-less dummy fallback.
   const int64_t weighted_size =
-      (int64_t)xwa->width * 9 + (int64_t)xwa->height * 8;
+      ((int64_t)xwa->width * 9) + ((int64_t)xwa->height * 8);
   size_t guessed_monitors =
       (size_t)(weighted_size / ((int64_t)xwa->height * 16));
   if (guessed_monitors < 1) {
@@ -247,8 +248,7 @@ static void GetMonitorsGuess(const XWindowAttributes *xwa,
     guessed_monitors = max_monitors;
   }
   for (size_t i = 0; i < guessed_monitors; ++i) {
-    int x = (int)((int64_t)xwa->width * (int64_t)i /
-                  (int64_t)guessed_monitors);
+    int x = (int)((int64_t)xwa->width * (int64_t)i / (int64_t)guessed_monitors);
     int y = 0;
     int w = (int)((int64_t)xwa->width * (int64_t)(i + 1) /
                   (int64_t)guessed_monitors) -

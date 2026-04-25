@@ -188,7 +188,7 @@ int GetMonotonicTimeMs(int64_t *time_ms) {
   {
     struct timespec ts;
     if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0) {
-      *time_ms = (int64_t)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+      *time_ms = ((int64_t)ts.tv_sec * 1000) + (ts.tv_nsec / 1000000);
       return 0;
     }
   }
@@ -199,7 +199,7 @@ int GetMonotonicTimeMs(int64_t *time_ms) {
     if (gettimeofday(&tv, NULL) != 0) {
       return -1;
     }
-    *time_ms = (int64_t)tv.tv_sec * 1000 + tv.tv_usec / 1000;
+    *time_ms = ((int64_t)tv.tv_sec * 1000) + (tv.tv_usec / 1000);
     return 0;
   }
 }

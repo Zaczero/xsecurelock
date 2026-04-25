@@ -234,8 +234,8 @@ int main(int argc, char **argv) {
 
   AuthUiContextInit(&ctx, argc, argv);
 
-  setlocale(LC_CTYPE, "");
-  setlocale(LC_TIME, "");
+  (void)setlocale(LC_CTYPE, "");
+  (void)setlocale(LC_TIME, "");
 
   SeedPromptRngFromClock(&ctx);
   if (!AuthUiConfigLoad(&ctx.config)) {

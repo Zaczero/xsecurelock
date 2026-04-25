@@ -24,7 +24,7 @@ static uint32_t NextPromptRandom(struct PromptRng *rng) {
 static uint32_t PromptRandomBelow(struct PromptRng *rng, uint32_t upper_bound) {
   assert(upper_bound != 0);
 
-  uint32_t minimum = (uint32_t)(-upper_bound) % upper_bound;
+  uint32_t minimum = (0U - upper_bound) % upper_bound;
   for (int attempt = 0; attempt < kPromptRandomRetryLimit; ++attempt) {
     uint32_t value = NextPromptRandom(rng);
     if (value >= minimum) {

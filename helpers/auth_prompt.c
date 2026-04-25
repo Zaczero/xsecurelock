@@ -109,7 +109,7 @@ static enum AuthActivityResult WaitForAuthActivity(struct AuthUiContext *ctx,
     }
   }
 
-  *deadline_ms = now_ms + (int64_t)ctx->config.prompt_timeout * 1000;
+  *deadline_ms = now_ms + ((int64_t)ctx->config.prompt_timeout * 1000);
   return AUTH_ACTIVITY_INPUT_READY;
 }
 
@@ -122,7 +122,8 @@ static int ShowPromptStorageWarning(struct AuthUiContext *ctx,
   return 1;
 }
 
-static int RenderPromptFrame(struct AuthUiContext *ctx, const char *message,
+static int RenderPromptFrame(struct AuthUiContext *ctx,
+                             const char *prompt_title,
                              const struct PromptState *state, bool echo,
                              int blink_state) {
   char displaybuf[PROMPT_DISPLAY_BUFFER_SIZE];
@@ -131,7 +132,7 @@ static int RenderPromptFrame(struct AuthUiContext *ctx, const char *message,
   if (RenderPromptDisplay(ctx->config.prompt_display_mode, state, echo,
                           blink_state, *kCursor, displaybuf, sizeof(displaybuf),
                           &displaylen) == 0) {
-    return AuthDisplayMessage(ctx, message, displaybuf, false);
+    return AuthDisplayMessage(ctx, prompt_title, displaybuf, false);
   }
   if (echo) {
     Log("Prompt rendering failed in echo mode");
@@ -145,7 +146,7 @@ static int RenderPromptFrame(struct AuthUiContext *ctx, const char *message,
     Log("Cursor prompt rendering fallback failed");
     return 0;
   }
-  return AuthDisplayMessage(ctx, message, displaybuf, false);
+  return AuthDisplayMessage(ctx, prompt_title, displaybuf, false);
 }
 
 static int HandlePromptInputByte(struct AuthUiContext *ctx,
@@ -251,8 +252,8 @@ enum StaticMessageResult AuthWaitStaticMessage(struct AuthUiContext *ctx,
 }
 
 enum PromptSessionResult AuthRunPromptSession(struct AuthUiContext *ctx,
-                                              const char *message, bool echo,
-                                              int response_fd,
+                                              const char *prompt_title,
+                                              bool echo, int response_fd,
                                               char response_type) {
   struct PromptState state;
   char input_byte = 0;
@@ -285,7 +286,7 @@ enum PromptSessionResult AuthRunPromptSession(struct AuthUiContext *ctx,
     bool redraw_requested = false;
     bool poll_only = false;
 
-    if (!RenderPromptFrame(ctx, message, &state, echo, blink_state)) {
+    if (!RenderPromptFrame(ctx, prompt_title, &state, echo, blink_state)) {
       result = PROMPT_SESSION_RESULT_FAILED;
       break;
     }

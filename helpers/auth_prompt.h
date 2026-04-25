@@ -22,8 +22,8 @@ enum StaticMessageResult AuthWaitStaticMessage(struct AuthUiContext *ctx,
                                                const char *message,
                                                bool warning, int extra_read_fd);
 enum PromptSessionResult AuthRunPromptSession(struct AuthUiContext *ctx,
-                                              const char *message, bool echo,
-                                              int response_fd,
+                                              const char *prompt_title,
+                                              bool echo, int response_fd,
                                               char response_type);
 
 #endif  // XSECURELOCK_HELPERS_AUTH_PROMPT_H

@@ -60,7 +60,7 @@ static int TextDescent(const struct AuthUiContext *ctx) {
 #ifdef HAVE_XFT_EXT
 static int XGlyphInfoExpandAmount(XGlyphInfo *extents) {
   int expand_left = extents->x;
-  int expand_right = -extents->x + extents->width - extents->xOff;
+  int expand_right = -extents->x + (int)extents->width - extents->xOff;
   int expand_max = expand_left > expand_right ? expand_left : expand_right;
   return expand_max > 0 ? expand_max : 0;
 }
@@ -73,7 +73,7 @@ static int TextWidth(const struct AuthUiContext *ctx, const char *string,
     XGlyphInfo extents;
     XftTextExtentsUtf8(ctx->resources.display, ctx->resources.xft_font,
                        (const FcChar8 *)string, len, &extents);
-    return extents.xOff + 2 * XGlyphInfoExpandAmount(&extents);
+    return extents.xOff + (2 * XGlyphInfoExpandAmount(&extents));
   }
 #endif
   return XTextWidth(ctx->resources.core_font, string, len);
@@ -196,9 +196,9 @@ void AuthPlaySound(struct AuthUiContext *ctx, enum AuthSound sound) {
   XChangeKeyboardControl(ctx->resources.display, KBBellPitch, &control);
   XBell(ctx->resources.display, 0);
 
-  control.bell_percent = state.bell_percent;
-  control.bell_duration = state.bell_duration;
-  control.bell_pitch = state.bell_pitch;
+  control.bell_percent = (int)state.bell_percent;
+  control.bell_duration = (int)state.bell_duration;
+  control.bell_pitch = (int)state.bell_pitch;
   XChangeKeyboardControl(ctx->resources.display,
                          KBBellPercent | KBBellDuration | KBBellPitch,
                          &control);
@@ -256,10 +256,11 @@ int AuthDisplayMessage(struct AuthUiContext *ctx, const char *title,
   }
 
   int line_height = TextAscent(ctx) + TextDescent(ctx) + LINE_SPACING;
-  int baseline_offset = TextAscent(ctx) + LINE_SPACING / 2;
+  int baseline_offset = TextAscent(ctx) + (LINE_SPACING / 2);
   int box_h = TotalMessageRowHeight(rows, row_count, line_height);
-  int region_w = MaxMessageRowWidth(rows, row_count) + 2 * AuthDialogInset(ctx);
-  int region_h = box_h + 2 * AuthDialogInset(ctx);
+  int region_w =
+      MaxMessageRowWidth(rows, row_count) + (2 * AuthDialogInset(ctx));
+  int region_h = box_h + (2 * AuthDialogInset(ctx));
 
   if (ctx->config.burnin_mitigation_max_offset_change > 0) {
     ctx->runtime.x_offset =
@@ -280,13 +281,13 @@ int AuthDisplayMessage(struct AuthUiContext *ctx, const char *title,
 
   for (size_t i = 0; i < ctx->windows.count; ++i) {
     int cx = region_w / 2;
-    int y = region_h / 2 + baseline_offset - box_h / 2;
+    int y = (region_h / 2) + baseline_offset - (box_h / 2);
 
     XClearWindow(ctx->resources.display, ctx->windows.windows[i]);
     DrawDialogBorder(ctx, i, region_w, region_h);
 
     for (size_t j = 0; j < row_count; ++j) {
-      DrawString(ctx, i, cx - rows[j].width / 2, y, rows[j].warning,
+      DrawString(ctx, i, cx - (rows[j].width / 2), y, rows[j].warning,
                  rows[j].text, rows[j].len);
       y += rows[j].advance_lines * line_height;
     }

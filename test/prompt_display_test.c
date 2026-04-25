@@ -94,7 +94,7 @@ static void ExpectCursorAndEchoRendering(void) {
 
   assert(RenderPromptDisplay(PROMPT_DISPLAY_MODE_CURSOR, &state, 0, 0, '|',
                              displaybuf, sizeof(displaybuf), &displaylen) == 0);
-  assert(displaylen == (size_t)(1u << DISCO_PASSWORD_DANCERS));
+  assert(displaylen == (size_t)(1U << DISCO_PASSWORD_DANCERS));
   assert(displaybuf[5] == '|');
 
   assert(RenderPromptDisplay(PROMPT_DISPLAY_MODE_CURSOR, &state, 0, 0, '_',

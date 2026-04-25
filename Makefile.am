@@ -9,7 +9,7 @@ AM_CFLAGS = $(WARNING_CFLAGS)
 .PHONY: clang_tidy_extra_args
 clang_tidy_extra_args:
 	@for flag in $(DEFAULT_INCLUDES) $(DEFS) $(AM_CPPFLAGS) $(CPPFLAGS) \
-	    $(FONTCONFIG_CFLAGS) $(XFT_CFLAGS); do \
+	    $(FONTCONFIG_CFLAGS) $(XFT_CFLAGS) $(NIX_CFLAGS_COMPILE); do \
 		printf '%s\n' "$$flag"; \
 	done
 

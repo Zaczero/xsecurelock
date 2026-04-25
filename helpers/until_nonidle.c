@@ -333,7 +333,7 @@ done:
     struct sigaction sa = {.sa_flags = 0, .sa_handler = SIG_DFL};
     sigemptyset(&sa.sa_mask);
     (void)sigaction(state.terminate_signal, &sa, NULL);
-    raise(state.terminate_signal);
+    (void)raise(state.terminate_signal);
   }
 
   return state.status;

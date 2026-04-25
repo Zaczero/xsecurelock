@@ -32,7 +32,7 @@ static void StartTimerMs(int milliseconds) {
       .it_value =
           {
               .tv_sec = milliseconds / 1000,
-              .tv_usec = (milliseconds % 1000) * 1000,
+              .tv_usec = ((suseconds_t)(milliseconds % 1000)) * 1000,
           },
   };
   if (setitimer(ITIMER_REAL, &timer, NULL) != 0) {

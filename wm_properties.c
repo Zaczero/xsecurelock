@@ -12,13 +12,13 @@
 
 static char *BorrowMutableString(const char *str) {
   char *mutable_str = NULL;
-  memcpy(&mutable_str, &str, sizeof(mutable_str));
+  memcpy((void *)&mutable_str, (const void *)&str, sizeof(mutable_str));
   return mutable_str;
 }
 
 static char **BorrowMutableArgv(char *const *argv) {
   char **mutable_argv = NULL;
-  memcpy(&mutable_argv, &argv, sizeof(mutable_argv));
+  memcpy((void *)&mutable_argv, (const void *)&argv, sizeof(mutable_argv));
   return mutable_argv;
 }
 

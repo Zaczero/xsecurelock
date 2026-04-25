@@ -20,15 +20,11 @@ refresh_configured_headers
 if command -v clang-tidy >/dev/null 2>&1; then
   set -- \
     "--extra-arg=-I$PWD" \
-    "--extra-arg=-I$PWD/test" \
-    '--extra-arg=-include' \
-    "--extra-arg=$PWD/config.h" \
-    '--extra-arg=-include' \
-    "--extra-arg=$PWD/build-config.h"
+    "--extra-arg=-I$PWD/test"
   for cflag in $(make -s clang_tidy_extra_args); do
     set -- "$@" "--extra-arg=$cflag"
   done
-  clang-tidy "$@" ./*.[ch] ./*/*.[ch]
+  clang-tidy "$@" ./*.c ./*/*.c
 fi
 
 # CPPCheck.

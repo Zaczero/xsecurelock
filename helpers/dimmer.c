@@ -262,18 +262,18 @@ static double sRGBToLinear(double value) {
 
 static double LinearTosRGB(double value) {
   return (value <= 0.0031308) ? 12.92 * value
-                              : 1.055 * pow(value, 1.0 / 2.4) - 0.055;
+                              : (1.055 * pow(value, 1.0 / 2.4)) - 0.055;
 }
 
 static void OpacityEffectDrawFrame(void *self, Display *display,
                                    Window dim_window, int frame, int unused_w,
                                    int unused_h) {
   struct OpacityEffect *dimmer = self;
-  double linear_alpha =
-      (frame + 1) * dimmer->super.config->dim_alpha / dimmer->super.frame_count;
+  double linear_alpha = ((frame + 1) * dimmer->super.config->dim_alpha) /
+                        dimmer->super.frame_count;
   double linear_min = linear_alpha * dimmer->dim_color_brightness;
   double linear_max =
-      linear_alpha * dimmer->dim_color_brightness + (1.0 - linear_alpha);
+      (linear_alpha * dimmer->dim_color_brightness) + (1.0 - linear_alpha);
   double srgb_min = LinearTosRGB(linear_min);
   double srgb_max = LinearTosRGB(linear_max);
   double srgb_alpha = 1.0 - (srgb_max - srgb_min);
@@ -298,9 +298,9 @@ static void OpacityEffectInit(struct OpacityEffect *dimmer, Display *display,
   dimmer->super.config = config;
   dimmer->property_atom = XInternAtom(display, "_NET_WM_WINDOW_OPACITY", False);
   dimmer->dim_color_brightness =
-      sRGBToLinear(config->dim_color.red / 65535.0) * 0.2126 +
-      sRGBToLinear(config->dim_color.green / 65535.0) * 0.7152 +
-      sRGBToLinear(config->dim_color.blue / 65535.0) * 0.0722;
+      (sRGBToLinear(config->dim_color.red / 65535.0) * 0.2126) +
+      (sRGBToLinear(config->dim_color.green / 65535.0) * 0.7152) +
+      (sRGBToLinear(config->dim_color.blue / 65535.0) * 0.0722);
 
   dimmer->super.frame_count =
       (int)ceil(config->dim_time_ms * config->dim_fps / 1000.0);
@@ -355,10 +355,9 @@ int main(int argc, char **argv) {
     dimattrs.save_under = 1;
     dimattrs.override_redirect = 1;
     dimmer->PreCreateWindow(dimmer, display, &dimattrs, &dimmask);
-    dim_window =
-        XCreateWindow(display, root_window, 0, 0, (unsigned int)w,
-                      (unsigned int)h, 0, CopyFromParent, InputOutput,
-                      CopyFromParent, dimmask, &dimattrs);
+    dim_window = XCreateWindow(display, root_window, 0, 0, (unsigned int)w,
+                               (unsigned int)h, 0, CopyFromParent, InputOutput,
+                               CopyFromParent, dimmask, &dimattrs);
     SetWMProperties(display, dim_window, "xsecurelock-dimmer", "dim", argc,
                     argv);
     dimmer->PostCreateWindow(dimmer, display, dim_window);

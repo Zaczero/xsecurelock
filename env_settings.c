@@ -34,7 +34,7 @@ static char *JoinHelperPath(const char *name) {
     return NULL;
   }
 
-  memcpy(path, HELPER_PATH, helper_len);
+  memcpy(path, HELPER_PATH, helper_len + 1);
   path[helper_len] = '/';
   memcpy(path + helper_len + 1, name, name_len + 1);
   return path;

@@ -16,15 +16,15 @@ static void PrintLogPrefix(void) {
   if (tm == NULL || !strftime(s, sizeof(s), "%Y-%m-%dT%H:%M:%SZ ", tm)) {
     *s = 0;
   }
-  fprintf(stderr, "%s%ld xsecurelock: ", s, (long)getpid());
+  (void)fprintf(stderr, "%s%ld xsecurelock: ", s, (long)getpid());
 }
 
 void Log(const char *format, ...) {
   va_list args;
   va_start(args, format);
   PrintLogPrefix();
-  vfprintf(stderr, format, args);
-  fputs(".\n", stderr);
+  (void)vfprintf(stderr, format, args);
+  (void)fputs(".\n", stderr);
   va_end(args);
 }
 
@@ -33,8 +33,8 @@ void LogErrno(const char *format, ...) {
   va_list args;
   va_start(args, format);
   PrintLogPrefix();
-  vfprintf(stderr, format, args);
-  fputs(": ", stderr);
+  (void)vfprintf(stderr, format, args);
+  (void)fputs(": ", stderr);
   errno = errno_save;
   perror(NULL);
   va_end(args);

@@ -120,7 +120,7 @@ char ReadPacket(int fd, char **message, int eof_permitted) {
       Log("invalid packet length");
       return 0;
     }
-    len = len * 10 + digit;
+    len = (len * 10) + digit;
   }
 have_len:
   if (len < 0 || len > MAX_PACKET_LENGTH) {

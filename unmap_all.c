@@ -74,7 +74,8 @@ int InitUnmapAllWindowsState(UnmapAllWindowsState *state, Display *display,
   state->windows = NULL;
   state->n_windows = 0;
 
-  Window unused_root_return, unused_parent_return;
+  Window unused_root_return;
+  Window unused_parent_return;
   if (!XQueryTree(state->display, state->root_window, &unused_root_return,
                   &unused_parent_return, &state->windows, &state->n_windows)) {
     state->windows = NULL;
@@ -148,10 +149,11 @@ int UnmapAllWindows(UnmapAllWindowsState *state,
     if (state->windows[i] != None) {
       XUnmapWindow(state->display, state->windows[i]);
       state->first_unmapped_window = i;
-      int ret;
-      if (just_unmapped_can_we_stop != NULL &&
-          (ret = just_unmapped_can_we_stop(state->windows[i], arg))) {
-        return ret;
+      if (just_unmapped_can_we_stop != NULL) {
+        int ret = just_unmapped_can_we_stop(state->windows[i], arg);
+        if (ret != 0) {
+          return ret;
+        }
       }
     }
     if (i == 0) {

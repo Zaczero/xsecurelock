@@ -391,7 +391,8 @@ static bool LookupKeypress(struct LockContext *ctx) {
         &ctx->runtime.sensitive.keysym, &lookup_status);
     if (ctx->runtime.sensitive.len <= 0) {
       return false;
-    } else if (lookup_status != XLookupChars && lookup_status != XLookupBoth) {
+    }
+    if (lookup_status != XLookupChars && lookup_status != XLookupBoth) {
       return false;
     }
   } else {
@@ -791,7 +792,7 @@ int main(int argc, char **argv) {
   int status = EXIT_FAILURE;
   int have_pending_x_events = 0;
 
-  setlocale(LC_CTYPE, "");
+  (void)setlocale(LC_CTYPE, "");
   InitLockContext(&ctx, argc, argv);
 
   ctx.runtime.xss_sleep_lock_fd = GetIntSetting("XSS_SLEEP_LOCK_FD", -1);
@@ -872,7 +873,7 @@ done:
     struct sigaction sa = {.sa_flags = 0, .sa_handler = SIG_DFL};
     sigemptyset(&sa.sa_mask);
     (void)sigaction(ctx.runtime.terminate_signal, &sa, NULL);
-    raise(ctx.runtime.terminate_signal);
+    (void)raise(ctx.runtime.terminate_signal);
   }
 
   return status;

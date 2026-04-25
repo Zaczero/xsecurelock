@@ -19,11 +19,11 @@ static void BuildBayerMatrix(int power, int *matrix) {
 
     for (int y = 0; y < prev_side; ++y) {
       for (int x = 0; x < prev_side; ++x) {
-        int value = matrix[y * prev_side + x];
-        next[y * side + x] = 4 * value;
-        next[y * side + (x + prev_side)] = 4 * value + 2;
-        next[(y + prev_side) * side + x] = 4 * value + 3;
-        next[(y + prev_side) * side + (x + prev_side)] = 4 * value + 1;
+        int value = matrix[(y * prev_side) + x];
+        next[(y * side) + x] = 4 * value;
+        next[(y * side) + (x + prev_side)] = (4 * value) + 2;
+        next[((y + prev_side) * side) + x] = (4 * value) + 3;
+        next[((y + prev_side) * side) + (x + prev_side)] = (4 * value) + 1;
       }
     }
 
@@ -49,9 +49,9 @@ int main(void) {
       DimmerBayerPoint((int)index, power, &x, &y);
       assert(x >= 0 && x < side);
       assert(y >= 0 && y < side);
-      assert(matrix[(size_t)y * (size_t)side + (size_t)x] == (int)index);
-      assert(seen[(size_t)y * (size_t)side + (size_t)x] == 0);
-      seen[(size_t)y * (size_t)side + (size_t)x] = 1;
+      assert(matrix[((size_t)y * (size_t)side) + (size_t)x] == (int)index);
+      assert(seen[((size_t)y * (size_t)side) + (size_t)x] == 0);
+      seen[((size_t)y * (size_t)side) + (size_t)x] = 1;
     }
 
     free(seen);

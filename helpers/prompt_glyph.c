@@ -5,7 +5,7 @@
 #include <assert.h>
 
 static int IsUtf8Continuation(unsigned char ch) {
-  return (ch & 0xC0u) == 0x80u;
+  return (ch & 0xC0U) == 0x80U;
 }
 
 // Prompt editing only needs stable UTF-8 sequence boundaries for masking and

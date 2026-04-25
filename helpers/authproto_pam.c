@@ -291,7 +291,7 @@ static int Authenticate(struct pam_conv *conv, pam_handle_t **pam) {
  * \return 0 if authentication successful, anything else otherwise.
  */
 int main(void) {
-  setlocale(LC_CTYPE, "");
+  (void)setlocale(LC_CTYPE, "");
 
   struct pam_conv conv = {
       .conv = Converse,

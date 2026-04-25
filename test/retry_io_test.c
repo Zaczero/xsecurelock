@@ -32,7 +32,7 @@ static void StartTimerMs(int milliseconds) {
       .it_value =
           {
               .tv_sec = milliseconds / 1000,
-              .tv_usec = (milliseconds % 1000) * 1000,
+              .tv_usec = ((suseconds_t)(milliseconds % 1000)) * 1000,
           },
   };
   assert(setitimer(ITIMER_REAL, &timer, NULL) == 0);
@@ -480,8 +480,7 @@ static void TestSleepNs(void) {
   assert(SleepNs(0) == 0);
   assert(errno == 0);
 
-  if ((int64_t)(time_t)(INT64_MAX / 1000000000) !=
-      INT64_MAX / 1000000000) {
+  if ((int64_t)(time_t)(INT64_MAX / 1000000000) != INT64_MAX / 1000000000) {
     errno = 0;
     assert(SleepNs(INT64_MAX) < 0);
     assert(errno == EOVERFLOW);

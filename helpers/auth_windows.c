@@ -76,13 +76,13 @@ static int CreateOrUpdatePerMonitorWindow(struct AuthUiContext *ctx, size_t i,
   int y;
   int64_t desired_x =
       (int64_t)monitor->x +
-      ((int64_t)monitor->width - (int64_t)w) * ctx->config.auth_x_position /
-          100 +
+      ((((int64_t)monitor->width - (int64_t)w) * ctx->config.auth_x_position) /
+       100) +
       ctx->runtime.x_offset;
   int64_t desired_y =
       (int64_t)monitor->y +
-      ((int64_t)monitor->height - (int64_t)h) * ctx->config.auth_y_position /
-          100 +
+      ((((int64_t)monitor->height - (int64_t)h) * ctx->config.auth_y_position) /
+       100) +
       ctx->runtime.y_offset;
   if (desired_x < INT_MIN || desired_x > INT_MAX || desired_y < INT_MIN ||
       desired_y > INT_MAX) {

@@ -21,7 +21,7 @@
 
 static char *const *BorrowExecvArgv(const char *const argv[]) {
   char *const *execv_argv = NULL;
-  memcpy(&execv_argv, &argv, sizeof(execv_argv));
+  memcpy((void *)&execv_argv, (const void *)&argv, sizeof(execv_argv));
   return execv_argv;
 }
 
@@ -41,7 +41,8 @@ void InitWaitPgrp(void) {
 
 pid_t ForkWithoutSigHandlers(void) {
   // Before forking, block all signals we may have handlers for.
-  sigset_t oldset, set;
+  sigset_t oldset;
+  sigset_t set;
   sigemptyset(&set);
   sigaddset(&set, SIGUSR1);
   sigaddset(&set, SIGUSR2);
@@ -163,7 +164,8 @@ int WaitPgrp(const char *name, pid_t *pid, int do_block, int already_killed,
 
 int WaitProc(const char *name, pid_t *pid, int do_block, int already_killed,
              int *exit_status) {
-  sigset_t oldset, set;
+  sigset_t oldset;
+  sigset_t set;
   sigemptyset(&set);
   // We're blocking the signals we may have forwarding handlers for as their
   // handling reads the pid variable we are changing here.

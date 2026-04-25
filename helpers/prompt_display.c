@@ -12,7 +12,7 @@
 #include "../util.h"
 #include "prompt_glyph.h"
 
-#define PROMPT_DISPLAY_ANIMATED_MARKER_COUNT (1u << DISCO_PASSWORD_DANCERS)
+#define PROMPT_DISPLAY_ANIMATED_MARKER_COUNT (1U << DISCO_PASSWORD_DANCERS)
 #define PROMPT_DISPLAY_ANIMATED_MIN_CHANGE 4
 static const char kCursorPromptVisibleMarker = '|';
 static const char kCursorPromptBlinkMarker = '-';
@@ -201,7 +201,7 @@ static int RenderTimePromptDisplay(enum PromptDisplayMode mode,
                        (int64_t)state->last_keystroke.tv_usec);
   } else {
     uint64_t time_hex =
-        (uint64_t)state->last_keystroke.tv_sec * UINT64_C(1000000) +
+        ((uint64_t)state->last_keystroke.tv_sec * UINT64_C(1000000)) +
         (uint64_t)state->last_keystroke.tv_usec;
     written = snprintf(displaybuf, displaybufsize, "%#" PRIx64, time_hex);
   }
