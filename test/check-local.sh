@@ -58,7 +58,6 @@ echo "Running native smoke tests"
 "$builddir"/explicit_bzero_test
 "$builddir"/explicit_bzero_fallback_test
 "$builddir"/retry_io_test
-"$builddir"/retry_io_fallback_test
 "$builddir"/signal_pipe_test
 "$builddir"/indicator_text_test
 "$builddir"/xkb_test

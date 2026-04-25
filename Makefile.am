@@ -173,7 +173,7 @@ CLEANFILES += xsecurelock.1.md xsecurelock.1
 endif
 
 # Some tools that we sure don't wan to install
-noinst_PROGRAMS = authproto_bounds_test authproto_pam_flow_test authproto_pam_flow_check_account_test auth_title_test blanking_test buf_util_test cat_authproto configured_command_test dimmer_bayer_test nvidia_break_compositor get_compositor keysym_config_test remap_all rect_test prompt_display_test prompt_glyph_test prompt_state_test xkb_test explicit_bzero_test explicit_bzero_fallback_test retry_io_test retry_io_fallback_test signal_pipe_test indicator_text_test mlock_page_test mlock_page_overflow_test prompt_random_test env_settings_test wait_pgrp_test xscreensaver_api_test unmap_all_test
+noinst_PROGRAMS = authproto_bounds_test authproto_pam_flow_test authproto_pam_flow_check_account_test auth_title_test blanking_test buf_util_test cat_authproto configured_command_test dimmer_bayer_test nvidia_break_compositor get_compositor keysym_config_test remap_all rect_test prompt_display_test prompt_glyph_test prompt_state_test xkb_test explicit_bzero_test explicit_bzero_fallback_test retry_io_test signal_pipe_test indicator_text_test mlock_page_test mlock_page_overflow_test prompt_random_test env_settings_test wait_pgrp_test xscreensaver_api_test unmap_all_test
 authproto_bounds_test_SOURCES = \
 	logging.c logging.h \
 	helpers/authproto.c helpers/authproto.h \
@@ -258,10 +258,6 @@ explicit_bzero_fallback_test_CPPFLAGS = $(AM_CPPFLAGS) -DFORCE_EXPLICIT_BZERO_FA
 retry_io_test_SOURCES = \
 	test/retry_io_test.c \
 	util.c util.h
-retry_io_fallback_test_SOURCES = \
-	test/retry_io_test.c \
-	util.c util.h
-retry_io_fallback_test_CPPFLAGS = $(AM_CPPFLAGS) -DFORCE_PIPE2_FALLBACK=1
 signal_pipe_test_SOURCES = \
 	logging.c logging.h \
 	signal_pipe.c signal_pipe.h \

@@ -182,7 +182,7 @@ if test x$have_pam = xtrue; then
 fi
 
 AC_SEARCH_LIBS([clock_gettime], [rt])
-AC_CHECK_FUNCS([clock_gettime explicit_bzero mlock mlockall pipe2])
+AC_CHECK_FUNCS([clock_gettime explicit_bzero mlock mlockall])
 
 # Xft optionally provides nicer font rendering.
 PKG_PROG_PKG_CONFIG

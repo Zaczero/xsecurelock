@@ -50,20 +50,6 @@
 #define HAVE_CLOCK_GETTIME 0
 #endif
 
-#ifndef HAVE_PIPE2
-#define HAVE_PIPE2 0
-#endif
-
-#ifndef FORCE_PIPE2_FALLBACK
-#define FORCE_PIPE2_FALLBACK 0
-#endif
-
-#if HAVE_PIPE2 && !FORCE_PIPE2_FALLBACK && defined(O_CLOEXEC)
-// With the repo's conservative feature-test macros, some libcs may hide the
-// prototype for pipe2() even when the function itself is available.
-int pipe2(int pipefd[2], int flags);
-#endif
-
 #if !HAVE_EXPLICIT_BZERO || FORCE_EXPLICIT_BZERO_FALLBACK
 // Prefer libc explicit_bzero() when it exists. Otherwise, route memset()
 // through a volatile function pointer so the wipe remains an observable call
@@ -241,15 +227,6 @@ int SetFdNonblocking(int fd) {
 }
 
 int PipeCloexec(int fds[2]) {
-#if HAVE_PIPE2 && !FORCE_PIPE2_FALLBACK && defined(O_CLOEXEC)
-  if (pipe2(fds, O_CLOEXEC) == 0) {
-    return 0;
-  }
-  if (errno != ENOSYS && errno != EINVAL) {
-    return -1;
-  }
-#endif
-
   if (pipe(fds) != 0) {
     return -1;
   }
