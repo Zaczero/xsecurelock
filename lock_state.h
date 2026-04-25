@@ -52,6 +52,7 @@ struct LockBlankingState {
   int64_t time_to_blank_ms;
   bool blanked;
 #ifdef HAVE_DPMS_EXT
+  int64_t next_dpms_reapply_ms;
   bool must_disable_dpms;
 #endif
 };

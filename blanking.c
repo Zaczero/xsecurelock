@@ -14,6 +14,8 @@
 #include "logging.h"
 #include "time_util.h"
 
+#define DPMS_REAPPLY_INTERVAL_MS 1000
+
 void LockBlankingResetTimer(struct LockContext *ctx) {
   if (ctx->config.blank_timeout < 0) {
     return;
@@ -33,8 +35,62 @@ void LockBlankingInit(struct LockContext *ctx) {
   LockBlankingResetTimer(ctx);
 }
 
+#ifdef HAVE_DPMS_EXT
+static int GetBlankingDpmsMode(const char *blank_dpms_state, CARD16 *mode) {
+  if (!strcmp(blank_dpms_state, "standby")) {
+    *mode = DPMSModeStandby;
+  } else if (!strcmp(blank_dpms_state, "suspend")) {
+    *mode = DPMSModeSuspend;
+  } else if (!strcmp(blank_dpms_state, "off")) {
+    *mode = DPMSModeOff;
+  } else {
+    return 0;
+  }
+  return 1;
+}
+
+static void ForceBlankingDpmsMode(struct LockContext *ctx, CARD16 mode,
+                                  BOOL onoff, int set_disable_on_unblank) {
+  if (!onoff) {
+    if (set_disable_on_unblank) {
+      ctx->blanking.must_disable_dpms = true;
+    }
+    DPMSEnable(ctx->runtime.display);
+  }
+  DPMSForceLevel(ctx->runtime.display, mode);
+}
+
+static void LockMaybeReapplyDpms(struct LockContext *ctx, int64_t now_ms) {
+  if (!strcmp(ctx->config.blank_dpms_state, "on")) {
+    return;
+  }
+
+  CARD16 mode = 0;
+  if (!GetBlankingDpmsMode(ctx->config.blank_dpms_state, &mode)) {
+    return;
+  }
+  if (now_ms < ctx->blanking.next_dpms_reapply_ms) {
+    return;
+  }
+  ctx->blanking.next_dpms_reapply_ms = now_ms + DPMS_REAPPLY_INTERVAL_MS;
+
+  int dummy = 0;
+  if (!DPMSQueryExtension(ctx->runtime.display, &dummy, &dummy)) {
+    return;
+  }
+
+  CARD16 state = 0;
+  BOOL onoff = False;
+  DPMSInfo(ctx->runtime.display, &state, &onoff);
+  if (!onoff || state != mode) {
+    ForceBlankingDpmsMode(ctx, mode, onoff, 1);
+    XFlush(ctx->runtime.display);
+  }
+}
+#endif
+
 void LockMaybeBlankScreen(struct LockContext *ctx) {
-  if (ctx->config.blank_timeout < 0 || ctx->blanking.blanked) {
+  if (ctx->config.blank_timeout < 0) {
     return;
   }
 
@@ -42,11 +98,20 @@ void LockMaybeBlankScreen(struct LockContext *ctx) {
   if (GetMonotonicTimeMs(&now_ms) != 0) {
     return;
   }
+  if (ctx->blanking.blanked) {
+#ifdef HAVE_DPMS_EXT
+    LockMaybeReapplyDpms(ctx, now_ms);
+#endif
+    return;
+  }
   if (now_ms < ctx->blanking.time_to_blank_ms) {
     return;
   }
 
   ctx->blanking.blanked = true;
+#ifdef HAVE_DPMS_EXT
+  ctx->blanking.next_dpms_reapply_ms = now_ms + DPMS_REAPPLY_INTERVAL_MS;
+#endif
   XForceScreenSaver(ctx->runtime.display, ScreenSaverActive);
   if (!strcmp(ctx->config.blank_dpms_state, "on")) {
     goto done;
@@ -62,19 +127,12 @@ void LockMaybeBlankScreen(struct LockContext *ctx) {
   }
 
   {
-    CARD16 state = 0;
-    BOOL onoff = False;
-    DPMSInfo(ctx->runtime.display, &state, &onoff);
-    if (!onoff) {
-      ctx->blanking.must_disable_dpms = true;
-      DPMSEnable(ctx->runtime.display);
-    }
-    if (!strcmp(ctx->config.blank_dpms_state, "standby")) {
-      DPMSForceLevel(ctx->runtime.display, DPMSModeStandby);
-    } else if (!strcmp(ctx->config.blank_dpms_state, "suspend")) {
-      DPMSForceLevel(ctx->runtime.display, DPMSModeSuspend);
-    } else if (!strcmp(ctx->config.blank_dpms_state, "off")) {
-      DPMSForceLevel(ctx->runtime.display, DPMSModeOff);
+    CARD16 mode = 0;
+    if (GetBlankingDpmsMode(ctx->config.blank_dpms_state, &mode)) {
+      CARD16 state = 0;
+      BOOL onoff = False;
+      DPMSInfo(ctx->runtime.display, &state, &onoff);
+      ForceBlankingDpmsMode(ctx, mode, onoff, 1);
     } else {
       Log("XSECURELOCK_BLANK_DPMS_STATE not in standby/suspend/off/on");
     }

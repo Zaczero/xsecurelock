@@ -191,7 +191,18 @@ IMPORTANT: Make sure your desktop environment does not launch any other locker,
 be it via autostart file or its own configuration, as multiple screen lockers
 may interfere with each other. You have been warned!
 
-## Authentication on resume from suspend/hibernate
+## Locking and power management
+
+XSecureLock locks an already running X11 session. Power-management events around
+that lock usually involve other components too:
+
+*   `xss-lock` starts the locker from X11 idle or logind suspend events.
+*   XSecureLock acquires grabs, shows the saver/auth UI, and can blank or DPMS
+    the display after the lock is active.
+*   `systemd-logind`, desktop power managers, or tools such as `xautolock`
+    decide whether the machine suspends later.
+
+### Authentication on resume from suspend/hibernate
 
 To have the authentication process start up without a keypress when
 the system exits suspend/hibernate, arrange for the system to send the
@@ -210,7 +221,7 @@ exit 0
 
 Don't forget to mark the script executable.
 
-## Showing the auth prompt immediately
+### Showing the auth prompt immediately
 
 By default, XSecureLock starts in the saver/blank state and opens the auth
 prompt after user activity. If you want the auth prompt visible immediately
@@ -225,7 +236,7 @@ Avoid starting XSecureLock in the background and immediately signaling it from
 the parent shell; that can race with startup before the signal handler is
 installed.
 
-## Running from systemd
+### Running from systemd
 
 XSecureLock must run inside the graphical X11 session it is locking. A system
 service, or a user service started without the session environment, cannot
@@ -246,7 +257,7 @@ The exact unit wiring is desktop-specific, but the important invariant is that
 the process must have the same `DISPLAY` and X authority as the logged-in X11
 session.
 
-## Ignoring power and sleep buttons while locked
+### Ignoring power and sleep buttons while locked
 
 Power, sleep, hibernate, and lid buttons are usually handled by
 `systemd-logind`, not by X11. XSecureLock cannot grab them like normal keyboard
@@ -271,7 +282,7 @@ sudo install -m 755 doc/examples/logind_button_inhibit_lock /usr/local/bin/xsecu
 xss-lock -n /usr/lib/xsecurelock/dimmer -l -- xsecurelock-logind-buttons
 ```
 
-## Running from XFCE
+### Running from XFCE
 
 XFCE waits for its configured lock command to exit. Running `xsecurelock`
 directly there can delay suspend until the screen is unlocked, because
@@ -287,7 +298,7 @@ sudo install -m 755 doc/examples/xfce_lock_command /usr/local/bin/xsecurelock-xf
 xfconf-query --channel xfce4-session --property /general/LockCommand --set xsecurelock-xfce
 ```
 
-# Automatic Locking
+### Automatic locking
 
 To automatically lock the screen after some time of inactivity, use
 [xss-lock](https://github.com/wavexx/xss-lock) as follows:
@@ -337,9 +348,22 @@ to use this as a security feature, make sure to kill the session whenever
 attempts to lock fail (in which case `xsecurelock` will return a non-zero exit
 status).
 
-## Alternatives
+### Blanking, DPMS, and suspend
 
-### xautolock
+After the lock is active, XSecureLock can ask X11 to blank the screen and enter
+a monitor DPMS state. This controls the display, not the machine's sleep state:
+`XSECURELOCK_BLANK_DPMS_STATE=suspend` means DPMS monitor suspend, not
+`systemctl suspend`.
+
+Use `XSECURELOCK_BLANK_TIMEOUT=0 XSECURELOCK_BLANK_DPMS_STATE=off` if you want
+the display powered off as soon as the lock starts, or immediately after an auth
+prompt times out and closes. Use `XSECURELOCK_BLANK_TIMEOUT=-1` if an external
+DPMS or screen-saver policy owns blanking instead of XSecureLock.
+
+For pre-lock display sleep, or for "lock now, turn the display off, suspend the
+machine later" workflows, keep that policy outside XSecureLock. For example,
+run a separate idle action with `xautolock`, a desktop power manager, or
+systemd/logind while XSecureLock remains responsible for the locked session.
 
 `xautolock` can be used instead of `xss-lock` as long as you do not care for
 suspend events (like on laptops):
@@ -347,39 +371,6 @@ suspend events (like on laptops):
 ```
 xautolock -time 10 -notify 5 -notifier '/usr/lib/xsecurelock/until_nonidle /usr/lib/xsecurelock/dimmer' -locker xsecurelock
 ```
-
-### Possible other tools
-
-Ideally, an environment integrating `xsecurelock` should provide the following
-facilities:
-
-1.  Wait for one of the following events:
-    1.  When idle for a sufficient amount of time:
-        1.  Run `dimmer`.
-        2.  When no longer idle while dimmed, kill `dimmer` and go back to the
-            start.
-        3.  When `dimmer` exits, run `xsecurelock` and wait for it.
-    2.  When locking was requested, run `xsecurelock` and wait for it.
-    3.  When suspending, run `xsecurelock` while passing along
-        `XSS_SLEEP_LOCK_FD` and wait for it.
-2.  Repeat.
-
-This is, of course, precisely what `xss-lock` does, and - apart from the suspend
-handling - what `xautolock` does.
-
-As an alternative, we also support this way of integrating:
-
-1.  Wait for one of the following events:
-    1.  When idle for a sufficient amount of time:
-        1.  Run `until_nonidle dimmer || exec xsecurelock` and wait for it.
-        2.  Reset your idle timer (optional when your idle timer is either the
-            X11 Screen Saver extension's idle timer or the X Synchronization
-            extension's `"IDLETIME"` timer, as this command can never exit
-            without those being reset).
-    2.  When locking was requested, run `xsecurelock` and wait for it.
-    3.  When suspending, run `xsecurelock` while passing along
-        `XSS_SLEEP_LOCK_FD` and wait for it.
-2.  Repeat.
 
 NOTE: When using `until_nonidle` with dimming tools other than the included
 `dimmer`, please set `XSECURELOCK_DIM_TIME_MS` and `XSECURELOCK_WAIT_TIME_MS` to
@@ -450,7 +441,8 @@ Options to XSecureLock can be passed by environment variables:
     timing instead of xsecurelock.
 *   `XSECURELOCK_BLANK_DPMS_STATE`: specifies which DPMS state to put the screen
     in when xsecurelock performs blanking (one of standby, suspend, off and on,
-    where "on" means to not invoke DPMS at all). This setting only matters when
+    where "on" means to not invoke DPMS at all). These are monitor power states,
+    not machine suspend or hibernate actions. This setting only matters when
     `XSECURELOCK_BLANK_TIMEOUT` is nonnegative.
 
     For example, to close the auth prompt after 5 seconds and immediately ask
