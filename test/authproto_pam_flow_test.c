@@ -18,6 +18,7 @@ static int auth_calls;
 static int acct_calls;
 static int chauthtok_calls;
 static int setcred_calls;
+static int tty_item_calls;
 
 static void ResetFakePam(int new_auth_status, int new_acct_status,
                          int new_chauthtok_status) {
@@ -28,9 +29,11 @@ static void ResetFakePam(int new_auth_status, int new_acct_status,
   acct_calls = 0;
   chauthtok_calls = 0;
   setcred_calls = 0;
+  tty_item_calls = 0;
   unsetenv("XSECURELOCK_PAM_SERVICE");
   unsetenv("XSECURELOCK_NO_PAM_RHOST");
   unsetenv("XSECURELOCK_ALLOW_NULL_PAM_AUTHTOK");
+  unsetenv("DISPLAY");
 }
 
 static int RunAuthenticate(void) {
@@ -42,6 +45,36 @@ static int RunAuthenticate(void) {
   return Authenticate(&conv, &pam);
 }
 
+static void ExpectBadConversationRejected(int num_msg,
+                                          const struct pam_message **msg) {
+  struct pam_response *resp = (struct pam_response *)1;
+  conv_error = 0;
+  if (Converse(num_msg, msg, &resp, NULL) != PAM_CONV_ERR) {
+    abort();
+  }
+  if (resp != NULL) {
+    abort();
+  }
+}
+
+static void ExpectMalformedConversationInputRejected(void) {
+  struct pam_message null_text = {
+      .msg_style = PAM_TEXT_INFO,
+      .msg = NULL,
+  };
+  const struct pam_message *null_messages[1] = {NULL};
+  const struct pam_message *null_text_messages[1] = {&null_text};
+
+  ExpectBadConversationRejected(1, NULL);
+  ExpectBadConversationRejected(1, null_messages);
+  ExpectBadConversationRejected(1, null_text_messages);
+
+  conv_error = 0;
+  if (Converse(1, null_text_messages, NULL, NULL) != PAM_CONV_ERR) {
+    abort();
+  }
+}
+
 static void ExpectSuccessWithoutTokenChange(void) {
   ResetFakePam(PAM_SUCCESS, PAM_SUCCESS, PAM_PERM_DENIED);
 
@@ -50,6 +83,35 @@ static void ExpectSuccessWithoutTokenChange(void) {
   }
   if (auth_calls != 1 || acct_calls != 1 || chauthtok_calls != 0 ||
       setcred_calls != 1) {
+    abort();
+  }
+}
+
+static void ExpectDisplaySetOnlyWhenPresent(void) {
+  ResetFakePam(PAM_SUCCESS, PAM_SUCCESS, PAM_PERM_DENIED);
+
+  if (RunAuthenticate() != PAM_SUCCESS) {
+    abort();
+  }
+  if (tty_item_calls != 0) {
+    abort();
+  }
+
+  ResetFakePam(PAM_SUCCESS, PAM_SUCCESS, PAM_PERM_DENIED);
+  setenv("DISPLAY", "", 1);
+  if (RunAuthenticate() != PAM_SUCCESS) {
+    abort();
+  }
+  if (tty_item_calls != 0) {
+    abort();
+  }
+
+  ResetFakePam(PAM_SUCCESS, PAM_SUCCESS, PAM_PERM_DENIED);
+  setenv("DISPLAY", ":1", 1);
+  if (RunAuthenticate() != PAM_SUCCESS) {
+    abort();
+  }
+  if (tty_item_calls != 1) {
     abort();
   }
 }
@@ -112,8 +174,12 @@ int pam_start(const char *service_name, const char *user,
 
 int pam_set_item(pam_handle_t *pamh, int item_type, const void *item) {
   (void)pamh;
-  (void)item_type;
-  (void)item;
+  if (item_type == PAM_TTY) {
+    ++tty_item_calls;
+    if (item == NULL || ((const char *)item)[0] == '\0') {
+      abort();
+    }
+  }
   return PAM_SUCCESS;
 }
 
@@ -162,7 +228,9 @@ const char *pam_strerror(pam_handle_t *pamh, int errnum) {
 }
 
 int main(void) {
+  ExpectMalformedConversationInputRejected();
   ExpectSuccessWithoutTokenChange();
+  ExpectDisplaySetOnlyWhenPresent();
   ExpectExpiredTokenChangeSuccessUnlocks();
   ExpectExpiredTokenChangeFailureBlocksUnlock();
   ExpectOrdinaryAccountFailureUsesBuildPolicy();

@@ -199,9 +199,21 @@ fi
 # PAM-less operation is... unfortunate. Let's have users explicitly disable this
 # if they need to use other auth modules, as most likely they should rather
 # install PAM development libraries instead.
-RP_SEARCH_LIBS(pam_authenticate, pam,
-               [HAVE_PAM], [pam], [yes],
-               [Enable support for the PAM library to authenticate the user])
+AC_ARG_WITH([pam],
+            [AS_HELP_STRING([--with-pam],
+                            [Enable support for the PAM library to authenticate the user @<:@default=yes@:>@])],
+            [with_pam=$withval],
+            [with_pam=yes])
+AS_IF([test "x$with_pam" = xno],
+      [have_pam=false],
+      [AC_CHECK_HEADER([security/pam_appl.h],
+                       [AC_SEARCH_LIBS([pam_authenticate], [pam],
+                                       [have_pam=true],
+                                       [have_pam=false])],
+                       [have_pam=false])
+       AS_IF([test x$have_pam != xtrue && test "x$with_pam" != xcheck],
+             [AC_MSG_ERROR([--with-pam was enabled, but test for pam failed])])])
+AM_CONDITIONAL([HAVE_PAM], [test x$have_pam = xtrue])
 if test x$have_pam = xtrue; then
   AC_DEFINE([HAVE_PAM], [1],
             [Enable support for the PAM library to authenticate the user.])

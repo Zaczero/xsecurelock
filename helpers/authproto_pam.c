@@ -87,19 +87,39 @@ static int ConverseOne(const struct pam_message *msg,
 static int Converse(int num_msg, const struct pam_message **msg,
                     struct pam_response **resp, void *appdata_ptr) {
   (void)appdata_ptr;
+  if (resp == NULL) {
+    conv_error = 1;
+    return PAM_CONV_ERR;
+  }
   *resp = NULL;
 
   if (conv_error) {
+    const char *first = "(none)";
+    if (num_msg > 0 && msg != NULL && msg[0] != NULL && msg[0]->msg != NULL) {
+      first = msg[0]->msg;
+    }
     Log("Converse() got called again with %d messages (first: %s) after "
         "having failed before - this is very likely a bug in the PAM "
         "module having made the call. Bailing out",
-        num_msg, num_msg <= 0 ? "(none)" : msg[0]->msg);
+        num_msg, first);
     exit(1);
   }
   if (num_msg <= 0 || num_msg > MAX_CONVERSE_MESSAGES) {
     Log("Converse() got invalid message count %d", num_msg);
     conv_error = 1;
     return PAM_CONV_ERR;
+  }
+  if (msg == NULL) {
+    Log("Converse() got NULL messages");
+    conv_error = 1;
+    return PAM_CONV_ERR;
+  }
+  for (int i = 0; i < num_msg; ++i) {
+    if (msg[i] == NULL || msg[i]->msg == NULL) {
+      Log("Converse() got invalid message %d", i);
+      conv_error = 1;
+      return PAM_CONV_ERR;
+    }
   }
 
   *resp = calloc((size_t)num_msg, sizeof(struct pam_response));
@@ -207,10 +227,12 @@ static int Authenticate(struct pam_conv *conv, pam_handle_t **pam) {
   }
 
   const char *display = getenv("DISPLAY");
-  status = pam_set_item(*pam, PAM_TTY, display);
-  if (status != PAM_SUCCESS) {
-    Log("pam_set_item: %s", pam_strerror(*pam, status));
-    return status;
+  if (display != NULL && display[0] != '\0') {
+    status = pam_set_item(*pam, PAM_TTY, display);
+    if (status != PAM_SUCCESS) {
+      Log("pam_set_item: %s", pam_strerror(*pam, status));
+      return status;
+    }
   }
 
 #ifdef PAM_DISALLOW_NULL_AUTHTOK
