@@ -14,10 +14,7 @@
 
 #ifdef HAVE_XRANDR_EXT
 #include <X11/extensions/Xrandr.h>  // for XRRMonitorInfo, XRRCrtcInfo, XRRO...
-#include <X11/extensions/randr.h>   // for RANDR_MAJOR, RRNotify, RANDR_MINOR
-#if RANDR_MAJOR > 1 || (RANDR_MAJOR == 1 && RANDR_MINOR >= 5)
-#define HAVE_XRANDR15_EXT
-#endif
+#include <X11/extensions/randr.h>   // for RRNotify
 #endif
 
 #include "../env_settings.h"  // for GetIntSetting

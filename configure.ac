@@ -85,6 +85,27 @@ AC_CHECK_LIB(X11, XOpenDisplay,
 AC_CHECK_LIB(m, sqrt,
              [], [AC_MSG_ERROR([Math library not found.])])
 
+# RP_SEARCH_EXTENSION(sym, lib, macro, flag, default, description, header)
+AC_DEFUN([RP_SEARCH_EXTENSION], [
+          AC_ARG_WITH([$4],
+                      [AS_HELP_STRING([--with-$4],
+                                      [$6 @<:@default=$5@:>@])],
+                      [with_$4=$withval],
+                      [with_$4=$5])
+          AS_IF([test "x$with_$4" = xno],
+                [have_$4=false],
+                [AC_CHECK_HEADER([$7],
+                    [AC_SEARCH_LIBS([$1], [$2],
+                                    [have_$4=true],
+                                    [AS_IF([test "x$with_$4" = xcheck],
+                                           [have_$4=false],
+                                           [AC_MSG_ERROR([--with-$4 was enabled, but test for $4 failed])])])],
+                    [AS_IF([test "x$with_$4" = xcheck],
+                           [have_$4=false],
+                           [AC_MSG_ERROR([--with-$4 was enabled, but $7 was not found])])],
+                    [[#include <X11/Xlib.h>]])])
+          AM_CONDITIONAL([$3], [test x$have_$4 = xtrue])])
+
 # RP_SEARCH_LIBS(sym, lib, macro, flag, default, description)
 AC_DEFUN([RP_SEARCH_LIBS], [
           AC_ARG_WITH([$4],
@@ -121,9 +142,10 @@ AC_DEFUN([RP_SEARCH_PROG], [
 
 # The DPMS extension is used to save power of the screen when turned off. Saves
 # electric power.
-RP_SEARCH_LIBS(DPMSQueryExtension, Xext,
-               [HAVE_DPMS_EXT], [dpms], [check],
-               [Use the DPMS extension to save power])
+RP_SEARCH_EXTENSION(DPMSQueryExtension, Xext,
+                    [HAVE_DPMS_EXT], [dpms], [check],
+                    [Use the DPMS extension to save power],
+                    [X11/extensions/dpms.h])
 if test x$have_dpms = xtrue; then
   AC_DEFINE([HAVE_DPMS_EXT], [1], [Use the DPMS extension to save power.])
 fi
@@ -131,9 +153,10 @@ fi
 # The X11 Screen Saver extension is used to turn off the screen saver when X11
 # handles screen blanking (e.g. via timeout) anyway; not needed for when we
 # handle blanking explicitly (XSECURELOCK_BLANK_TIMEOUT). Saves CPU power.
-RP_SEARCH_LIBS(XScreenSaverQueryExtension, Xss,
-               [HAVE_XSCREENSAVER_EXT], [xss], [check],
-               [Use the X11 Screen Saver extension to save power])
+RP_SEARCH_EXTENSION(XScreenSaverQueryExtension, Xss,
+                    [HAVE_XSCREENSAVER_EXT], [xss], [check],
+                    [Use the X11 Screen Saver extension to save power],
+                    [X11/extensions/scrnsaver.h])
 if test x$have_xss = xtrue; then
   AC_DEFINE([HAVE_XSCREENSAVER_EXT], [1],
             [Use the X11 Screen Saver extension to save power.])
@@ -141,9 +164,10 @@ fi
 
 # The X Synchronization extension is used to get per-device idle times. Used by
 # until_nonidle only.
-RP_SEARCH_LIBS(XSyncQueryExtension, Xext,
-               [HAVE_XSYNC_EXT], [xsync], [check],
-               [Use the X Synchronization extension to detect idle time])
+RP_SEARCH_EXTENSION(XSyncQueryExtension, Xext,
+                    [HAVE_XSYNC_EXT], [xsync], [check],
+                    [Use the X Synchronization extension to detect idle time],
+                    [X11/extensions/sync.h])
 if test x$have_xsync = xtrue; then
   AC_DEFINE([HAVE_XSYNC_EXT], [1],
             [Use the X Synchronization extension to detect idle time.])
@@ -152,9 +176,10 @@ fi
 # The Composite extension needs an explicit opt-out because not having it can
 # cause desktop notifications to appear on top of the screen saver (privacy
 # risk).
-RP_SEARCH_LIBS(XCompositeQueryExtension, Xcomposite,
-               [HAVE_XCOMPOSITE_EXT], [xcomposite], [yes],
-               [Use the X11 Composite extension to cover desktop notifications])
+RP_SEARCH_EXTENSION(XCompositeQueryExtension, Xcomposite,
+                    [HAVE_XCOMPOSITE_EXT], [xcomposite], [yes],
+                    [Use the X11 Composite extension to cover desktop notifications],
+                    [X11/extensions/Xcomposite.h])
 if test x$have_xcomposite = xtrue; then
   AC_DEFINE([HAVE_XCOMPOSITE_EXT], [1],
             [Use the X11 Composite extension to cover desktop notifications.])
@@ -162,9 +187,10 @@ fi
 
 # This extension doesn't really exist anymore, but served to counteract the
 # (also no longer existing) AllowClosedownGrabs and similar X server settings.
-RP_SEARCH_LIBS(XF86MiscSetGrabKeysState, Xxf86misc,
-               [HAVE_XF86MISC_EXT], [xf86misc], [check],
-               [Use the XFree86-Misc extension to disable ungrab keys])
+RP_SEARCH_EXTENSION(XF86MiscSetGrabKeysState, Xxf86misc,
+                    [HAVE_XF86MISC_EXT], [xf86misc], [check],
+                    [Use the XFree86-Misc extension to disable ungrab keys],
+                    [X11/extensions/xf86misc.h])
 if test x$have_xf86misc = xtrue; then
   AC_DEFINE([HAVE_XF86MISC_EXT], [1],
             [Use the XFree86-Misc extension to disable ungrab keys.])
@@ -232,9 +258,10 @@ fi
 
 # Querying the keyboard LEDs (and layout name) makes auth_x11 more user
 # friendly.
-RP_SEARCH_LIBS(XkbGetIndicatorState, X11,
-               [HAVE_XKB_EXT], [xkb], [check],
-               [Use the X Keyboard extension to show the keyboard LEDs])
+RP_SEARCH_EXTENSION(XkbGetIndicatorState, X11,
+                    [HAVE_XKB_EXT], [xkb], [check],
+                    [Use the X Keyboard extension to show the keyboard LEDs],
+                    [X11/extensions/XKBstr.h])
 if test x$have_xkb = xtrue; then
   AC_DEFINE([HAVE_XKB_EXT], [1],
             [Use the X Keyboard extension to show the keyboard LEDs.])
@@ -242,19 +269,36 @@ fi
 
 # XRandR provides information about monitor layouts and is strongly recommended
 # on systems which can use more than one monitor (which includes most laptops).
-RP_SEARCH_LIBS(XRRGetScreenResources, Xrandr,
-               [HAVE_XRANDR_EXT], [xrandr], [check],
-               [Use the XRandR extension to query monitor layouts])
+RP_SEARCH_EXTENSION(XRRGetScreenResources, Xrandr,
+                    [HAVE_XRANDR_EXT], [xrandr], [check],
+                    [Use the XRandR extension to query monitor layouts],
+                    [X11/extensions/Xrandr.h])
 if test x$have_xrandr = xtrue; then
   AC_DEFINE([HAVE_XRANDR_EXT], [1],
             [Use the XRandR extension to query monitor layouts.])
+  AC_MSG_CHECKING([whether XRandR headers provide 1.5 monitor support])
+  AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+#include <X11/Xlib.h>
+#include <X11/extensions/Xrandr.h>
+#include <X11/extensions/randr.h>
+#if !(RANDR_MAJOR > 1 || (RANDR_MAJOR == 1 && RANDR_MINOR >= 5))
+#error XRandR headers are older than 1.5.
+#endif
+  ]])],
+    [AC_MSG_RESULT([yes])
+     AC_SEARCH_LIBS([XRRGetMonitors], [Xrandr],
+                    [AC_DEFINE([HAVE_XRANDR15_EXT], [1],
+                               [Use XRandR 1.5 monitor layout support.])],
+                    [AC_MSG_WARN([XRandR headers provide 1.5 but library lacks XRRGetMonitors; disabling XRandR 1.5 monitor support])])],
+    [AC_MSG_RESULT([no])])
 fi
 
 # The XFixes extension is used to work around possible weird leftover state from
 # compositors.
-RP_SEARCH_LIBS(XFixesSetWindowShapeRegion, Xfixes,
-               [HAVE_XFIXES_EXT], [xfixes], [check],
-               [Use the XFixes extension to work around some compositors])
+RP_SEARCH_EXTENSION(XFixesSetWindowShapeRegion, Xfixes,
+                    [HAVE_XFIXES_EXT], [xfixes], [check],
+                    [Use the XFixes extension to work around some compositors],
+                    [X11/extensions/Xfixes.h])
 if test x$have_xfixes = xtrue; then
   AC_DEFINE([HAVE_XFIXES_EXT], [1],
             [Use the XFixes extension to work around some compositors.])
