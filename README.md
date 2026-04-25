@@ -246,6 +246,31 @@ The exact unit wiring is desktop-specific, but the important invariant is that
 the process must have the same `DISPLAY` and X authority as the logged-in X11
 session.
 
+## Ignoring power and sleep buttons while locked
+
+Power, sleep, hibernate, and lid buttons are usually handled by
+`systemd-logind`, not by X11. XSecureLock cannot grab them like normal keyboard
+shortcuts; configure logind policy or use an inhibitor if you want those buttons
+ignored while the screen is locked.
+
+For manual locking, this can be as simple as:
+
+```
+systemd-inhibit --what=handle-power-key:handle-suspend-key:handle-hibernate-key \
+  --who=xsecurelock --why='screen is locked' --mode=block -- xsecurelock
+```
+
+When using `xss-lock -l`, do not put `systemd-inhibit` between `xss-lock` and
+`xsecurelock`, because that can prevent the transferred sleep-lock file
+descriptor from reaching XSecureLock. Instead, copy the example wrapper
+`doc/examples/logind_button_inhibit_lock` to a location in `PATH`, make it
+executable, and use that as the locker:
+
+```
+sudo install -m 755 doc/examples/logind_button_inhibit_lock /usr/local/bin/xsecurelock-logind-buttons
+xss-lock -n /usr/lib/xsecurelock/dimmer -l -- xsecurelock-logind-buttons
+```
+
 ## Running from XFCE
 
 XFCE waits for its configured lock command to exit. Running `xsecurelock`

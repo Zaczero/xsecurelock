@@ -344,6 +344,7 @@ EXTRA_DIST = \
 
 examplesdir = $(docdir)/examples
 dist_examples_DATA = \
+	doc/examples/logind_button_inhibit_lock \
 	doc/examples/saver_livestreams \
 	doc/examples/xfce_lock_command
 

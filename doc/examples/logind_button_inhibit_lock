@@ -1,0 +1,22 @@
+#!/bin/sh
+# Example wrapper for ignoring logind power/sleep buttons while locked.
+#
+# Keep xsecurelock as the direct exec target so xss-lock -l can still pass
+# XSS_SLEEP_LOCK_FD through to it. systemd-inhibit is only a sidecar here.
+
+lock_pid=$$
+
+if command -v systemd-inhibit >/dev/null 2>&1; then
+  systemd-inhibit \
+    --what=handle-power-key:handle-suspend-key:handle-hibernate-key \
+    --who=xsecurelock \
+    --why='screen is locked' \
+    --mode=block \
+    sh -c 'while kill -0 "$1" 2>/dev/null; do sleep 1; done' \
+    sh "$lock_pid" &
+else
+  printf '%s\n' \
+    'warning: systemd-inhibit not found; power/sleep keys are not inhibited' >&2
+fi
+
+exec xsecurelock "$@"
