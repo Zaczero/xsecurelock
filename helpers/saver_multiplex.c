@@ -10,26 +10,26 @@
 #include <X11/Xlib.h>  // for XEvent, XFlush, XNextEvent, XOpenDi...
 #include <errno.h>     // for errno, EAGAIN, EINTR, EWOULDBLOCK
 #include <poll.h>      // for pollfd, POLLIN, POLLHUP
-#include <signal.h>    // for sigaction, SIGTERM, SIGUSR1, SIGUSR2
+#include <signal.h>    // for sigaction, SIGCHLD, SIGTERM, SIGUSR1, SIGUSR2
 #include <stdbool.h>   // for bool
+#include <stdint.h>    // for int64_t
 #include <stdlib.h>    // for EXIT_FAILURE, setenv
 #include <string.h>    // for memcmp, memcpy, memset
-#include <unistd.h>    // for read, write, ssize_t
 
 #include "../env_settings.h"      // for GetIntSetting, GetExecutablePathSet...
 #include "../io_util.h"           // for ClosePair, PipeCloexec, RetryPoll
 #include "../logging.h"           // for Log, LogErrno
 #include "../saver_child.h"       // for KillAllSaverChildren, MAX_SAVERS
 #include "../signal_pipe.h"       // for SignalPipe, SignalPipeInit
-#include "../time_util.h"         // for SleepMs
+#include "../time_util.h"         // for GetMonotonicTimeMs, SleepMs
 #include "../util.h"              // for ARRAY_LEN
-#include "../wait_pgrp.h"         // for InitWaitPgrp
 #include "../wm_properties.h"     // for SetWMProperties
 #include "../xscreensaver_api.h"  // for ReadWindowID
 #include "monitors.h"             // for IsMonitorChangeEvent, Monitor, Sele...
 
 #define MAX_MONITORS MAX_SAVERS
 #define MAX_X_EVENTS_PER_TICK 128
+#define FAILED_SAVER_RESTART_DELAY_MS 1000
 
 struct SaverMultiplexState {
   int argc;
@@ -44,11 +44,14 @@ struct SaverMultiplexState {
   Window windows[MAX_MONITORS];
   int terminate_signal;
   bool have_pending_x_events;
+  bool child_state_dirty;
+  int64_t next_child_watch_ms;
 };
 
 static volatile sig_atomic_t g_reset_requested = 0;
 static volatile sig_atomic_t g_auth_open_requested = 0;
 static volatile sig_atomic_t g_terminate_signal = 0;
+static volatile sig_atomic_t g_child_state_dirty = 0;
 
 static void HandleSIGUSR1(int unused_signo) {
   (void)unused_signo;
@@ -64,6 +67,12 @@ static void HandleSIGUSR2(int unused_signo) {
 
 static void HandleSIGTERM(int signo) {
   g_terminate_signal = signo;
+  SignalPipeNotifyFromHandler();
+}
+
+static void HandleSIGCHLD(int unused_signo) {
+  (void)unused_signo;
+  g_child_state_dirty = 1;
   SignalPipeNotifyFromHandler();
 }
 
@@ -101,10 +110,22 @@ static int InstallSignalHandlers(void) {
     return 0;
   }
 
+  sa.sa_flags = SA_NOCLDSTOP;
+  sa.sa_handler = HandleSIGCHLD;
+  if (sigaction(SIGCHLD, &sa, NULL) != 0) {
+    LogErrno("sigaction(SIGCHLD)");
+    return 0;
+  }
+
   return 1;
 }
 
-static int HandleSignalFlags(struct SaverMultiplexState *state) {
+static void MarkChildStateDirty(struct SaverMultiplexState *state) {
+  state->child_state_dirty = true;
+}
+
+static int HandleSignalFlags(struct SaverMultiplexState *state,
+                             bool *watch_savers) {
   if (g_terminate_signal != 0) {
     state->terminate_signal = g_terminate_signal;
     g_terminate_signal = 0;
@@ -113,12 +134,23 @@ static int HandleSignalFlags(struct SaverMultiplexState *state) {
   if (g_reset_requested) {
     g_reset_requested = 0;
     KillAllSaverChildren(SIGUSR1);
+    MarkChildStateDirty(state);
+    *watch_savers = true;
   }
   if (g_auth_open_requested) {
     g_auth_open_requested = 0;
     KillAllSaverChildren(SIGUSR2);
+    MarkChildStateDirty(state);
+    *watch_savers = true;
   }
   return 0;
+}
+
+static void HandleChildSignalFlag(struct SaverMultiplexState *state) {
+  if (g_child_state_dirty) {
+    g_child_state_dirty = 0;
+    MarkChildStateDirty(state);
+  }
 }
 
 static void WatchSavers(const struct SaverMultiplexState *state) {
@@ -129,6 +161,46 @@ static void WatchSavers(const struct SaverMultiplexState *state) {
     WatchSaverChild(state->display, state->windows[i], (int)i,
                     state->saver_executable, 1);
   }
+}
+
+static void NoteChildWatchFinished(struct SaverMultiplexState *state) {
+  int64_t now_ms = 0;
+
+  state->child_state_dirty = false;
+  if (GetMonotonicTimeMs(&now_ms) != 0) {
+    state->next_child_watch_ms = 0;
+    return;
+  }
+  state->next_child_watch_ms = now_ms + FAILED_SAVER_RESTART_DELAY_MS;
+}
+
+static int ChildWatchTimeoutMs(const struct SaverMultiplexState *state) {
+  int64_t now_ms = 0;
+
+  if (!state->child_state_dirty) {
+    return -1;
+  }
+  if (state->next_child_watch_ms == 0 || GetMonotonicTimeMs(&now_ms) != 0) {
+    return 0;
+  }
+  if (now_ms >= state->next_child_watch_ms) {
+    return 0;
+  }
+  return (int)(state->next_child_watch_ms - now_ms);
+}
+
+static int PollTimeoutMs(const struct SaverMultiplexState *state) {
+  int child_watch_timeout_ms = ChildWatchTimeoutMs(state);
+
+  if (state->have_pending_x_events) {
+    return 0;
+  }
+  return child_watch_timeout_ms;
+}
+
+static void WatchSaversAfterWakeup(struct SaverMultiplexState *state) {
+  WatchSavers(state);
+  NoteChildWatchFinished(state);
 }
 
 static void StopSavers(struct SaverMultiplexState *state) {
@@ -249,8 +321,6 @@ int main(int argc, char **argv) {
     goto done;
   }
 
-  SpawnSavers(&state);
-
   if (SignalPipeInit(&state.signal_pipe) != 0) {
     LogErrno("SignalPipeInit");
     goto done;
@@ -264,18 +334,18 @@ int main(int argc, char **argv) {
     goto done;
   }
 
-  InitWaitPgrp();
+  SpawnSavers(&state);
   status = 0;
 
   for (;;) {
+    bool watch_savers = false;
     struct pollfd fds[2] = {
         {.fd = state.x11_fd, .events = POLLIN | POLLHUP, .revents = 0},
         {.fd = state.signal_pipe.fds[0],
          .events = POLLIN | POLLHUP,
          .revents = 0},
     };
-    int ready =
-        RetryPoll(fds, ARRAY_LEN(fds), state.have_pending_x_events ? 0 : -1);
+    int ready = RetryPoll(fds, ARRAY_LEN(fds), PollTimeoutMs(&state));
     if (ready < 0) {
       LogErrno("poll");
     }
@@ -283,12 +353,15 @@ int main(int argc, char **argv) {
     if (fds[1].revents & (POLLIN | POLLHUP)) {
       SignalPipeDrain(state.signal_pipe.fds[0], "signal pipe");
     }
-    if (HandleSignalFlags(&state)) {
+    HandleChildSignalFlag(&state);
+    if (HandleSignalFlags(&state, &watch_savers)) {
       goto done;
     }
 
-    WatchSavers(&state);
     ProcessPendingXEvents(&state);
+    if (watch_savers || ChildWatchTimeoutMs(&state) == 0) {
+      WatchSaversAfterWakeup(&state);
+    }
   }
 
 done:

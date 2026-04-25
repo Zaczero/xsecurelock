@@ -86,6 +86,7 @@ PATH="$prefix/bin:$PATH" ./run-tests.sh \
   test-wrong-password \
   test-sigusr2-starts-auth \
   test-saver-auth-open-notify \
+  test-saver-multiplex-restarts \
   test-xss-activation-keeps-saver \
   test-global-saver-relative-override \
   test-authproto-static-info-advance \

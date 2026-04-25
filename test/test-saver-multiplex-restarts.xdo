@@ -1,0 +1,15 @@
+#preexec . ./saver-multiplex-restart-preexec.sh
+
+# Assert that xsecurelock is running and the multiplex wrapper is mapped.
+search --name background
+search --name saver_multiplex_screen
+
+# saver_multiplex should notice the exited saver child without waiting for X
+# events. Before the SIGCHLD self-pipe wakeup, this count stayed at 1.
+exec --sync /bin/sh -c 'i=0; while [ "$i" -lt 50 ]; do count=$(cat "$XSECURELOCK_TEST_SAVER_COUNT_FILE" 2>/dev/null || echo 0); [ "$count" -ge 2 ] && exit 0; i=$((i + 1)); sleep 0.1; done; exit 1'
+
+# Repeated saver failures should be throttled, not converted into a busy
+# respawn loop.
+exec --sync /bin/sh -c 'cat "$XSECURELOCK_TEST_SAVER_COUNT_FILE" > "$XSECURELOCK_TEST_SAVER_COUNT_FILE.baseline"'
+sleep 2
+exec --sync /bin/sh -c 'baseline=$(cat "$XSECURELOCK_TEST_SAVER_COUNT_FILE.baseline"); count=$(cat "$XSECURELOCK_TEST_SAVER_COUNT_FILE"); test "$((count - baseline))" -le 3'
