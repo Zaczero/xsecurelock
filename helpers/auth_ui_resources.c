@@ -62,10 +62,8 @@ static XftFont *FixedXftFontOpenName(Display *display, int screen,
     return NULL;
   }
 #elif defined(HAVE_FONTCONFIG)
-#warning "Fontconfig lacks FC_COLOR. May crash trying to use emoji fonts."
   Log("Fontconfig lacks FC_COLOR. May crash trying to use emoji fonts.");
 #else
-#warning "Xft enabled without fontconfig. May crash trying to use emoji fonts."
   Log("Xft enabled without fontconfig. May crash trying to use emoji fonts.");
 #endif
   return xft_font;
