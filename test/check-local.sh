@@ -12,9 +12,9 @@ for tool in clang startx Xephyr xdotool htpasswd xset; do
   fi
 done
 
-checksrcdir=$(mktemp -d -t xsecurelock-check-src.XXXXXX)
-builddir=$(mktemp -d -t xsecurelock-check-build.XXXXXX)
-prefix=$(mktemp -d -t xsecurelock-check-prefix.XXXXXX)
+checksrcdir=$(mktemp -d "${TMPDIR:-/tmp}/xsecurelock-check-src.XXXXXX")
+builddir=$(mktemp -d "${TMPDIR:-/tmp}/xsecurelock-check-build.XXXXXX")
+prefix=$(mktemp -d "${TMPDIR:-/tmp}/xsecurelock-check-prefix.XXXXXX")
 status=0
 trap 'status=$?; rm -rf "$checksrcdir" "$builddir" "$prefix"; exit $status' 0 1 2 3 15
 rm -rf "$checksrcdir"

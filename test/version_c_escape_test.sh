@@ -3,7 +3,7 @@
 set -eu
 
 srcdir=$1
-tmpdir=$(mktemp -d -t xsecurelock-version-c.XXXXXX)
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/xsecurelock-version-c.XXXXXX")
 status=0
 trap 'status=$?; rm -rf "$tmpdir"; exit $status' 0 1 2 3 15
 

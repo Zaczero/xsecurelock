@@ -13,7 +13,7 @@ xsecurelock_bin=$(command -v xsecurelock) || {
 }
 
 # Set up an isolated homedir with a fixed password.
-homedir=$(mktemp -d -t xsecurelock-run-test.XXXXXX)
+homedir=$(mktemp -d "${TMPDIR:-/tmp}/xsecurelock-run-test.XXXXXX") || exit 1
 trap 'rm -rf "$homedir"' EXIT
 htpasswd -bc "$homedir/.xsecurelock.pw" "$USER" hunter2
 

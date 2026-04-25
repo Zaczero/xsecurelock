@@ -57,7 +57,7 @@ run_helper_once_in_dir() {
   esac
 }
 
-tmpdir=$(mktemp -d -t xsecurelock-saver-xscreensaver.XXXXXX)
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/xsecurelock-saver-xscreensaver.XXXXXX")
 trap 'rm -rf "$tmpdir"' EXIT
 
 grep -Fq "sh -c \"\$saver\"" "$helper" || fail "helper does not use sh -c"
