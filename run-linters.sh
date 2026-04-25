@@ -4,11 +4,12 @@ set -eu
 
 refresh_configured_headers() {
   if [ -x ./config.status ]; then
-    ./config.status config.h build-config.h >/dev/null
+    ./config.status Makefile config.h build-config.h >/dev/null
     return
   fi
-  if [ ! -f ./config.h ] || [ ! -f ./build-config.h ]; then
-    echo "error: run ./configure first so config.h and build-config.h exist" >&2
+  if [ ! -f ./Makefile ] || [ ! -f ./config.h ] ||
+     [ ! -f ./build-config.h ]; then
+    echo "error: run ./configure first so Makefile and generated headers exist" >&2
     exit 1
   fi
 }
@@ -18,34 +19,16 @@ refresh_configured_headers
 # clang-tidy.
 if command -v clang-tidy >/dev/null 2>&1; then
   set -- \
-    'bugprone-*' \
-    'cert-*' \
-    'clang-analyzer-*' \
-    'misc-*' \
-    'performance-*' \
-    'readability-*' \
-    '-cert-env33-c' \
-    '-cert-msc30-c' \
-    '-cert-msc50-cpp' \
-    '-clang-analyzer-alpha.core.FixedAddr' \
-    '-clang-analyzer-alpha.core.PointerArithm' \
-    '-clang-analyzer-alpha.deadcode.UnreachableCode'
-  checks=$(echo "$*" | tr ' ' ,)
-  set -- \
-    "-extra-arg=-I$PWD" \
-    '-extra-arg=-include' \
-    "-extra-arg=$PWD/config.h" \
-    '-extra-arg=-include' \
-    "-extra-arg=$PWD/build-config.h"
-  # Try once without optional font includes.
-  clang-tidy -checks="$checks" \
-    "$@" \
-    ./*.[ch] ./*/*.[ch]
-  # Try again with all extensions.
-  clang-tidy -checks="$checks" \
-    -extra-arg=-I/usr/include/freetype2 \
-    "$@" \
-    ./*.[ch] ./*/*.[ch]
+    "--extra-arg=-I$PWD" \
+    "--extra-arg=-I$PWD/test" \
+    '--extra-arg=-include' \
+    "--extra-arg=$PWD/config.h" \
+    '--extra-arg=-include' \
+    "--extra-arg=$PWD/build-config.h"
+  for cflag in $(make -s clang_tidy_extra_args); do
+    set -- "$@" "--extra-arg=$cflag"
+  done
+  clang-tidy "$@" ./*.[ch] ./*/*.[ch]
 fi
 
 # CPPCheck.

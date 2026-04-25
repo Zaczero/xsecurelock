@@ -6,6 +6,13 @@ CLEANFILES =
 AM_CPPFLAGS = -I$(top_builddir) $(FEATURE_TEST_CPPFLAGS)
 AM_CFLAGS = $(WARNING_CFLAGS)
 
+.PHONY: clang_tidy_extra_args
+clang_tidy_extra_args:
+	@for flag in $(DEFAULT_INCLUDES) $(DEFS) $(AM_CPPFLAGS) $(CPPFLAGS) \
+	    $(FONTCONFIG_CFLAGS) $(XFT_CFLAGS); do \
+		printf '%s\n' "$$flag"; \
+	done
+
 LDADD = $(CLOCK_LIBS)
 X11_PROGRAM_LIBS = $(X11_LIBS) $(CLOCK_LIBS)
 LOCKER_LIBS = \
@@ -353,6 +360,7 @@ env_helpstr.inc: README.md # Autogenerate for --help.
 main.$(OBJEXT): env_helpstr.inc
 
 EXTRA_DIST = \
+	.clang-tidy \
 	LICENSE \
 	README.md \
 	autogen.sh \

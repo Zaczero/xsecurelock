@@ -257,12 +257,12 @@ AC_ARG_WITH([xft],
 if test "x$with_xft" = xno; then
   have_xft=false
 else
-  PKG_CHECK_MODULES([XFT], [xft],
+  PKG_CHECK_MODULES([XFT], [xft xrender],
                     [have_xft=true],
                     [have_xft=false])
   if test x$have_xft != xtrue &&
      test "x$with_xft" != xcheck; then
-    AC_MSG_ERROR([--with-xft was enabled, but test for xft failed])
+    AC_MSG_ERROR([--with-xft was enabled, but test for xft/xrender failed])
   fi
 fi
 AM_CONDITIONAL([HAVE_XFT_EXT], [test x$have_xft = xtrue])
