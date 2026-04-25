@@ -130,6 +130,7 @@ static void DrawDialogBorder(const struct AuthUiContext *ctx,
 enum { AUTH_MESSAGE_MAX_ROWS = 6 };
 
 struct AuthTextRow {
+  // Text is borrowed and must outlive the AuthDisplayMessage draw pass.
   const char *text;
   int len;
   int width;
@@ -209,6 +210,7 @@ int AuthDisplayMessage(struct AuthUiContext *ctx, const char *title,
                        const char *message, bool warning) {
   char full_title[256];
   char datetime[80] = "";
+  char layout_switch_hint[96];
   struct XkbIndicators indicators = {0};
   struct AuthTextRow rows[AUTH_MESSAGE_MAX_ROWS];
   size_t row_count = 0;
@@ -243,7 +245,6 @@ int AuthDisplayMessage(struct AuthUiContext *ctx, const char *title,
   rows[row_count++] =
       MeasureTextRow(ctx, indicators.text, indicators.warning != 0, 1);
   if (indicators.have_multiple_layouts) {
-    char layout_switch_hint[96];
     (void)snprintf(layout_switch_hint, sizeof(layout_switch_hint),
                    "Press Ctrl-%s to switch keyboard layout",
                    ctx->config.layout_switch_key_name);
