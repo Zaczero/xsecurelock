@@ -33,7 +33,8 @@ int FormatDiscoPrompt(size_t displaymarker, char *displaybuf,
                       size_t displaybufsize, size_t *displaylen);
 int RenderPromptDisplay(enum PromptDisplayMode mode,
                         const struct PromptState *state, int echo,
-                        int blink_state, char cursor_char, char *displaybuf,
-                        size_t displaybufsize, size_t *displaylen);
+                        int blink_state, char text_cursor_char,
+                        char *displaybuf, size_t displaybufsize,
+                        size_t *displaylen);
 
 #endif  // XSECURELOCK_HELPERS_PROMPT_DISPLAY_H

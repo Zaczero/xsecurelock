@@ -14,6 +14,8 @@
 
 #define PROMPT_DISPLAY_ANIMATED_MARKER_COUNT (1u << DISCO_PASSWORD_DANCERS)
 #define PROMPT_DISPLAY_ANIMATED_MIN_CHANGE 4
+static const char kCursorPromptVisibleMarker = '|';
+static const char kCursorPromptBlinkMarker = '-';
 static const char *const kDiscoCombiner = " ♪ ";
 static const char *const kDiscoDancers[] = {
     "┏(･o･)┛",
@@ -98,8 +100,8 @@ static int WriteDisplayString(char *displaybuf, size_t displaybufsize,
 }
 
 static int RenderCursorPromptDisplay(const struct PromptState *state,
-                                     int blink_state, char cursor_char,
-                                     char *displaybuf, size_t displaybufsize,
+                                     int blink_state, char *displaybuf,
+                                     size_t displaybufsize,
                                      size_t *displaylen) {
   if (displaybuf == NULL || displaylen == NULL || displaybufsize == 0) {
     goto fail;
@@ -111,7 +113,8 @@ static int RenderCursorPromptDisplay(const struct PromptState *state,
     goto fail;
   }
   memset(displaybuf, '_', *displaylen);
-  displaybuf[state->display_marker] = blink_state ? '-' : cursor_char;
+  displaybuf[state->display_marker] =
+      blink_state ? kCursorPromptBlinkMarker : kCursorPromptVisibleMarker;
   displaybuf[*displaylen] = '\0';
   return 0;
 
@@ -285,20 +288,21 @@ int FormatDiscoPrompt(size_t displaymarker, char *displaybuf,
 
 int RenderPromptDisplay(enum PromptDisplayMode mode,
                         const struct PromptState *state, int echo,
-                        int blink_state, char cursor_char, char *displaybuf,
-                        size_t displaybufsize, size_t *displaylen) {
+                        int blink_state, char text_cursor_char,
+                        char *displaybuf, size_t displaybufsize,
+                        size_t *displaylen) {
   if (state == NULL) {
     return ClearDisplayFailure(displaybuf, displaybufsize, displaylen);
   }
 
   if (echo) {
-    return RenderEchoPromptDisplay(state, blink_state, cursor_char, displaybuf,
-                                   displaybufsize, displaylen);
+    return RenderEchoPromptDisplay(state, blink_state, text_cursor_char,
+                                   displaybuf, displaybufsize, displaylen);
   }
 
   switch (mode) {
     case PROMPT_DISPLAY_MODE_ASTERISKS:
-      return RenderAsterisksPromptDisplay(state, blink_state, cursor_char,
+      return RenderAsterisksPromptDisplay(state, blink_state, text_cursor_char,
                                           displaybuf, displaybufsize,
                                           displaylen);
     case PROMPT_DISPLAY_MODE_HIDDEN:
@@ -321,7 +325,7 @@ int RenderPromptDisplay(enum PromptDisplayMode mode,
                                      displaylen);
     case PROMPT_DISPLAY_MODE_CURSOR:
     default:
-      return RenderCursorPromptDisplay(state, blink_state, cursor_char,
-                                       displaybuf, displaybufsize, displaylen);
+      return RenderCursorPromptDisplay(state, blink_state, displaybuf,
+                                       displaybufsize, displaylen);
   }
 }
