@@ -8,16 +8,37 @@
 #include "env_settings.h"
 
 #include <assert.h>  // for assert
-#include <errno.h>   // for errno, ERANGE
-#include <limits.h>  // for PATH_MAX
+#include <errno.h>   // for errno, ENAMETOOLONG, ERANGE
+#include <limits.h>  // for INT_MAX
 #include <math.h>    // for isfinite
-#include <stdio.h>   // for fprintf, NULL, stderr
-#include <stdlib.h>  // for getenv, strtol, strtoull
-#include <string.h>  // for strchr
+#include <stdint.h>  // for SIZE_MAX
+#include <stdlib.h>  // for free, getenv, malloc, strtol, strtoull
+#include <string.h>  // for memcpy, strchr, strlen
 #include <unistd.h>  // for access, X_OK
 
 #include "build-config.h"
 #include "logging.h"
+
+static char *JoinHelperPath(const char *name) {
+  size_t helper_len = strlen(HELPER_PATH);
+  size_t name_len = strlen(name);
+
+  if (helper_len > SIZE_MAX - 1 || helper_len + 1 > SIZE_MAX - name_len ||
+      helper_len + 1 + name_len > SIZE_MAX - 1) {
+    errno = ENAMETOOLONG;
+    return NULL;
+  }
+
+  char *path = malloc(helper_len + 1 + name_len + 1);
+  if (path == NULL) {
+    return NULL;
+  }
+
+  memcpy(path, HELPER_PATH, helper_len);
+  path[helper_len] = '/';
+  memcpy(path + helper_len + 1, name, name_len + 1);
+  return path;
+}
 
 unsigned long long GetUnsignedLongLongSetting(const char *name,
                                               unsigned long long def) {
@@ -179,21 +200,20 @@ const char *GetExecutablePathSetting(const char *name, const char *def,
     }
   }
   const char *executable_path = value;
-  char helper_path[PATH_MAX];
+  char *helper_path = NULL;
   if (basename == value) {
-    int helper_path_len =
-        snprintf(helper_path, sizeof(helper_path), "%s/%s", HELPER_PATH, value);
-    if (helper_path_len <= 0 ||
-        (size_t)helper_path_len >= sizeof(helper_path)) {
-      Log("Executable path '%s/%s' does not fit into the buffer", HELPER_PATH,
-          value);
+    helper_path = JoinHelperPath(value);
+    if (helper_path == NULL) {
+      LogErrno("Unable to build executable path '%s/%s'", HELPER_PATH, value);
       return def;
     }
     executable_path = helper_path;
   }
   if (access(executable_path, X_OK)) {
     Log("Executable '%s' must be executable", executable_path);
+    free(helper_path);
     return def;
   }
+  free(helper_path);
   return value;
 }

@@ -1,5 +1,4 @@
 #include <errno.h>
-#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -42,8 +41,9 @@ static void ExpectKeyCommandEnvRejectsTruncation(void) {
 }
 
 static void ExpectForegroundShellCommandSucceeds(const char *tmpbase) {
-  char path[PATH_MAX] = "";
-  char command[PATH_MAX + 64] = "";
+  char path[sizeof("/tmp/xsecurelock-configured-command.XXXXXX.foreground")] =
+      "";
+  char command[sizeof("printf 'foreground' > ''") + sizeof(path)] = "";
 
   if (snprintf(path, sizeof(path), "%s.foreground", tmpbase) <= 0) {
     abort();
@@ -74,8 +74,9 @@ static void ExpectUnsetEnvDoesNothing(void) {
 }
 
 static void ExpectEnvShellCommandRuns(const char *tmpbase) {
-  char path[PATH_MAX] = "";
-  char command[PATH_MAX + 96] = "";
+  char path[sizeof("/tmp/xsecurelock-configured-command.XXXXXX.env")] = "";
+  char command[sizeof("printf '' '' > ''") + sizeof("%s") +
+               sizeof("env works") + sizeof(path)] = "";
 
   if (snprintf(path, sizeof(path), "%s.env", tmpbase) <= 0) {
     abort();
@@ -95,8 +96,9 @@ static void ExpectEnvShellCommandRuns(const char *tmpbase) {
 }
 
 static void ExpectBackgroundShellCommandDetaches(const char *tmpbase) {
-  char path[PATH_MAX] = "";
-  char command[PATH_MAX + 128] = "";
+  char path[sizeof("/tmp/xsecurelock-configured-command.XXXXXX.background")] =
+      "";
+  char command[sizeof("sleep 1; printf 'background' > ''") + sizeof(path)] = "";
 
   if (snprintf(path, sizeof(path), "%s.background", tmpbase) <= 0) {
     abort();

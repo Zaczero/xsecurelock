@@ -2,6 +2,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "../env_settings.h"
 
@@ -184,6 +185,44 @@ static void ExpectClampedFiniteDoubleSettingClampsAndFallsBack(void) {
   }
 }
 
+static void ExpectExecutablePathSettingsValidate(void) {
+  const char *def = "default-executable";
+
+  setenv("XSECURELOCK_TEST_EXECUTABLE", "/bin/sh", 1);
+  if (strcmp(GetExecutablePathSetting("XSECURELOCK_TEST_EXECUTABLE", def, 0),
+             "/bin/sh") != 0) {
+    abort();
+  }
+
+  setenv("XSECURELOCK_TEST_EXECUTABLE",
+         "/tmp/xsecurelock-test-missing-executable", 1);
+  if (GetExecutablePathSetting("XSECURELOCK_TEST_EXECUTABLE", def, 0) != def) {
+    abort();
+  }
+
+  setenv("XSECURELOCK_TEST_EXECUTABLE", "xsecurelock-test-missing-helper", 1);
+  if (GetExecutablePathSetting("XSECURELOCK_TEST_EXECUTABLE", def, 0) != def) {
+    abort();
+  }
+
+  setenv("XSECURELOCK_TEST_EXECUTABLE", "relative/helper", 1);
+  if (GetExecutablePathSetting("XSECURELOCK_TEST_EXECUTABLE", def, 0) != def) {
+    abort();
+  }
+
+  setenv("XSECURELOCK_TEST_EXECUTABLE", "/bin/sh", 1);
+  if (GetExecutablePathSetting("XSECURELOCK_TEST_EXECUTABLE", def, 1) != def) {
+    abort();
+  }
+
+  setenv("XSECURELOCK_TEST_EXECUTABLE", "auth_test_helper", 1);
+  if (GetExecutablePathSetting("XSECURELOCK_TEST_EXECUTABLE", def, 0) != def) {
+    abort();
+  }
+
+  unsetenv("XSECURELOCK_TEST_EXECUTABLE");
+}
+
 int main(void) {
   ExpectUnsetFallsBackToDefault();
   ExpectValuesClampToBounds();
@@ -197,11 +236,13 @@ int main(void) {
   ExpectIntSettingRejectsOverflow();
   ExpectFiniteDoubleSettingRejectsNanAndInfinity();
   ExpectClampedFiniteDoubleSettingClampsAndFallsBack();
+  ExpectExecutablePathSettingsValidate();
   unsetenv("XSECURELOCK_TEST_INT");
   unsetenv("XSECURELOCK_TEST_BOOL");
   unsetenv("XSECURELOCK_TEST_NONNEGATIVE_INT");
   unsetenv("XSECURELOCK_TEST_POSITIVE_INT");
   unsetenv("XSECURELOCK_TEST_DOUBLE");
   unsetenv("XSECURELOCK_TEST_UNSIGNED");
+  unsetenv("XSECURELOCK_TEST_EXECUTABLE");
   return 0;
 }
