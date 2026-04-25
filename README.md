@@ -29,7 +29,7 @@ the usual C build tools plus the X11 and PAM development packages:
     `libc6-dev`
 *   `autoconf` and `automake` (for `autoreconf`/`aclocal`)
 *   `pkg-config`
-*   `libx11-dev` and `libxmuu-dev` or `libxmu-dev`
+*   `libx11-dev`
 *   `libpam0g-dev`, unless configuring with `--without-pam`
 *   `libxcomposite-dev`, unless configuring with
     `--without-xcomposite`

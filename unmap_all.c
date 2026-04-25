@@ -2,11 +2,67 @@
 
 #include "unmap_all.h"
 
-#include <X11/X.h>            // for Window, None, IsUnmapped
-#include <X11/Xlib.h>         // for XFree, XGetWindowAttributes, XMapWindow
-#include <X11/Xmu/WinUtil.h>  // for XmuClientWindow
-#include <X11/Xutil.h>        // for XClassHint, XGetClassHint
-#include <string.h>           // for NULL, strcmp
+#include <X11/X.h>      // for AnyPropertyType, Atom, None, Success, Window
+#include <X11/Xlib.h>   // for XFree, XGetWindowAttributes, XGetWindowProperty
+#include <X11/Xutil.h>  // for XClassHint, XGetClassHint
+#include <string.h>     // for NULL, strcmp
+
+enum { FIND_CLIENT_WINDOW_MAX_DEPTH = 64 };
+
+static int HasWindowProperty(Display *display, Window window, Atom property) {
+  Atom actual_type = None;
+  int actual_format = 0;
+  unsigned long nitems = 0;
+  unsigned long bytes_after = 0;
+  unsigned char *data = NULL;
+  int status = XGetWindowProperty(display, window, property, 0, 0, False,
+                                  AnyPropertyType, &actual_type, &actual_format,
+                                  &nitems, &bytes_after, &data);
+  if (data != NULL) {
+    XFree(data);
+  }
+  return status == Success && actual_type != None;
+}
+
+static Window FindClientWindowAtDepth(Display *display, Window window,
+                                      Atom wm_state, int depth) {
+  if (HasWindowProperty(display, window, wm_state)) {
+    return window;
+  }
+  if (depth >= FIND_CLIENT_WINDOW_MAX_DEPTH) {
+    return None;
+  }
+
+  Window root_return = None;
+  Window parent_return = None;
+  Window *children = NULL;
+  unsigned int nchildren = 0;
+  if (!XQueryTree(display, window, &root_return, &parent_return, &children,
+                  &nchildren)) {
+    return None;
+  }
+
+  Window found = None;
+  for (unsigned int i = 0; i < nchildren; ++i) {
+    found = FindClientWindowAtDepth(display, children[i], wm_state, depth + 1);
+    if (found != None) {
+      break;
+    }
+  }
+  if (children != NULL) {
+    XFree(children);
+  }
+  return found;
+}
+
+static Window FindClientWindow(Display *display, Window window, Atom wm_state) {
+  if (wm_state == None) {
+    return window;
+  }
+
+  Window client = FindClientWindowAtDepth(display, window, wm_state, 0);
+  return client != None ? client : window;
+}
 
 int InitUnmapAllWindowsState(UnmapAllWindowsState *state, Display *display,
                              Window root_window, const Window *ignored_windows,
@@ -27,6 +83,7 @@ int InitUnmapAllWindowsState(UnmapAllWindowsState *state, Display *display,
     return 0;
   }
   state->first_unmapped_window = state->n_windows;  // That means none unmapped.
+  Atom wm_state = include_frame ? None : XInternAtom(display, "WM_STATE", True);
   for (unsigned int i = 0; i < state->n_windows; ++i) {
     XWindowAttributes xwa;
     if (!XGetWindowAttributes(display, state->windows[i], &xwa)) {
@@ -41,7 +98,8 @@ int InitUnmapAllWindowsState(UnmapAllWindowsState *state, Display *display,
     // Go down to the next WM_STATE window if available, as unmapping window
     // frames may confuse WMs.
     if (!include_frame) {
-      state->windows[i] = XmuClientWindow(display, state->windows[i]);
+      state->windows[i] =
+          FindClientWindow(display, state->windows[i], wm_state);
     }
     // If any window we'd be unmapping is in the ignore list, skip it.
     for (size_t j = 0; j < n_ignored_windows; ++j) {
