@@ -299,15 +299,30 @@ int SleepMs(int timeout_ms) {
   return 0;
 }
 
+static int Int64ToTimeTSeconds(int64_t seconds, time_t *out) {
+  time_t converted = (time_t)seconds;
+  if ((int64_t)converted != seconds) {
+    errno = EOVERFLOW;
+    return -1;
+  }
+  *out = converted;
+  return 0;
+}
+
 int SleepNs(int64_t timeout_ns) {
   if (timeout_ns < 0) {
     errno = EINVAL;
     return -1;
   }
 
+  time_t seconds;
+  if (Int64ToTimeTSeconds(timeout_ns / 1000000000, &seconds) != 0) {
+    return -1;
+  }
+
   struct timespec delay = {
-      .tv_sec = timeout_ns / 1000000000,
-      .tv_nsec = timeout_ns % 1000000000,
+      .tv_sec = seconds,
+      .tv_nsec = (long)(timeout_ns % 1000000000),
   };
   while (nanosleep(&delay, &delay) != 0) {
     if (errno != EINTR) {

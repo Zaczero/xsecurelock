@@ -4,10 +4,12 @@
 #include <poll.h>
 #include <signal.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <string.h>
 #include <sys/select.h>
 #include <sys/time.h>
 #include <sys/wait.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "../io_util.h"
@@ -469,6 +471,23 @@ static void TestSleepMs(void) {
   assert(signal_count > 0);
 }
 
+static void TestSleepNs(void) {
+  errno = 0;
+  assert(SleepNs(-1) < 0);
+  assert(errno == EINVAL);
+
+  errno = 0;
+  assert(SleepNs(0) == 0);
+  assert(errno == 0);
+
+  if ((int64_t)(time_t)(INT64_MAX / 1000000000) !=
+      INT64_MAX / 1000000000) {
+    errno = 0;
+    assert(SleepNs(INT64_MAX) < 0);
+    assert(errno == EOVERFLOW);
+  }
+}
+
 int main(void) {
   InstallSignalHandler();
   TestRetryRead();
@@ -488,5 +507,6 @@ int main(void) {
   TestMoveFdToFromStdout();
   TestGetMonotonicTimeMs();
   TestSleepMs();
+  TestSleepNs();
   return 0;
 }
