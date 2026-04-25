@@ -158,19 +158,21 @@ static void DitherEffectDrawFrame(void *self, Display *display,
   }
 
   XChangeGC(display, dimmer->dim_gc, GCStipple, &dimmer->gc_values);
-  for (int y = 0; y < h; y += dimmer->max_fill_size) {
+  for (int y = 0; y < h;) {
     int hh = h - y;
     if (hh > dimmer->max_fill_size) {
       hh = dimmer->max_fill_size;
     }
-    for (int x = 0; x < w; x += dimmer->max_fill_size) {
+    for (int x = 0; x < w;) {
       int ww = w - x;
       if (ww > dimmer->max_fill_size) {
         ww = dimmer->max_fill_size;
       }
       XFillRectangle(display, dim_window, dimmer->dim_gc, x, y, ww, hh);
       XFlush(display);
+      x += ww;
     }
+    y += hh;
   }
 }
 
@@ -345,13 +347,18 @@ int main(int argc, char **argv) {
     int h = DisplayHeight(display, DefaultScreen(display));
     XSetWindowAttributes dimattrs = {0};
     unsigned long dimmask = CWSaveUnder | CWOverrideRedirect;
+    if (w <= 0 || h <= 0) {
+      Log("Display has invalid size %dx%d", w, h);
+      goto done;
+    }
 
     dimattrs.save_under = 1;
     dimattrs.override_redirect = 1;
     dimmer->PreCreateWindow(dimmer, display, &dimattrs, &dimmask);
     dim_window =
-        XCreateWindow(display, root_window, 0, 0, w, h, 0, CopyFromParent,
-                      InputOutput, CopyFromParent, dimmask, &dimattrs);
+        XCreateWindow(display, root_window, 0, 0, (unsigned int)w,
+                      (unsigned int)h, 0, CopyFromParent, InputOutput,
+                      CopyFromParent, dimmask, &dimattrs);
     SetWMProperties(display, dim_window, "xsecurelock-dimmer", "dim", argc,
                     argv);
     dimmer->PostCreateWindow(dimmer, display, dim_window);

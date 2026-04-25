@@ -38,27 +38,28 @@ static int ValidWindowSize(int width, int height) {
   return width > 0 && height > 0;
 }
 
-static unsigned int ObscurerDimension(int size) {
+static int ObscurerDimension(int size) {
   // Keep the obscurer inset by 1px to avoid fullscreen-window unredirect
   // heuristics in compositors; the composite overlay is the full-screen cover.
-  return (size > 2) ? (unsigned int)(size - 2) : 1U;
+  return (size > 2) ? size - 2 : 1;
 }
 
 static int CreateTrackedCoverWindow(struct LockContext *ctx, Window *window,
                                     Window parent, int x, int y,
-                                    unsigned int width, unsigned int height,
+                                    int width, int height,
                                     unsigned long valuemask,
                                     XSetWindowAttributes *attrs,
                                     const char *role) {
-  if (!ValidWindowSize((int)width, (int)height)) {
-    Log("%s window has invalid size %ux%u", role, width, height);
+  if (!ValidWindowSize(width, height)) {
+    Log("%s window has invalid size %dx%d", role, width, height);
     *window = None;
     return 0;
   }
 
-  *window = XCreateWindow(ctx->runtime.display, parent, x, y, width, height, 0,
-                          CopyFromParent, InputOutput, CopyFromParent,
-                          valuemask, attrs);
+  *window = XCreateWindow(ctx->runtime.display, parent, x, y,
+                          (unsigned int)width, (unsigned int)height, 0,
+                          CopyFromParent, InputOutput, CopyFromParent, valuemask,
+                          attrs);
   if (*window == None) {
     Log("XCreateWindow failed for %s", role);
     return 0;
@@ -197,6 +198,11 @@ int LockWindowsInit(struct LockContext *ctx) {
       DisplayWidth(ctx->runtime.display, DefaultScreen(ctx->runtime.display));
   ctx->windows.height =
       DisplayHeight(ctx->runtime.display, DefaultScreen(ctx->runtime.display));
+  if (!ValidWindowSize(ctx->windows.width, ctx->windows.height)) {
+    Log("Root window has invalid size %dx%d", ctx->windows.width,
+        ctx->windows.height);
+    return 0;
+  }
 
   XColor black = {.pixel = BlackPixel(ctx->runtime.display,
                                       DefaultScreen(ctx->runtime.display))};
@@ -316,8 +322,7 @@ int LockWindowsInit(struct LockContext *ctx) {
 
   if (!CreateTrackedCoverWindow(
           ctx, &ctx->windows.background_window, ctx->windows.parent_window, 0,
-          0, (unsigned int)ctx->windows.width,
-          (unsigned int)ctx->windows.height,
+          0, ctx->windows.width, ctx->windows.height,
           CWBackPixel | CWSaveUnder | CWOverrideRedirect | CWCursor,
           &coverattrs, "background")) {
     return 0;
@@ -325,15 +330,15 @@ int LockWindowsInit(struct LockContext *ctx) {
 
   if (!CreateTrackedCoverWindow(
           ctx, &ctx->windows.saver_window, ctx->windows.background_window, 0, 0,
-          (unsigned int)ctx->windows.width, (unsigned int)ctx->windows.height,
-          CWBackPixel, &coverattrs, "saver")) {
+          ctx->windows.width, ctx->windows.height, CWBackPixel, &coverattrs,
+          "saver")) {
     return 0;
   }
 
   if (!CreateTrackedCoverWindow(
           ctx, &ctx->windows.auth_window, ctx->windows.background_window, 0, 0,
-          (unsigned int)ctx->windows.width, (unsigned int)ctx->windows.height,
-          CWBackPixel, &coverattrs, "auth")) {
+          ctx->windows.width, ctx->windows.height, CWBackPixel, &coverattrs,
+          "auth")) {
     return 0;
   }
 
@@ -357,19 +362,24 @@ void LockWindowsMap(struct LockContext *ctx) {
 }
 
 void LockWindowsResizeToRoot(struct LockContext *ctx, int width, int height) {
+  if (!ValidWindowSize(width, height)) {
+    Log("Ignoring invalid root resize %dx%d", width, height);
+    return;
+  }
   ctx->windows.width = width;
   ctx->windows.height = height;
 #ifdef HAVE_XCOMPOSITE_EXT
   if (ctx->windows.obscurer_window != None) {
     XMoveResizeWindow(ctx->runtime.display, ctx->windows.obscurer_window, 1, 1,
-                      ObscurerDimension(width), ObscurerDimension(height));
+                      (unsigned int)ObscurerDimension(width),
+                      (unsigned int)ObscurerDimension(height));
   }
 #endif
   XMoveResizeWindow(ctx->runtime.display, ctx->windows.background_window, 0, 0,
-                    width, height);
+                    (unsigned int)width, (unsigned int)height);
   XClearWindow(ctx->runtime.display, ctx->windows.background_window);
   XMoveResizeWindow(ctx->runtime.display, ctx->windows.saver_window, 0, 0,
-                    width, height);
+                    (unsigned int)width, (unsigned int)height);
 }
 
 void LockWindowsHandleConfigureNotify(struct LockContext *ctx,

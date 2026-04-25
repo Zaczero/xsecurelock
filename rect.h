@@ -10,6 +10,8 @@ typedef struct {
   int h;
 } Rect;
 
+int RectClip(Rect rect, Rect clip, Rect *out);
+int RectContainsPoint(Rect rect, int x, int y);
 size_t RectSubtract(Rect old_rect, Rect new_rect, Rect out[4]);
 
 #endif

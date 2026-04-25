@@ -4,6 +4,8 @@
 
 #include <X11/X.h>
 #include <X11/Xlib.h>
+#include <limits.h>
+#include <stdint.h>
 #include <stdlib.h>
 
 #ifdef HAVE_XFT_EXT
@@ -70,32 +72,40 @@ static int CreateOrUpdatePerMonitorWindow(struct AuthUiContext *ctx, size_t i,
                                           int region_h) {
   int w = region_w;
   int h = region_h;
-  int x = monitor->x +
-          (monitor->width - w) * ctx->config.auth_x_position / 100 +
-          ctx->runtime.x_offset;
-  int y = monitor->y +
-          (monitor->height - h) * ctx->config.auth_y_position / 100 +
-          ctx->runtime.y_offset;
+  int x;
+  int y;
+  int64_t desired_x =
+      (int64_t)monitor->x +
+      ((int64_t)monitor->width - (int64_t)w) * ctx->config.auth_x_position /
+          100 +
+      ctx->runtime.x_offset;
+  int64_t desired_y =
+      (int64_t)monitor->y +
+      ((int64_t)monitor->height - (int64_t)h) * ctx->config.auth_y_position /
+          100 +
+      ctx->runtime.y_offset;
+  if (desired_x < INT_MIN || desired_x > INT_MAX || desired_y < INT_MIN ||
+      desired_y > INT_MAX) {
+    Log("Auth dialog position is outside supported geometry range");
+    return 0;
+  }
+  x = (int)desired_x;
+  y = (int)desired_y;
 
-  if (x < 0) {
-    w += x;
-    x = 0;
-  }
-  if (y < 0) {
-    h += y;
-    y = 0;
-  }
-  if (x + w > monitor->x + monitor->width) {
-    w = monitor->x + monitor->width - x;
-  }
-  if (y + h > monitor->y + monitor->height) {
-    h = monitor->y + monitor->height - y;
-  }
-  if (w <= 0 || h <= 0) {
+  Rect new_rect;
+  if (!RectClip((Rect){.x = x, .y = y, .w = w, .h = h},
+                (Rect){.x = monitor->x,
+                       .y = monitor->y,
+                       .w = monitor->width,
+                       .h = monitor->height},
+                &new_rect)) {
     Log("Auth dialog has no visible area after clipping");
     return 0;
   }
-  Rect new_rect = {.x = x, .y = y, .w = w, .h = h};
+  x = new_rect.x;
+  y = new_rect.y;
+  w = new_rect.w;
+  h = new_rect.h;
 
   if (i < ctx->windows.count) {
     ClearWindowUncoveredAreas(ctx, i, new_rect);
@@ -210,10 +220,11 @@ int AuthWindowsUpdate(struct AuthUiContext *ctx, int region_w, int region_h) {
                   &unused_root, &unused_child, &unused_root_x, &unused_root_y,
                   &x, &y, &unused_mask);
     for (size_t i = 0; i < ctx->windows.monitor_count; ++i) {
-      if (x >= ctx->windows.monitors[i].x &&
-          x < ctx->windows.monitors[i].x + ctx->windows.monitors[i].width &&
-          y >= ctx->windows.monitors[i].y &&
-          y < ctx->windows.monitors[i].y + ctx->windows.monitors[i].height) {
+      if (RectContainsPoint((Rect){.x = ctx->windows.monitors[i].x,
+                                   .y = ctx->windows.monitors[i].y,
+                                   .w = ctx->windows.monitors[i].width,
+                                   .h = ctx->windows.monitors[i].height},
+                            x, y)) {
         if (!CreateOrUpdatePerMonitorWindow(ctx, 0, &ctx->windows.monitors[i],
                                             region_w, region_h)) {
           AuthWindowsDestroy(ctx, 0);

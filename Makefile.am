@@ -83,6 +83,7 @@ saver_multiplex_SOURCES = \
 	helpers/monitors.c helpers/monitors.h \
 	helpers/saver_multiplex.c \
 	logging.c logging.h \
+	rect.c rect.h \
 	saver_child.c saver_child.h \
 	signal_pipe.c signal_pipe.h \
 	util.c util.h \

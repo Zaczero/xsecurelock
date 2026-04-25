@@ -8,6 +8,7 @@
 #include "monitors.h"
 
 #include <X11/Xlib.h>  // for XWindowAttributes, Display, XGetW...
+#include <limits.h>    // for INT_MAX
 #include <stdint.h>    // for int64_t
 #include <stdlib.h>    // for qsort
 #include <string.h>    // for memcmp, memset
@@ -19,6 +20,7 @@
 
 #include "../env_settings.h"  // for GetIntSetting
 #include "../logging.h"       // for Log
+#include "../rect.h"          // for Rect, RectClip
 
 #ifdef HAVE_XRANDR_EXT
 static Display *initialized_for = NULL;
@@ -61,8 +63,6 @@ static int MaybeInitXRandR(Display *dpy) {
   return have_xrandr12_ext;
 }
 #endif
-
-#define CLAMP(x, mi, ma) ((x) < (mi) ? (mi) : (x) > (ma) ? (ma) : (x))
 
 static int CompareMonitors(const void *a, const void *b) {
   return memcmp(a, b, sizeof(Monitor));
@@ -121,6 +121,18 @@ static void AddMonitor(Monitor *out_monitors, size_t *num_monitors,
   ++*num_monitors;
 }
 
+static void AddClippedMonitor(Monitor *out_monitors, size_t *num_monitors,
+                              size_t max_monitors, Rect monitor, Rect clip) {
+  Rect clipped;
+  if (!RectClip(monitor, clip, &clipped)) {
+    return;
+  }
+  int x = (int)((int64_t)clipped.x - (int64_t)clip.x);
+  int y = (int)((int64_t)clipped.y - (int64_t)clip.y);
+  AddMonitor(out_monitors, num_monitors, max_monitors, x, y,
+             clipped.w, clipped.h);
+}
+
 #ifdef HAVE_XRANDR_EXT
 static int GetMonitorsXRandR12(Display *dpy, Window window, int wx, int wy,
                                int ww, int wh, Monitor *out_monitors,
@@ -146,11 +158,15 @@ static int GetMonitorsXRandR12(Display *dpy, Window window, int wx, int wy,
                                      : 0);
       XRRCrtcInfo *info = (crtc ? XRRGetCrtcInfo(dpy, screenres, crtc) : 0);
       if (info != NULL) {
-        int x = CLAMP(info->x, wx, wx + ww) - wx;
-        int y = CLAMP(info->y, wy, wy + wh) - wy;
-        int w = CLAMP(info->x + (int)info->width, wx + x, wx + ww) - (wx + x);
-        int h = CLAMP(info->y + (int)info->height, wy + y, wy + wh) - (wy + y);
-        AddMonitor(out_monitors, out_num_monitors, max_monitors, x, y, w, h);
+        if (info->width <= (unsigned int)INT_MAX &&
+            info->height <= (unsigned int)INT_MAX) {
+          AddClippedMonitor(out_monitors, out_num_monitors, max_monitors,
+                            (Rect){.x = info->x,
+                                   .y = info->y,
+                                   .w = (int)info->width,
+                                   .h = (int)info->height},
+                            (Rect){.x = wx, .y = wy, .w = ww, .h = wh});
+        }
         XRRFreeCrtcInfo(info);
       }
     }
@@ -174,11 +190,12 @@ static int GetMonitorsXRandR15(Display *dpy, Window window, int wx, int wy,
   }
   for (int i = 0; i < num_rrmonitors; ++i) {
     XRRMonitorInfo *info = &rrmonitors[i];
-    int x = CLAMP(info->x, wx, wx + ww) - wx;
-    int y = CLAMP(info->y, wy, wy + wh) - wy;
-    int w = CLAMP(info->x + info->width, wx + x, wx + ww) - (wx + x);
-    int h = CLAMP(info->y + info->height, wy + y, wy + wh) - (wy + y);
-    AddMonitor(out_monitors, out_num_monitors, max_monitors, x, y, w, h);
+    AddClippedMonitor(out_monitors, out_num_monitors, max_monitors,
+                      (Rect){.x = info->x,
+                             .y = info->y,
+                             .w = info->width,
+                             .h = info->height},
+                      (Rect){.x = wx, .y = wy, .w = ww, .h = wh});
   }
   XRRFreeMonitors(rrmonitors);
   return *out_num_monitors != 0;
@@ -221,13 +238,21 @@ static void GetMonitorsGuess(const XWindowAttributes *xwa,
   // XRandR-less dummy fallback.
   const int64_t weighted_size =
       (int64_t)xwa->width * 9 + (int64_t)xwa->height * 8;
-  const size_t guessed_monitors = CLAMP(
-      (size_t)(weighted_size / ((int64_t)xwa->height * 16)), 1, max_monitors);
+  size_t guessed_monitors =
+      (size_t)(weighted_size / ((int64_t)xwa->height * 16));
+  if (guessed_monitors < 1) {
+    guessed_monitors = 1;
+  }
+  if (guessed_monitors > max_monitors) {
+    guessed_monitors = max_monitors;
+  }
   for (size_t i = 0; i < guessed_monitors; ++i) {
-    int x = xwa->width * i / guessed_monitors;
+    int x = (int)((int64_t)xwa->width * (int64_t)i /
+                  (int64_t)guessed_monitors);
     int y = 0;
-    int w = (xwa->width * (i + 1) / guessed_monitors) -
-            (xwa->width * i / guessed_monitors);
+    int w = (int)((int64_t)xwa->width * (int64_t)(i + 1) /
+                  (int64_t)guessed_monitors) -
+            x;
     int h = xwa->height;
     AddMonitor(out_monitors, out_num_monitors, max_monitors, x, y, w, h);
   }
@@ -249,6 +274,9 @@ size_t GetMonitors(Display *dpy, Window window, Monitor *out_monitors,
                DisplayWidth(dpy, DefaultScreen(dpy)),
                DisplayHeight(dpy, DefaultScreen(dpy)));
     return num_monitors;
+  }
+  if (xwa.width <= 0 || xwa.height <= 0) {
+    return 0;
   }
 
   do {
