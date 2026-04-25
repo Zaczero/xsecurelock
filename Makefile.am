@@ -6,6 +6,21 @@ CLEANFILES =
 AM_CPPFLAGS = -I$(top_builddir) $(FEATURE_TEST_CPPFLAGS)
 AM_CFLAGS = $(WARNING_CFLAGS)
 
+LDADD = $(CLOCK_LIBS)
+X11_PROGRAM_LIBS = $(X11_LIBS) $(CLOCK_LIBS)
+LOCKER_LIBS = \
+	$(X11_PROGRAM_LIBS) \
+	$(DPMS_LIBS) $(XSS_LIBS) \
+	$(XCOMPOSITE_LIBS) $(XFIXES_LIBS) \
+	$(XF86MISC_LIBS)
+AUTH_X11_LIBS = \
+	$(X11_PROGRAM_LIBS) \
+	$(XRANDR_LIBS) $(XKB_LIBS) \
+	$(FONTCONFIG_LIBS) $(XFT_LIBS)
+DIMMER_LIBS = $(X11_PROGRAM_LIBS) $(MATH_LIBS)
+MONITOR_LIBS = $(X11_PROGRAM_LIBS) $(XRANDR_LIBS)
+IDLE_TIMER_LIBS = $(X11_PROGRAM_LIBS) $(XSS_LIBS) $(XSYNC_LIBS)
+
 noinst_HEADERS = \
 	blanking.h \
 	configured_command.h \
@@ -46,6 +61,7 @@ xsecurelock_SOURCES = \
 	incompatible_compositor.xbm
 nodist_xsecurelock_SOURCES = \
 	env_helpstr.inc
+xsecurelock_LDADD = $(LOCKER_LIBS)
 
 helpersdir = $(pkglibexecdir)
 helpers_SCRIPTS = \
@@ -90,6 +106,7 @@ saver_multiplex_SOURCES = \
 	wait_pgrp.c wait_pgrp.h \
 	wm_properties.c wm_properties.h \
 	xscreensaver_api.c xscreensaver_api.h
+saver_multiplex_LDADD = $(MONITOR_LIBS)
 
 helpers_PROGRAMS += \
 	dimmer
@@ -101,6 +118,7 @@ dimmer_SOURCES = \
 	logging.c logging.h \
 	util.c util.h \
 	wm_properties.c wm_properties.h
+dimmer_LDADD = $(DIMMER_LIBS)
 
 if HAVE_IDLE_TIMER
 helpers_PROGRAMS += \
@@ -111,6 +129,7 @@ until_nonidle_SOURCES = \
 	logging.c logging.h \
 	util.c util.h \
 	wait_pgrp.c wait_pgrp.h
+until_nonidle_LDADD = $(IDLE_TIMER_LIBS)
 endif
 
 helpers_PROGRAMS += \
@@ -143,7 +162,7 @@ auth_x11_SOURCES = \
 	wm_properties.c wm_properties.h \
 	xscreensaver_api.c xscreensaver_api.h
 auth_x11_CPPFLAGS = $(AM_CPPFLAGS) $(FONTCONFIG_CFLAGS) $(XFT_CFLAGS)
-auth_x11_LDADD = $(FONTCONFIG_LIBS) $(XFT_LIBS)
+auth_x11_LDADD = $(AUTH_X11_LIBS)
 
 if HAVE_PAM
 helpers_PROGRAMS += \
@@ -156,6 +175,7 @@ authproto_pam_SOURCES = \
 	logging.c logging.h \
 	mlock_page.h \
 	util.c util.h
+authproto_pam_LDADD = $(PAM_LIBS) $(CLOCK_LIBS)
 endif
 
 doc_DATA = \
@@ -223,18 +243,23 @@ dimmer_bayer_test_SOURCES = \
 dimmer_opacity_test_SOURCES = \
 	helpers/dimmer_opacity.h \
 	test/dimmer_opacity_test.c
+dimmer_opacity_test_LDADD = $(MATH_LIBS)
 nvidia_break_compositor_SOURCES = \
 	test/nvidia_break_compositor.c
+nvidia_break_compositor_LDADD = $(X11_LIBS) $(XCOMPOSITE_LIBS)
 get_compositor_SOURCES = \
 	test/get_compositor.c
+get_compositor_LDADD = $(X11_LIBS) $(XCOMPOSITE_LIBS)
 keysym_config_test_SOURCES = \
 	env_settings.c env_settings.h \
 	keysym_config.c keysym_config.h \
 	logging.c logging.h \
 	test/keysym_config_test.c
+keysym_config_test_LDADD = $(X11_LIBS)
 remap_all_SOURCES= \
 	test/remap_all.c \
 	unmap_all.c unmap_all.h
+remap_all_LDADD = $(X11_LIBS)
 rect_test_SOURCES = \
 	rect.c rect.h \
 	test/rect_test.c
@@ -277,6 +302,7 @@ xkb_test_SOURCES = \
 	helpers/xkb.c helpers/xkb.h \
 	logging.c logging.h \
 	test/xkb_test.c
+xkb_test_LDADD = $(X11_LIBS) $(XKB_LIBS)
 mlock_page_test_SOURCES = \
 	test/mlock_page_test.c \
 	mlock_page.h

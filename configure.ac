@@ -68,59 +68,57 @@ dnl includes instead of config.h.
 FEATURE_TEST_CPPFLAGS='-D_POSIX_C_SOURCE=200112L -D_XOPEN_SOURCE=600'
 AC_SUBST([FEATURE_TEST_CPPFLAGS])
 
-dnl We only detect libraries globally, but not all binaries need all of them.
-dnl So we use --as-needed to work around.
-AC_MSG_CHECKING([whether the linker supports --as-needed])
-saved_LDFLAGS=$LDFLAGS
-LDFLAGS="$LDFLAGS -Wl,--as-needed"
-AC_LINK_IFELSE([AC_LANG_PROGRAM([])],
-               [AC_MSG_RESULT([yes])],
-               [AC_MSG_RESULT([no])
-                LDFLAGS=$saved_LDFLAGS])
+AC_DEFUN([RP_SEARCH_LIBS_INTO], [
+          $3=
+          AC_SUBST([$3])
+          AC_MSG_CHECKING([for library containing $1])
+          rp_save_LIBS=$LIBS
+          rp_base_LIBS="$6"
+          rp_result=no
+          LIBS="$rp_base_LIBS $rp_save_LIBS"
+          AC_LINK_IFELSE([AC_LANG_CALL([], [$1])],
+                         [rp_result="none required"],
+                         [for rp_lib in $2; do
+                            LIBS="-l$rp_lib $rp_base_LIBS $rp_save_LIBS"
+                            AC_LINK_IFELSE([AC_LANG_CALL([], [$1])],
+                                           [rp_result="-l$rp_lib"; break])
+                          done])
+          LIBS=$rp_save_LIBS
+          AC_MSG_RESULT([$rp_result])
+          AS_IF([test "x$rp_result" = xno],
+                [$5],
+                [AS_IF([test "x$rp_result" != "xnone required"],
+                       [$3="$rp_result"])
+                 $4])])
 
 AC_CHECK_HEADER(X11/Xlib.h,
                 [], [AC_MSG_ERROR([X includes not found.])])
-AC_CHECK_LIB(X11, XOpenDisplay,
-             [], [AC_MSG_ERROR([X library not found.])])
-AC_CHECK_LIB(m, sqrt,
-             [], [AC_MSG_ERROR([Math library not found.])])
+RP_SEARCH_LIBS_INTO([XOpenDisplay], [X11], [X11_LIBS],
+                    [], [AC_MSG_ERROR([X library not found.])], [])
+RP_SEARCH_LIBS_INTO([sqrt], [m], [MATH_LIBS],
+                    [], [AC_MSG_ERROR([Math library not found.])], [])
 
-# RP_SEARCH_EXTENSION(sym, lib, macro, flag, default, description, header)
+# RP_SEARCH_EXTENSION(sym, lib, libs-var, macro, flag, default, description, header)
 AC_DEFUN([RP_SEARCH_EXTENSION], [
-          AC_ARG_WITH([$4],
-                      [AS_HELP_STRING([--with-$4],
-                                      [$6 @<:@default=$5@:>@])],
-                      [with_$4=$withval],
-                      [with_$4=$5])
-          AS_IF([test "x$with_$4" = xno],
-                [have_$4=false],
-                [AC_CHECK_HEADER([$7],
-                    [AC_SEARCH_LIBS([$1], [$2],
-                                    [have_$4=true],
-                                    [AS_IF([test "x$with_$4" = xcheck],
-                                           [have_$4=false],
-                                           [AC_MSG_ERROR([--with-$4 was enabled, but test for $4 failed])])])],
-                    [AS_IF([test "x$with_$4" = xcheck],
-                           [have_$4=false],
-                           [AC_MSG_ERROR([--with-$4 was enabled, but $7 was not found])])],
+          AC_ARG_WITH([$5],
+                      [AS_HELP_STRING([--with-$5],
+                                      [$7 @<:@default=$6@:>@])],
+                      [with_$5=$withval],
+                      [with_$5=$6])
+          AS_IF([test "x$with_$5" = xno],
+                [have_$5=false],
+                [AC_CHECK_HEADER([$8],
+                    [RP_SEARCH_LIBS_INTO([$1], [$2], [$3],
+                                    [have_$5=true],
+                                    [AS_IF([test "x$with_$5" = xcheck],
+                                           [have_$5=false],
+                                           [AC_MSG_ERROR([--with-$5 was enabled, but test for $5 failed])])],
+                                    [$X11_LIBS])],
+                    [AS_IF([test "x$with_$5" = xcheck],
+                           [have_$5=false],
+                           [AC_MSG_ERROR([--with-$5 was enabled, but $8 was not found])])],
                     [[#include <X11/Xlib.h>]])])
-          AM_CONDITIONAL([$3], [test x$have_$4 = xtrue])])
-
-# RP_SEARCH_LIBS(sym, lib, macro, flag, default, description)
-AC_DEFUN([RP_SEARCH_LIBS], [
-          AC_ARG_WITH([$4],
-                      [AS_HELP_STRING([--with-$4],
-                                      [$6 @<:@default=$5@:>@])],
-                      [with_$4=$withval],
-                      [with_$4=$5])
-          AS_IF([test "x$with_$4" = xno],
-                [have_$4=false],
-                [AC_SEARCH_LIBS([$1], [$2],
-                                [have_$4=true],
-                                [AS_IF([test "x$with_$4" = xcheck],
-                                       [have_$4=false],
-                                       [AC_MSG_ERROR([--with-$4 was enabled, but test for $4 failed])])])])
-          AM_CONDITIONAL([$3], [test x$have_$4 = xtrue])])
+          AM_CONDITIONAL([$4], [test x$have_$5 = xtrue])])
 
 # RP_SEARCH_PROG(prog, path, macro, flag, default, description)
 AC_DEFUN([RP_SEARCH_PROG], [
@@ -142,7 +140,7 @@ AC_DEFUN([RP_SEARCH_PROG], [
 
 # The DPMS extension is used to save power of the screen when turned off. Saves
 # electric power.
-RP_SEARCH_EXTENSION(DPMSQueryExtension, Xext,
+RP_SEARCH_EXTENSION(DPMSQueryExtension, Xext, [DPMS_LIBS],
                     [HAVE_DPMS_EXT], [dpms], [check],
                     [Use the DPMS extension to save power],
                     [X11/extensions/dpms.h])
@@ -153,7 +151,7 @@ fi
 # The X11 Screen Saver extension is used to turn off the screen saver when X11
 # handles screen blanking (e.g. via timeout) anyway; not needed for when we
 # handle blanking explicitly (XSECURELOCK_BLANK_TIMEOUT). Saves CPU power.
-RP_SEARCH_EXTENSION(XScreenSaverQueryExtension, Xss,
+RP_SEARCH_EXTENSION(XScreenSaverQueryExtension, Xss, [XSS_LIBS],
                     [HAVE_XSCREENSAVER_EXT], [xss], [check],
                     [Use the X11 Screen Saver extension to save power],
                     [X11/extensions/scrnsaver.h])
@@ -164,7 +162,7 @@ fi
 
 # The X Synchronization extension is used to get per-device idle times. Used by
 # until_nonidle only.
-RP_SEARCH_EXTENSION(XSyncQueryExtension, Xext,
+RP_SEARCH_EXTENSION(XSyncQueryExtension, Xext, [XSYNC_LIBS],
                     [HAVE_XSYNC_EXT], [xsync], [check],
                     [Use the X Synchronization extension to detect idle time],
                     [X11/extensions/sync.h])
@@ -176,7 +174,7 @@ fi
 # The Composite extension needs an explicit opt-out because not having it can
 # cause desktop notifications to appear on top of the screen saver (privacy
 # risk).
-RP_SEARCH_EXTENSION(XCompositeQueryExtension, Xcomposite,
+RP_SEARCH_EXTENSION(XCompositeQueryExtension, Xcomposite, [XCOMPOSITE_LIBS],
                     [HAVE_XCOMPOSITE_EXT], [xcomposite], [yes],
                     [Use the X11 Composite extension to cover desktop notifications],
                     [X11/extensions/Xcomposite.h])
@@ -187,7 +185,7 @@ fi
 
 # This extension doesn't really exist anymore, but served to counteract the
 # (also no longer existing) AllowClosedownGrabs and similar X server settings.
-RP_SEARCH_EXTENSION(XF86MiscSetGrabKeysState, Xxf86misc,
+RP_SEARCH_EXTENSION(XF86MiscSetGrabKeysState, Xxf86misc, [XF86MISC_LIBS],
                     [HAVE_XF86MISC_EXT], [xf86misc], [check],
                     [Use the XFree86-Misc extension to disable ungrab keys],
                     [X11/extensions/xf86misc.h])
@@ -207,9 +205,10 @@ AC_ARG_WITH([pam],
 AS_IF([test "x$with_pam" = xno],
       [have_pam=false],
       [AC_CHECK_HEADER([security/pam_appl.h],
-                       [AC_SEARCH_LIBS([pam_authenticate], [pam],
-                                       [have_pam=true],
-                                       [have_pam=false])],
+                       [RP_SEARCH_LIBS_INTO([pam_authenticate], [pam],
+                                            [PAM_LIBS],
+                                            [have_pam=true],
+                                            [have_pam=false], [])],
                        [have_pam=false])
        AS_IF([test x$have_pam != xtrue && test "x$with_pam" != xcheck],
              [AC_MSG_ERROR([--with-pam was enabled, but test for pam failed])])])
@@ -219,8 +218,11 @@ if test x$have_pam = xtrue; then
             [Enable support for the PAM library to authenticate the user.])
 fi
 
-AC_SEARCH_LIBS([clock_gettime], [rt])
-AC_CHECK_FUNCS([clock_gettime explicit_bzero mlock mlockall])
+RP_SEARCH_LIBS_INTO([clock_gettime], [rt], [CLOCK_LIBS],
+                    [AC_DEFINE([HAVE_CLOCK_GETTIME], [1],
+                               [Define to 1 if you have clock_gettime.])],
+                    [], [])
+AC_CHECK_FUNCS([explicit_bzero mlock mlockall])
 
 # Xft optionally provides nicer font rendering.
 PKG_PROG_PKG_CONFIG
@@ -270,7 +272,7 @@ fi
 
 # Querying the keyboard LEDs (and layout name) makes auth_x11 more user
 # friendly.
-RP_SEARCH_EXTENSION(XkbGetIndicatorState, X11,
+RP_SEARCH_EXTENSION(XkbGetIndicatorState, X11, [XKB_LIBS],
                     [HAVE_XKB_EXT], [xkb], [check],
                     [Use the X Keyboard extension to show the keyboard LEDs],
                     [X11/extensions/XKBstr.h])
@@ -281,7 +283,7 @@ fi
 
 # XRandR provides information about monitor layouts and is strongly recommended
 # on systems which can use more than one monitor (which includes most laptops).
-RP_SEARCH_EXTENSION(XRRGetScreenResources, Xrandr,
+RP_SEARCH_EXTENSION(XRRGetScreenResources, Xrandr, [XRANDR_LIBS],
                     [HAVE_XRANDR_EXT], [xrandr], [check],
                     [Use the XRandR extension to query monitor layouts],
                     [X11/extensions/Xrandr.h])
@@ -298,16 +300,19 @@ if test x$have_xrandr = xtrue; then
 #endif
   ]])],
     [AC_MSG_RESULT([yes])
-     AC_SEARCH_LIBS([XRRGetMonitors], [Xrandr],
+     saved_LIBS=$LIBS
+     LIBS="$XRANDR_LIBS $X11_LIBS $LIBS"
+     AC_LINK_IFELSE([AC_LANG_CALL([], [XRRGetMonitors])],
                     [AC_DEFINE([HAVE_XRANDR15_EXT], [1],
                                [Use XRandR 1.5 monitor layout support.])],
-                    [AC_MSG_WARN([XRandR headers provide 1.5 but library lacks XRRGetMonitors; disabling XRandR 1.5 monitor support])])],
+                    [AC_MSG_WARN([XRandR headers provide 1.5 but library lacks XRRGetMonitors; disabling XRandR 1.5 monitor support])])
+     LIBS=$saved_LIBS],
     [AC_MSG_RESULT([no])])
 fi
 
 # The XFixes extension is used to work around possible weird leftover state from
 # compositors.
-RP_SEARCH_EXTENSION(XFixesSetWindowShapeRegion, Xfixes,
+RP_SEARCH_EXTENSION(XFixesSetWindowShapeRegion, Xfixes, [XFIXES_LIBS],
                     [HAVE_XFIXES_EXT], [xfixes], [check],
                     [Use the XFixes extension to work around some compositors],
                     [X11/extensions/Xfixes.h])
